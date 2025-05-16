@@ -97,4 +97,4 @@ def add_card():
     return render_template('add.html')  # フォームページを表示
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=10000)
