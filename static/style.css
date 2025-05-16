@@ -1,0 +1,52 @@
+body {
+    font-family: sans-serif;
+    background-color: #f8f8f8;
+}
+
+h1 {
+    text-align: center;
+}
+
+.card {
+    width: 90vw;
+    max-width: 1200px;
+    height: auto;
+    border: 2px solid #333;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px auto;
+    text-align: center;
+    font-size: 24px;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    box-shadow: 2px 2px 6px #aaa;
+    background: #fff;
+}
+
+.card img {
+    display: block;
+    margin: 0 auto 10px;  /* 中央寄せ */
+    width: 100% !important;        /* 画像の横幅を親要素に合わせる */
+    height: auto;          /* 縦横比を保ちながら自動調整 */
+}
+
+.footer {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.footer button {
+    font-size: 18px;
+    padding: 8px 16px;
+    margin: 0 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: #007BFF;
+    color: white;
+    cursor: pointer;
+}
+
+.footer button:hover {
+    background-color: #0056b3;
+}

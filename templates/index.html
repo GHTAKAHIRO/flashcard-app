@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <title>フラッシュカード</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>フラッシュカード</h1>
+
+    <div id="flashcard" class="card">
+        <!-- 問題が表示される場所 -->
+    </div>
+
+    <div class="footer">
+        <button id="knownBtn">〇</button>
+        <button id="unknownBtn">✕</button>
+    </div>
+
+    <!-- カードデータをJavaScriptへ渡す -->
+    <script>
+        const rawCards = {{ cards | tojson }};
+    </script>
+
+    <!-- 外部JSファイル読み込み -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <!-- 初期化処理 -->
+    <script>
+        window.onload = function () {
+            setCards(rawCards);
+            document.getElementById('flashcard').addEventListener('click', toggleAnswer);
+            document.getElementById('knownBtn').addEventListener('click', markKnown);
+            document.getElementById('unknownBtn').addEventListener('click', markUnknown);
+        };
+    </script>
+</body>
+</html>
