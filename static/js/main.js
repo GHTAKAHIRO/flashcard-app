@@ -1,4 +1,21 @@
-console.log("✅ main.js 読み込まれました");
+console.log("🚀 main.js が Render 上で動いています！");
+
+document.addEventListener('DOMContentLoaded', function () {
+    console.log("🌐 DOMContentLoaded 発火");
+
+    if (typeof rawCards === "undefined") {
+        console.error("❌ rawCards が定義されていません！");
+        return;  // ここで止めてクラッシュを防ぐ
+    }
+
+    console.log("📦 rawCards:", rawCards);
+
+    document.getElementById('flashcard').addEventListener('click', toggleAnswer);
+    document.getElementById('knownBtn').addEventListener('click', markKnown);
+    document.getElementById('unknownBtn').addEventListener('click', markUnknown);
+
+    setCards(rawCards);
+});
 
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -11,7 +28,27 @@ function shuffle(array) {
 let cards = [];
 let currentIndex = 0;
 let showingAnswer = false;
-let cardStatus = {};  // カードIDごとの記録
+let cardStatus = {};
+
+function sendResultToServer(cardId, result) {
+    console.log("送信するデータ:", { card_id: cardId, result: result });
+    fetch('/log_result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            card_id: cardId,
+            result: result
+        })
+    }).then(res => {
+        if (!res.ok) {
+            console.error("❌ サーバーへの記録に失敗しました");
+        } else {
+            console.log("✅ サーバーへの記録成功");
+        }
+    }).catch(err => {
+        console.error("エラーが発生しました:", err);
+    });
+}
 
 function setCards(data) {
     cards = shuffle(data);
@@ -60,13 +97,16 @@ function toggleAnswer() {
 
 function markKnown() {
     const id = cards[currentIndex].id;
+    console.log("🟢 knownボタン押下: id =", id);
     cardStatus[id] = 'known';
+    sendResultToServer(id, 'known');
     nextCard();
 }
 
 function markUnknown() {
     const id = cards[currentIndex].id;
     cardStatus[id] = 'unknown';
+    sendResultToServer(id, 'unknown');
     nextCard();
 }
 
