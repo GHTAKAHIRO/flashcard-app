@@ -1,13 +1,19 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_cors import CORS  # Import CORS
 import psycopg2
 import os
 from dotenv import load_dotenv
+import logging  # ロギングのインポート
 
 # .envファイルを読み込む
 load_dotenv(dotenv_path='dbname.env')
 
 # Flaskアプリケーションのインスタンス作成
 app = Flask(__name__)
+
+# ログ設定
+logging.basicConfig(level=logging.DEBUG)
+
 app.secret_key = 'your_secret_key'  # フラッシュメッセージ用
 
 # 環境変数からデータベース接続情報を取得
@@ -30,36 +36,27 @@ def get_db_connection():
 
 @app.route('/')
 def index():
-    """データベースからカード情報を取得して表示"""
-    conn = get_db_connection()
-    cur = conn.cursor()
+    cards_dict = []  # ← これを最初に必ず定義しておく
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer 
+                               FROM image ORDER BY id DESC''')
+                cards = cur.fetchall()
+                for c in cards:
+                    cards_dict.append({
+                        'id': c[0], 'subject': c[1], 'grade': c[2],
+                        'source': c[3], 'page_number': c[4],
+                        'problem_number': c[5], 'topic': c[6],
+                        'level': c[7], 'format': c[8],
+                        'image_problem': c[9], 'image_answer': c[10]
+                    })
+    except Exception as e:
+        app.logger.error(f"エラーが発生しました: {e}")
+        flash('データベースの取得に失敗しました。')
 
-    # データベースからデータを取得
-    cur.execute('''SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer 
-                   FROM image ORDER BY id DESC''')
-    cards = cur.fetchall()
-
-    # データを辞書形式に変換
-    cards_dict = []
-    for c in cards:
-        cards_dict.append({
-            'id': c[0],
-            'subject': c[1],
-            'grade': c[2],
-            'source': c[3],
-            'page_number': c[4],
-            'problem_number': c[5],
-            'topic': c[6],
-            'level': c[7],
-            'format': c[8],
-            'image_problem': c[9],  # WasabiのURL
-            'image_answer': c[10]   # WasabiのURL
-        })
-    
-    cur.close()
-    conn.close()
-
-    return render_template('index.html', cards=cards_dict)
+    # 常にテンプレートを返す（redirectしない）
+return render_template("index.html", cards=cards_dict)
 
 @app.route('/add', methods=['GET', 'POST'])
 def add_card():
@@ -96,5 +93,36 @@ def add_card():
 
     return render_template('add.html')  # フォームページを表示
 
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=10000)
+@app.route('/log_result', methods=['POST'])
+def log_result():
+    data = request.get_json()
+    card_id = data.get('card_id')
+    result = data.get('result')
+    user_id = 'guest'
+
+    # 受け取ったデータをデバッグログに記録
+    app.logger.debug(f"受け取ったデータ: {data}")
+
+    if not card_id or not result:
+        app.logger.error("必要なデータが不足しています")
+        return jsonify({'status': 'error', 'message': 'Missing data'}), 400
+
+    try:
+        # データベースに接続し、ログ記録
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('''INSERT INTO study_log (user_id, card_id, result) VALUES (%s, %s, %s)''', (user_id, card_id, result))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # データベースに書き込み成功した場合のログ
+        app.logger.info("データベースに書き込み成功")
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        # 例外発生時のログ
+        app.logger.error(f"DB書き込みエラー: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# if __name__ == '__main__':
+#     app.run(host="0.0.0.0", port=10000)
