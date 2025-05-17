@@ -36,27 +36,17 @@ def get_db_connection():
 
 @app.route('/')
 def index():
-    cards_dict = []  # ← これを最初に必ず定義しておく
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute('''SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer 
-                               FROM image ORDER BY id DESC''')
+                cur.execute('SELECT ...')
                 cards = cur.fetchall()
-                for c in cards:
-                    cards_dict.append({
-                        'id': c[0], 'subject': c[1], 'grade': c[2],
-                        'source': c[3], 'page_number': c[4],
-                        'problem_number': c[5], 'topic': c[6],
-                        'level': c[7], 'format': c[8],
-                        'image_problem': c[9], 'image_answer': c[10]
-                    })
+                cards_dict = [ ... ]
+        return render_template('index.html', cards=cards_dict)  # ✅ 関数内
     except Exception as e:
         app.logger.error(f"エラーが発生しました: {e}")
         flash('データベースの取得に失敗しました。')
-
-    # 常にテンプレートを返す（redirectしない）
-return render_template("index.html", cards=cards_dict)
+        return redirect(url_for('index'))
 
 @app.route('/add', methods=['GET', 'POST'])
 def add_card():
