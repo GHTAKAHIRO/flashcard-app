@@ -31,25 +31,25 @@ let showingAnswer = false;
 let cardStatus = {};
 
 function sendResultToServer(cardId, result) {
-    console.log("送信するデータ:", { card_id: cardId, result: result });
+    const payload = { card_id: cardId, result: result };
+    console.log("送信するデータ：", JSON.stringify(payload));  // ✅ 文字列で出力して確認しやすく
+
     fetch('/log_result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            card_id: cardId,
-            result: result
-        })
-    }).then(res => {
+        body: JSON.stringify(payload)  // ✅ 同じオブジェクトを送信
+    })
+    .then(res => {
         if (!res.ok) {
             console.error("❌ サーバーへの記録に失敗しました");
         } else {
             console.log("✅ サーバーへの記録成功");
         }
-    }).catch(err => {
+    })
+    .catch(err => {
         console.error("エラーが発生しました:", err);
     });
 }
-
 function setCards(data) {
     cards = shuffle(data);
     currentIndex = 0;

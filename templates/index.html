@@ -16,8 +16,6 @@
 <script>
     const rawCards = {{ cards | tojson }};
 </script>
-
-<!-- 必ずこれが最後 -->
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}?v=12345"></script>
 </body>
 </html>
