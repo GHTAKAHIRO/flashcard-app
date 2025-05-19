@@ -41,10 +41,9 @@ def get_db_connection():
     )
 
 class User(UserMixin):
-    def __init__(self, id, username, password_hash):
+    def __init__(self, id, username):
         self.id = id
         self.username = username
-        self.password_hash = password_hash
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -200,10 +199,12 @@ def login():
         conn.close()
 
         if user and check_password_hash(user[2], password):
-            login_user(User(*user))
+            login_user(User(user[0], user[1]))  # password_hash は不要なので渡さない構成に変更
             return redirect(url_for('index'))
+
         flash('ログインに失敗しました')
-    return redirect(url_for('dashboard'))
+
+    return render_template('login.html')  # ← ✅ 失敗時はログイン画面に戻す
 
 @app.route('/logout')
 @login_required
