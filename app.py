@@ -78,7 +78,7 @@ def index():
     except Exception as e:
         app.logger.error(f"エラーが発生しました: {e}")
         flash('データベースの取得に失敗しました。')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('index'))  # ✅ 他の安全なルートへ
 
 @app.route('/log_result', methods=['POST'])
 @login_required
