@@ -1,15 +1,33 @@
-{% extends "base.html" %}
-{% block title %}学習設定{% endblock %}
-{% block content %}
-  <h2>学習設定 - {{ source }}</h2>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>設定 - 教材準備</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="header">
+    <p>📘 教材: {{ source }}</p>
+    <a href="{{ url_for('dashboard') }}">← ダッシュボードに戻る</a>
+  </div>
+
+  <h2>学習の設定をしてください</h2>
+
   <form method="POST">
-    <label>ページ範囲（例: 1-5）:</label>
-    <input type="text" name="page_range" required><br><br>
+    <div>
+      <label for="page_range">ページ範囲（例: 1-5 または 3,7,10）:</label><br>
+      <input type="text" name="page_range" id="page_range" required>
+    </div>
 
-    <label>モード:</label><br>
-    <input type="radio" name="mode" value="normal" checked> 初回テスト<br>
-    <input type="radio" name="mode" value="retry"> 再テスト（間違いのみ）<br><br>
+    <div style="margin-top: 10px;">
+      <label>モード選択:</label><br>
+      <label><input type="radio" name="mode" value="first" checked> 初回テスト</label><br>
+      <label><input type="radio" name="mode" value="retry"> 間違えた問題の再テスト</label>
+    </div>
 
-    <button type="submit">学習スタート ▶</button>
+    <div style="margin-top: 20px;">
+      <button type="submit">▶ この設定で学習開始</button>
+    </div>
   </form>
-{% endblock %}
+</body>
+</html>
