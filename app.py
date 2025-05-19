@@ -2,10 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import psycopg2
+
 import os
-from dotenv import load_dotenv
 import logging
+import psycopg2
+from dotenv import load_dotenv
+
 
 # .envファイルの読み込み
 load_dotenv(dotenv_path='dbname.env')
@@ -78,7 +80,7 @@ def index():
     except Exception as e:
         app.logger.error(f"エラーが発生しました: {e}")
         flash('データベースの取得に失敗しました。')
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
 
 @app.route('/log_result', methods=['POST'])
 @login_required
@@ -108,6 +110,61 @@ def log_result():
     except Exception as e:
         app.logger.error(f"DB書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT DISTINCT source, subject, grade FROM image ORDER BY source')
+                rows = cur.fetchall()
+                sources = [
+                    {"source": row[0], "subject": row[1], "grade": row[2]}
+                    for row in rows
+                ]
+    except Exception as e:
+        app.logger.error(f"教材一覧の取得に失敗: {e}")
+        flash("教材の取得に失敗しました")
+        return redirect(url_for('index'))
+
+    return render_template('dashboard.html', sources=sources)
+
+@app.route('/study/<source>')
+@login_required
+def study(source):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
+                    FROM image
+                    WHERE source = %s
+                    ORDER BY id DESC
+                ''', (source,))
+                records = cur.fetchall()
+                cards_dict = []
+                for c in records:
+                    cards_dict.append({
+                        'id': c[0],
+                        'subject': c[1],
+                        'grade': c[2],
+                        'source': c[3],
+                        'page_number': c[4],
+                        'problem_number': c[5],
+                        'topic': c[6],
+                        'level': c[7],
+                        'format': c[8],
+                        'image_problem': c[9],
+                        'image_answer': c[10]
+                    })
+
+    except Exception as e:
+        app.logger.error(f"教材カード取得エラー: {e}")
+        flash("教材カードの取得に失敗しました")
+        return redirect(url_for('dashboard'))
+
+    return render_template('index.html', cards=cards_dict)  # index.html を再利用
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <title>教材を選ぶ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <p>ようこそ、{{ current_user.name }} さん</p>
+        <a href="{{ url_for('logout') }}">ログアウト</a>
+    </div>
+
+    <h2>学習する教材を選んでください</h2>
+    <ul>
+        {% for s in sources %}
+            <li>
+                📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）
+                <a href="{{ url_for('study', source=s.source) }}">[この教材で学習する]</a>
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
