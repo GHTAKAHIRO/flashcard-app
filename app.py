@@ -165,6 +165,38 @@ def study(source):
 
     return render_template('index.html', cards=cards_dict)  # index.html を再利用
 
+@app.route('/retry')
+@login_required
+def retry():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    SELECT image.id, image.subject, image.grade, image.source,
+                           image.page_number, image.problem_number, image.topic,
+                           image.level, image.format, image.image_problem, image.image_answer
+                    FROM study_log
+                    JOIN image ON study_log.card_id = image.id
+                    WHERE study_log.user_id = %s AND study_log.result = 'unknown'
+                    ORDER BY study_log.timestamp DESC
+                ''', (current_user.id,))
+                records = cur.fetchall()
+
+        cards_dict = []
+        for c in records:
+            cards_dict.append({
+                'id': c[0], 'subject': c[1], 'grade': c[2], 'source': c[3],
+                'page_number': c[4], 'problem_number': c[5], 'topic': c[6],
+                'level': c[7], 'format': c[8],
+                'image_problem': c[9], 'image_answer': c[10]
+            })
+
+        return render_template('index.html', cards=cards_dict)
+    except Exception as e:
+        app.logger.error(f"再出題エラー: {e}")
+        flash("間違えたカードの取得に失敗しました")
+        return redirect(url_for('dashboard'))
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
