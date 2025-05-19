@@ -6,16 +6,30 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+
+    <!-- ヘッダー -->
+    <div style="padding: 10px; background: #f0f0f0; margin-bottom: 20px;">
+        {% if current_user.is_authenticated %}
+            ようこそ、{{ current_user.username }} さん！
+            <a href="{{ url_for('logout') }}">ログアウト</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">ログイン</a> |
+            <a href="{{ url_for('register') }}">登録</a>
+        {% endif %}
+    </div>
+
     <div id="flashcard" class="card"></div>
+
     <div class="footer">
         <button id="knownBtn">〇</button>
         <button id="unknownBtn">✕</button>
     </div>
 
-<!-- データを埋め込む -->
-<script>
-    const rawCards = {{ cards | tojson }};
-</script>
-<script src="{{ url_for('static', filename='js/main.js') }}?v=12345"></script>
+    <!-- データを埋め込む -->
+    <script>
+        const rawCards = {{ cards | tojson }};
+    </script>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=12345"></script>
 </body>
 </html>

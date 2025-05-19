@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}フラッシュカード{% endblock %}</title>
+</head>
+<body>
+  <!-- ヘッダー -->
+  <div style="padding: 10px; background: #f0f0f0; margin-bottom: 20px;">
+    {% if current_user.is_authenticated %}
+      ようこそ、{{ current_user.username }} さん！
+      <a href="{{ url_for('logout') }}">ログアウト</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">ログイン</a> |
+      <a href="{{ url_for('register') }}">登録</a>
+    {% endif %}
+  </div>
+
+  <!-- メインコンテンツ -->
+  {% block content %}{% endblock %}
+</body>
+</html>
