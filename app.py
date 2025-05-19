@@ -203,7 +203,7 @@ def login():
             login_user(User(*user))
             return redirect(url_for('index'))
         flash('ログインに失敗しました')
-    return render_template('login.html')
+    return redirect(url_for('dashboard'))
 
 @app.route('/logout')
 @login_required
