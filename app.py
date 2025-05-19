@@ -124,7 +124,7 @@ def dashboard():
     except Exception as e:
         app.logger.error(f"教材一覧の取得に失敗: {e}")
         flash("教材の取得に失敗しました")
-           return redirect(url_for('dashboard'))  ← ✅ 修正
+           return redirect(url_for('dashboard'))
 
     return render_template('dashboard.html', sources=sources)
 
