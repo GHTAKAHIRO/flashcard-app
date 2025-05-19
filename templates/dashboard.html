@@ -16,7 +16,7 @@
         {% for s in sources %}
             <li>
                 📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）
-                <a href="{{ url_for('study', source=s.source) }}">[この教材で学習する]</a>
+                <a href="{{ url_for('prepare', source=s.source) }}">[この教材で学習する]</a>
             </li>
         {% endfor %}
     </ul>

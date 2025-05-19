@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}学習設定{% endblock %}
+{% block content %}
+  <h2>学習設定 - {{ source }}</h2>
+  <form method="POST">
+    <label>ページ範囲（例: 1-5）:</label>
+    <input type="text" name="page_range" required><br><br>
+
+    <label>モード:</label><br>
+    <input type="radio" name="mode" value="normal" checked> 初回テスト<br>
+    <input type="radio" name="mode" value="retry"> 再テスト（間違いのみ）<br><br>
+
+    <button type="submit">学習スタート ▶</button>
+  </form>
+{% endblock %}

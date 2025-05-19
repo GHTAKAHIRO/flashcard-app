@@ -129,6 +129,16 @@ def dashboard():
 
     return render_template('dashboard.html', sources=sources)
 
+@app.route('/prepare/<source>', methods=['GET', 'POST'])
+@login_required
+def prepare(source):
+    if request.method == 'POST':
+        # 設定内容を取得してセッションに保存
+        session['page_range'] = request.form['page_range']
+        session['mode'] = request.form['mode']
+        return redirect(url_for('study', source=source))
+    return render_template('prepare.html', source=source)
+
 @app.route('/study/<source>')
 @login_required
 def study(source):
