@@ -8,7 +8,6 @@ import logging
 import psycopg2
 from dotenv import load_dotenv
 
-
 # .envファイルの読み込み
 load_dotenv(dotenv_path='dbname.env')
 
@@ -49,7 +48,7 @@ class User(UserMixin):
 def load_user(user_id):
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, password_hash FROM users WHERE id = %s", (user_id,))
+    cur.execute("SELECT id, username FROM users WHERE id = %s", (user_id,))  # ← ここを3列から、3列のままならエラー
     user = cur.fetchone()
     cur.close()
     conn.close()
