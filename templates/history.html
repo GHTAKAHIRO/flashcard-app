@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>学習履歴</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <p>ようこそ、{{ current_user.username }} さん</p>
+        <a href="{{ url_for('dashboard') }}">← ダッシュボードに戻る</a> |
+        <a href="{{ url_for('logout') }}">ログアウト</a>
+    </div>
+
+    <h2>学習履歴</h2>
+
+    {% if logs %}
+        <table>
+            <thead>
+                <tr>
+                    <th>日時</th>
+                    <th>教材</th>
+                    <th>ページ</th>
+                    <th>問題</th>
+                    <th>結果</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ log.source }}（{{ log.subject }} {{ log.grade }}）</td>
+                    <td>P.{{ log.page_number }}</td>
+                    <td>{{ log.problem_number }}</td>
+                    <td>
+                        {% if log.result == 'known' %}
+                            ✅
+                        {% else %}
+                            ❌
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>まだ学習履歴がありません。</p>
+    {% endif %}
+</body>
+</html>

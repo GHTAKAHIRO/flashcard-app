@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 import os
 import logging
@@ -211,6 +212,48 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+@app.route('/history')
+@login_required
+def history():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    SELECT
+                        sl.timestamp,
+                        img.source,
+                        img.subject,
+                        img.grade,
+                        img.page_number,
+                        img.problem_number,
+                        sl.result
+                    FROM study_log sl
+                    JOIN image img ON sl.card_id = img.id
+                    WHERE sl.user_id = %s
+                    ORDER BY sl.timestamp DESC
+                ''', (current_user.id,))
+                records = cur.fetchall()
+
+        logs = [
+            {
+                'timestamp': r[0],
+                'source': r[1],
+                'subject': r[2],
+                'grade': r[3],
+                'page_number': r[4],
+                'problem_number': r[5],
+                'result': r[6]
+            }
+            for r in records
+        ]
+
+        return render_template('history.html', logs=logs)
+
+    except Exception as e:
+        app.logger.error(f"学習履歴取得エラー: {e}")
+        flash("学習履歴の取得に失敗しました")
+        return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
