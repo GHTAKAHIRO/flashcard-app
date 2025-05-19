@@ -198,8 +198,9 @@ def login():
         conn.close()
 
         if user and check_password_hash(user[2], password):
-            login_user(User(user[0], user[1]))  # password_hash は不要なので渡さない構成に変更
-            return redirect(url_for('index'))
+            login_user(User(user[0], user[1]))
+            return redirect(url_for('dashboard'))  # ✅ ここに変更
+
 
         flash('ログインに失敗しました')
 
