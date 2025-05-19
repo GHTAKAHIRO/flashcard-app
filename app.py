@@ -143,30 +143,42 @@ def prepare(source):
 @app.route('/study/<source>')
 @login_required
 def study(source):
+    mode = session.get('mode', 'first')  # 'first' or 'retry'
+    page_range = session.get('page_range')  # e.g., "1-5"
+
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute('''
+                # 基本クエリ
+                query = '''
                     SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
                     FROM image
                     WHERE source = %s
-                    ORDER BY id DESC
-                ''', (source,))
+                '''
+                params = [source]
+
+                # ページ範囲が指定されていれば追加
+                if page_range and '-' in page_range:
+                    start, end = map(int, page_range.split('-'))
+                    query += " AND page_number BETWEEN %s AND %s"
+                    params.extend([start, end])
+
+                # 再テストモードなら間違えたカードだけ
+                if mode == 'retry':
+                    query += " AND id IN (SELECT card_id FROM study_log WHERE user_id = %s AND result = 'unknown')"
+                    params.append(current_user.id)
+
+                query += " ORDER BY id DESC"
+                cur.execute(query, tuple(params))
                 records = cur.fetchall()
+
+                # カード整形
                 cards_dict = []
                 for c in records:
                     cards_dict.append({
-                        'id': c[0],
-                        'subject': c[1],
-                        'grade': c[2],
-                        'source': c[3],
-                        'page_number': c[4],
-                        'problem_number': c[5],
-                        'topic': c[6],
-                        'level': c[7],
-                        'format': c[8],
-                        'image_problem': c[9],
-                        'image_answer': c[10]
+                        'id': c[0], 'subject': c[1], 'grade': c[2], 'source': c[3],
+                        'page_number': c[4], 'problem_number': c[5], 'topic': c[6],
+                        'level': c[7], 'format': c[8], 'image_problem': c[9], 'image_answer': c[10]
                     })
 
     except Exception as e:
@@ -174,7 +186,7 @@ def study(source):
         flash("教材カードの取得に失敗しました")
         return redirect(url_for('dashboard'))
 
-    return render_template('index.html', cards=cards_dict)  # index.html を再利用
+    return render_template('index.html', cards=cards_dict)
 
 @app.route('/retry')
 @login_required
