@@ -111,10 +111,11 @@ function markUnknown() {
 }
 
 function nextCard() {
-    if (currentIndex + 1 >= cards.length) {
-        alert("学習完了！おつかれさまでした。");
-        return;
-    }
+if (currentIndex + 1 >= cards.length) {
+    alert("学習完了！おつかれさまでした。");
+    window.location.href = `/prepare/${cards[0].source}`;  // 最初のカードの教材名に戻る
+    return;
+}
     currentIndex += 1;
     showingAnswer = false;
     renderCard();

@@ -157,28 +157,42 @@ def study(source):
                 '''
                 params = [source]
 
-                # ページ範囲が指定されていれば追加
-                if page_range and '-' in page_range:
+                # ✅ ページ範囲が指定されていれば追加
+                if page_range:
                     start, end = map(int, page_range.split('-'))
-                    query += " AND page_number BETWEEN %s AND %s"
+                    query += ' AND page_number BETWEEN %s AND %s'
                     params.extend([start, end])
 
-                # 再テストモードなら間違えたカードだけ
+                # ✅ 「再テスト」モードの場合：最新の結果が✕だったカードのみ
                 if mode == 'retry':
-                    query += " AND id IN (SELECT card_id FROM study_log WHERE user_id = %s AND result = 'unknown')"
-                    params.append(current_user.id)
+                    query += '''
+                        AND id IN (
+                            SELECT sl.card_id
+                            FROM study_log sl
+                            JOIN (
+                                SELECT card_id, MAX(timestamp) AS latest
+                                FROM study_log
+                                WHERE user_id = %s
+                                GROUP BY card_id
+                            ) AS latest_logs
+                            ON sl.card_id = latest_logs.card_id AND sl.timestamp = latest_logs.latest
+                            WHERE sl.user_id = %s AND sl.result = 'unknown'
+                        )
+                    '''
+                    params.extend([current_user.id, current_user.id])
 
-                query += " ORDER BY id DESC"
+                query += ' ORDER BY id DESC'
+
                 cur.execute(query, tuple(params))
                 records = cur.fetchall()
 
-                # カード整形
                 cards_dict = []
                 for c in records:
                     cards_dict.append({
                         'id': c[0], 'subject': c[1], 'grade': c[2], 'source': c[3],
                         'page_number': c[4], 'problem_number': c[5], 'topic': c[6],
-                        'level': c[7], 'format': c[8], 'image_problem': c[9], 'image_answer': c[10]
+                        'level': c[7], 'format': c[8],
+                        'image_problem': c[9], 'image_answer': c[10]
                     })
 
     except Exception as e:
