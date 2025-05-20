@@ -143,13 +143,12 @@ def prepare(source):
 @app.route('/study/<source>')
 @login_required
 def study(source):
-    mode = session.get('mode', 'first')  # 'first' or 'retry'
-    page_range = session.get('page_range')  # e.g., "1-5"
+    mode = session.get('mode', 'first')
+    page_range = session.get('page_range')
 
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 基本クエリ
                 query = '''
                     SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
                     FROM image
@@ -157,47 +156,51 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ ページ範囲が指定されていれば追加
+                # ページ範囲フィルター
                 if page_range:
-                    start, end = map(int, page_range.split('-'))
-                    query += ' AND page_number BETWEEN %s AND %s'
-                    params.extend([start, end])
+                    page_conditions = []
+                    page_values = []
+                    for part in page_range.split(','):
+                        part = part.strip()
+                        if '-' in part:
+                            start, end = map(int, part.split('-'))
+                            page_conditions.append("(page_number BETWEEN %s AND %s)")
+                            page_values.extend([start, end])
+                        else:
+                            page_conditions.append("page_number = %s")
+                            page_values.append(int(part))
+                    query += " AND (" + " OR ".join(page_conditions) + ")"
+                    params.extend(page_values)
 
-                # ✅ 「再テスト」モードの場合：最新の結果が✕だったカードのみ
+                # 再テストモード（過去に不正解だったものだけ）
                 if mode == 'retry':
                     query += '''
                         AND id IN (
-                            SELECT sl.card_id
-                            FROM study_log sl
-                            JOIN (
-                                SELECT card_id, MAX(timestamp) AS latest
-                                FROM study_log
-                                WHERE user_id = %s
-                                GROUP BY card_id
-                            ) AS latest_logs
-                            ON sl.card_id = latest_logs.card_id AND sl.timestamp = latest_logs.latest
-                            WHERE sl.user_id = %s AND sl.result = 'unknown'
+                            SELECT card_id FROM study_log
+                            WHERE user_id = %s AND result = 'unknown'
                         )
                     '''
-                    params.extend([current_user.id, current_user.id])
+                    params.append(current_user.id)
 
-                query += ' ORDER BY id DESC'
-
-                cur.execute(query, tuple(params))
+                query += " ORDER BY id DESC"
+                cur.execute(query, params)
                 records = cur.fetchall()
+
+                if not records:
+                    flash("条件に一致するカードが見つかりませんでした。")
+                    return redirect(url_for('prepare', source=source))  # ← ✅ dashboard ではなく prepare に戻す
 
                 cards_dict = []
                 for c in records:
                     cards_dict.append({
                         'id': c[0], 'subject': c[1], 'grade': c[2], 'source': c[3],
                         'page_number': c[4], 'problem_number': c[5], 'topic': c[6],
-                        'level': c[7], 'format': c[8],
-                        'image_problem': c[9], 'image_answer': c[10]
+                        'level': c[7], 'format': c[8], 'image_problem': c[9], 'image_answer': c[10]
                     })
 
     except Exception as e:
         app.logger.error(f"教材カード取得エラー: {e}")
-        flash("教材カードの取得に失敗しました")
+        flash("カード取得に失敗しました")
         return redirect(url_for('dashboard'))
 
     return render_template('index.html', cards=cards_dict)
