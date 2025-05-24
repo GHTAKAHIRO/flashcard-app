@@ -328,15 +328,12 @@ def reset_history(source):
                 ''', (str(current_user.id), source))
                 conn.commit()
         flash(f"{source} の学習履歴を削除しました。")
+        return redirect(url_for('history'))  # ✅ 成功時も return を忘れず！
+    
     except Exception as e:
         app.logger.error(f"履歴削除エラー: {e}")
         flash("履歴の削除に失敗しました。")
-        return redirect(url_for('history'))
-
-    except Exception as e:
-        app.logger.error(f"学習履歴取得エラー: {e}")
-        flash("学習履歴の取得に失敗しました")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('dashboard'))  # ← 失敗時だけ dashboard に戻す
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
