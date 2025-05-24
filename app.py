@@ -145,7 +145,7 @@ def prepare(source):
 def study(source):
     mode = session.get('mode', 'first')  # 'first' or 'retry'
     page_range = session.get('page_range')  # 例: "1-5"
-    user_id = str(current_user.id)  # ← ここで文字列にキャスト！
+    user_id = str(current_user.id)  # ← 文字列にキャスト！
 
     try:
         with get_db_connection() as conn:
@@ -165,24 +165,18 @@ def study(source):
                             WHERE user_id = %s AND result = 'unknown'
                         )
                     '''
-                    params.append(user_id)  # ← ここで str にした user_id を渡す！
+                    params.append(user_id)
 
-                # ✅ ページ範囲の処理（省略）
+                # ✅ ページ範囲の処理（あとで追加OK）
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
-                rows = cur.fetchall()
-
-                query += " ORDER BY id DESC"
-                cur.execute(query, params)
                 records = cur.fetchall()
 
-                # 🚨 ここが重要！
                 if not records:
                     flash("条件に一致するカードが見つかりませんでした。")
-                    return redirect(url_for('prepare', source=source))  # ← prepareに戻す！
+                    return redirect(url_for('prepare', source=source))
 
-                # 通常のカード構築処理
                 cards_dict = []
                 for c in records:
                     cards_dict.append({
