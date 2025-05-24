@@ -308,5 +308,5 @@ def reset_history(source):
         return redirect(url_for('history'))
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    port = int(os.environ.get('PORT', 10000))  # ← RenderはこのPORTを使う
+    app.run(host='0.0.0.0', port=port)
