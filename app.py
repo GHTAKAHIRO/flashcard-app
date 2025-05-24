@@ -294,21 +294,21 @@ def history():
                 ''', (current_user.id,))
                 records = cur.fetchall()
 
-            logs = [
-                {
-                    'timestamp': r[0],
-                    'source': r[1],
-                    'subject': r[2],
-                    'grade': r[3],
-                    'page_number': r[4],
-                    'problem_number': r[5],
-                    'result': r[6]
-                }
-                for r in records
-            ]
+        logs = [
+            {
+                'timestamp': r[0],
+                'source': r[1],
+                'subject': r[2],
+                'grade': r[3],
+                'page_number': r[4],
+                'problem_number': r[5],
+                'result': r[6]
+            }
+            for r in records
+        ]
 
-            return render_template('history.html', logs=logs)
-
+        return render_template('history.html', logs=logs)  # ← try ブロックの中！
+    
     except Exception as e:
         app.logger.error(f"履歴の取得に失敗しました: {e}")
         flash("履歴の読み込みに失敗しました。")
@@ -331,7 +331,7 @@ def reset_history(source):
     except Exception as e:
         app.logger.error(f"履歴削除エラー: {e}")
         flash("履歴の削除に失敗しました。")
-    return redirect(url_for('history'))
+        return redirect(url_for('history'))
 
     except Exception as e:
         app.logger.error(f"学習履歴取得エラー: {e}")
