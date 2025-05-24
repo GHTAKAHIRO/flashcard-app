@@ -172,7 +172,7 @@ def study(source):
                     query += " AND (" + " OR ".join(page_conditions) + ")"
                     params.extend(page_values)
 
-                # 再テストモード（過去に不正解だったものだけ）
+                # 再テストモードの場合：不正解だったカードだけ
                 if mode == 'retry':
                     query += '''
                         AND id IN (
@@ -186,10 +186,12 @@ def study(source):
                 cur.execute(query, params)
                 records = cur.fetchall()
 
+                # 🚨 ここが重要！
                 if not records:
                     flash("条件に一致するカードが見つかりませんでした。")
-                    return redirect(url_for('prepare', source=source))  # ← ✅ dashboard ではなく prepare に戻す
+                    return redirect(url_for('prepare', source=source))  # ← prepareに戻す！
 
+                # 通常のカード構築処理
                 cards_dict = []
                 for c in records:
                     cards_dict.append({
@@ -200,7 +202,7 @@ def study(source):
 
     except Exception as e:
         app.logger.error(f"教材カード取得エラー: {e}")
-        flash("カード取得に失敗しました")
+        flash("カード取得に失敗しました。")
         return redirect(url_for('dashboard'))
 
     return render_template('index.html', cards=cards_dict)
