@@ -45,6 +45,13 @@ class User(UserMixin):
         self.id = id
         self.username = username
 
+@app.route('/')
+def home():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    else:
+        return redirect(url_for('login'))
+        
 @login_manager.user_loader
 def load_user(user_id):
     conn = get_db_connection()
