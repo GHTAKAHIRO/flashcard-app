@@ -308,11 +308,6 @@ def history():
         ]
 
         return render_template('history.html', logs=logs)  # ← try ブロックの中！
-    
-    except Exception as e:
-        app.logger.error(f"履歴の取得に失敗しました: {e}")
-        flash("履歴の読み込みに失敗しました。")
-        return redirect(url_for('dashboard'))
 
 @app.route('/reset_history/<source>', methods=['POST'])
 @login_required
@@ -328,12 +323,12 @@ def reset_history(source):
                 ''', (str(current_user.id), source))
                 conn.commit()
         flash(f"{source} の学習履歴を削除しました。")
-        return redirect(url_for('history'))  # ✅ 成功時も return を忘れず！
-    
+
     except Exception as e:
         app.logger.error(f"履歴削除エラー: {e}")
         flash("履歴の削除に失敗しました。")
-        return redirect(url_for('dashboard'))  # ← 失敗時だけ dashboard に戻す
+
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
