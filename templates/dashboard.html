@@ -20,5 +20,20 @@
             </li>
         {% endfor %}
     </ul>
+    
+    <ul>
+  {% for s in sources %}
+    <li>
+      📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）
+      <a href="{{ url_for('prepare', source=s.source) }}">[この教材で学習する]</a>
+
+      <!-- 🗑️ 履歴リセットボタン -->
+      <form method="POST" action="{{ url_for('reset_history', source=s.source) }}" style="display: inline;">
+        <button type="submit" onclick="return confirm('この教材の履歴を削除します。よろしいですか？')">🗑️ 履歴削除</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+
 </body>
 </html>
