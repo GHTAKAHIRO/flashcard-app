@@ -15,6 +15,9 @@
     <h2>学習履歴</h2>
 
     {% if logs %}
+    <form method="POST" action="{{ url_for('reset_history', source=logs[0].source) }}">
+    <button type="submit" onclick="return confirm('この教材の履歴をすべて削除します。よろしいですか？')">🗑️ この教材の履歴をリセット</button>
+    </form>
         <table>
             <thead>
                 <tr>
