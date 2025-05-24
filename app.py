@@ -309,6 +309,11 @@ def history():
 
         return render_template('history.html', logs=logs)
 
+    except Exception as e:
+        app.logger.error(f"履歴の取得に失敗しました: {e}")
+        flash("履歴の読み込みに失敗しました。")
+        return redirect(url_for('dashboard'))
+
 @app.route('/reset_history/<source>', methods=['POST'])
 @login_required
 def reset_history(source):
