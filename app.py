@@ -51,7 +51,22 @@ def home():
         return redirect(url_for('dashboard'))
     else:
         return redirect(url_for('login'))
-        
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT DISTINCT source, subject, grade FROM image ORDER BY source')
+                rows = cur.fetchall()
+                sources = [{"source": r[0], "subject": r[1], "grade": r[2]} for r in rows]
+        return render_template('dashboard.html', sources=sources)
+    except Exception as e:
+        app.logger.error(f"ダッシュボード取得エラー: {e}")
+        flash("教材一覧の取得に失敗しました")
+        return redirect(url_for('login'))
+
 @login_manager.user_loader
 def load_user(user_id):
     conn = get_db_connection()
