@@ -18,6 +18,9 @@
     <form method="POST" action="{{ url_for('reset_history', source=logs[0].source) }}">
     <button type="submit" onclick="return confirm('この教材の履歴をすべて削除します。よろしいですか？')">🗑️ この教材の履歴をリセット</button>
     </form>
+    <div id="loading" style="display:none; color: red; font-weight: bold; margin-top: 10px;">
+  ⏳ 履歴を削除中です...
+    </div>
         <table>
             <thead>
                 <tr>
@@ -49,5 +52,13 @@
     {% else %}
         <p>まだ学習履歴がありません。</p>
     {% endif %}
+    
+<!-- ③ この <script> を </body> タグの直前に追加 -->
+<script>
+  function showLoading() {
+    document.getElementById("loading").style.display = "block";
+  }
+</script>
+
 </body>
 </html>
