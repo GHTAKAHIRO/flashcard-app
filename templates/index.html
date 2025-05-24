@@ -25,11 +25,14 @@
         <button id="unknownBtn">✕</button>
     </div>
 
-    <!-- データを埋め込む -->
+    <!-- カードデータをJavaScriptへ渡す -->
     <script>
         const rawCards = {{ cards | tojson }};
+        const studyMode = "{{ mode }}";  <!-- ✅ この行を追加 -->
     </script>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=12345"></script>
+    <!-- 外部JSファイル読み込み -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
 </body>
 </html>

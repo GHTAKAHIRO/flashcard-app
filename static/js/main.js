@@ -1,21 +1,33 @@
-console.log("🚀 main.js が Render 上で動いています！");
+// ✅ mode = 'test' or 'practice' は Flask 側から index.html に渡される
+// 例: <script>const studyMode = "{{ mode }}";</script>
 
-document.addEventListener('DOMContentLoaded', function () {
-    console.log("🌐 DOMContentLoaded 発火");
+console.log("🚀 main.js 読み込み完了");
 
+// グローバル変数
+let cards = [];
+let currentIndex = 0;
+let showingAnswer = false;
+let cardStatus = {};  // id -> 'known' | 'unknown'
+let wrongCards = [];  // 練習モードで使う
+
+// 初期化
+window.onload = function () {
     if (typeof rawCards === "undefined") {
-        console.error("❌ rawCards が定義されていません！");
-        return;  // ここで止めてクラッシュを防ぐ
+        console.error("❌ rawCards が未定義");
+        return;
     }
-
-    console.log("📦 rawCards:", rawCards);
+    console.log("✅ studyMode:", studyMode);
 
     document.getElementById('flashcard').addEventListener('click', toggleAnswer);
     document.getElementById('knownBtn').addEventListener('click', markKnown);
     document.getElementById('unknownBtn').addEventListener('click', markUnknown);
 
-    setCards(rawCards);
-});
+    if (studyMode === 'practice') {
+        initPracticeMode(rawCards);
+    } else {
+        initTestMode(rawCards);
+    }
+};
 
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -25,35 +37,30 @@ function shuffle(array) {
     return array;
 }
 
-let cards = [];
-let currentIndex = 0;
-let showingAnswer = false;
-let cardStatus = {};
-
-function sendResultToServer(cardId, result) {
-    const payload = { card_id: cardId, result: result };
-    console.log("送信するデータ：", JSON.stringify(payload));  // ✅ 文字列で出力して確認しやすく
-
-    fetch('/log_result', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)  // ✅ 同じオブジェクトを送信
-    })
-    .then(res => {
-        if (!res.ok) {
-            console.error("❌ サーバーへの記録に失敗しました");
-        } else {
-            console.log("✅ サーバーへの記録成功");
-        }
-    })
-    .catch(err => {
-        console.error("エラーが発生しました:", err);
-    });
-}
-function setCards(data) {
+// ✅ テストモード：1回出題のみ
+function initTestMode(data) {
     cards = shuffle(data);
     currentIndex = 0;
-    showingAnswer = false;
+    cardStatus = {};
+    renderCard();
+}
+
+// ✅ 練習モード：ループ形式
+function initPracticeMode(data) {
+    wrongCards = [...data];
+    nextPracticeRound();
+}
+
+function nextPracticeRound() {
+    if (wrongCards.length === 0) {
+        alert("🎉 全問正解！練習モード終了");
+        window.location.href = `/prepare/${rawCards[0].source}`;
+        return;
+    }
+    cards = shuffle(wrongCards);
+    wrongCards = [];  // 今ラウンドでミスしたものを再格納
+    currentIndex = 0;
+    cardStatus = {};  // 今回ラウンドの成否
     renderCard();
 }
 
@@ -74,16 +81,11 @@ function renderCard() {
         questionDiv.appendChild(text);
     }
 
-    if (showingAnswer) {
+    if (showingAnswer && card.image_answer) {
         const answerDiv = document.createElement('div');
-        if (card.image_answer) {
-            const img = document.createElement('img');
-            img.src = card.image_answer;
-            answerDiv.appendChild(img);
-        }
-        const answerText = document.createElement('p');
-        answerText.textContent = card.answer;
-        answerDiv.appendChild(answerText);
+        const img = document.createElement('img');
+        img.src = card.image_answer;
+        answerDiv.appendChild(img);
         cardDiv.appendChild(answerDiv);
     } else {
         cardDiv.appendChild(questionDiv);
@@ -97,26 +99,42 @@ function toggleAnswer() {
 
 function markKnown() {
     const id = cards[currentIndex].id;
-    console.log("🟢 knownボタン押下: id =", id);
     cardStatus[id] = 'known';
     sendResultToServer(id, 'known');
-    nextCard();
+    moveNext();
 }
 
 function markUnknown() {
     const id = cards[currentIndex].id;
     cardStatus[id] = 'unknown';
     sendResultToServer(id, 'unknown');
-    nextCard();
+    if (studyMode === 'practice') {
+        wrongCards.push(cards[currentIndex]);  // ✕のみ次ラウンド対象に
+    }
+    moveNext();
 }
 
-function nextCard() {
-if (currentIndex + 1 >= cards.length) {
-    alert("学習完了！おつかれさまでした。");
-    window.location.href = `/prepare/${cards[0].source}`;  // 最初のカードの教材名に戻る
-    return;
-}
-    currentIndex += 1;
+function moveNext() {
+    if (currentIndex + 1 >= cards.length) {
+        if (studyMode === 'practice') {
+            nextPracticeRound();
+        } else {
+            alert("✅ テスト完了！");
+            window.location.href = `/prepare/${cards[0].source}`;
+        }
+        return;
+    }
+    currentIndex++;
     showingAnswer = false;
     renderCard();
+}
+
+function sendResultToServer(cardId, result) {
+    fetch('/log_result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_id: cardId, result: result })
+    }).then(res => {
+        if (!res.ok) console.error("❌ サーバー記録失敗");
+    }).catch(err => console.error("❌ fetch エラー", err));
 }

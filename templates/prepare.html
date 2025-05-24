@@ -14,30 +14,24 @@
   <h2>学習の設定をしてください</h2>
 
   <form method="POST">
-  <div>
-    <label for="page_range">ページ範囲（例: 1-5 または 3,7,10）:</label><br>
-    <input type="text" name="page_range" id="page_range" required>
-  </div>
+    <div>
+      <label for="page_range">ページ範囲（例: 1-5 または 3,7,10）:</label><br>
+      <input type="text" name="page_range" id="page_range" required>
+    </div>
 
-  <div style="margin-top: 10px;">
-    <label>モード選択:</label><br>
-    <label><input type="radio" name="mode" value="first" checked> 初回テスト</label><br>
-    <label><input type="radio" name="mode" value="retry"> 再テスト</label>
-  </div>
+    <div style="margin-top: 20px;">
+      <label>ステージとモードの選択:</label><br>
 
-  <div style="margin-top: 10px;">
-    <label>ステージ:</label><br>
-    <select name="stage">
-      <option value="1">1回目</option>
-      <option value="2">2回目</option>
-      <option value="3">3回目</option>
-    </select>
-  </div>
+      {% for stage_num in range(1, 4) %}
+        <label><input type="radio" name="stage" value="{{ stage_num }}-test"> ステージ{{ stage_num }}：テスト</label><br>
+        <label><input type="radio" name="stage" value="{{ stage_num }}-practice"> ステージ{{ stage_num }}：練習</label><br>
+      {% endfor %}
+    </div>
 
-  <div style="margin-top: 20px;">
-    <button type="submit">▶ この設定で学習開始</button>
-  </div>
-</form>
-
+    <div style="margin-top: 20px;">
+      <button type="submit">▶ この設定で学習開始</button>
+    </div>
+  </form>
 </body>
 </html>
+
