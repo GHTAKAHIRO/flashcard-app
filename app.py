@@ -145,15 +145,34 @@ def study(source):
                 params = [source]
 
                 if mode == 'test':
-                    pass  # 全件対象
+                    pass  # 全件対象（ページ範囲で絞る処理はこのあと）
                 elif mode == 'practice':
+                    # ステージ1のときは stage=1 の unknown を対象にする
+                    target_stage = stage - 1 if stage > 1 else 1
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
                             WHERE user_id = %s AND result = 'unknown' AND stage = %s
                         )
                     '''
-                    params.extend([user_id, stage - 1])
+                    params.extend([user_id, target_stage])
+
+                # ページ範囲指定があればここでフィルタ
+                if page_range:
+                    # 例: "1-3,5,7" を ["1", "2", "3", "5", "7"] に展開
+                    pages = []
+                    parts = page_range.split(',')
+                    for part in parts:
+                        if '-' in part:
+                            start, end = part.split('-')
+                            pages.extend(str(i) for i in range(int(start), int(end) + 1))
+                        else:
+                            pages.append(part.strip())
+
+                    # SQL IN句に追加
+                    placeholders = ','.join(['%s'] * len(pages))
+                    query += f' AND page_number IN ({placeholders})'
+                    params.extend(pages)
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -171,11 +190,11 @@ def study(source):
 
         return render_template('index.html', cards=cards_dict, mode=mode)
 
-
     except Exception as e:
         app.logger.error(f"教材取得エラー: {e}")
         flash("データの取得に失敗しました")
         return redirect(url_for('dashboard'))
+
 
 @app.route('/log_result', methods=['POST'])
 @login_required
