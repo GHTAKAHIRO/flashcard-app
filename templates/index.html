@@ -20,12 +20,13 @@
     <button id="unknownBtn">✕</button>
   </div>
 
-  <!-- ✅ mode 変数をJavaScriptに渡す -->
+  <!-- ✅ ここに追加：Flaskから渡されたデータをJSに渡す -->
   <script>
+    const rawCards = {{ cards | tojson }};
     const mode = "{{ mode }}";
   </script>
 
-  <!-- main.js 読み込み -->
+  <!-- main.js の読み込みはこの後 -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 
