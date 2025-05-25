@@ -2,36 +2,27 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>設定 - 教材準備</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>学習設定</title>
 </head>
 <body>
-  <div class="header">
-    <p>📘 教材: {{ source }}</p>
-    <a href="{{ url_for('dashboard') }}">← ダッシュボードに戻る</a>
-  </div>
-
   <h2>学習の設定をしてください</h2>
 
   <form method="POST">
-    <div>
-      <label for="page_range">ページ範囲（例: 1-5 または 3,7,10）:</label><br>
-      <input type="text" name="page_range" id="page_range" required>
-    </div>
+    <label>ページ範囲（例: 1-5 または 3,5,7）:</label><br>
+    <input type="text" name="page_range" required><br><br>
 
-    <div style="margin-top: 20px;">
-      <label>ステージとモードの選択:</label><br>
+    <label>ステージとモードの選択:</label><br>
+    <label><input type="radio" name="stage" value="1-test"> ステージ1：テスト</label><br>
+    <label><input type="radio" name="stage" value="1-practice"> ステージ1：練習</label><br>
+    <label><input type="radio" name="stage" value="2-test"> ステージ2：テスト</label><br>
+    <label><input type="radio" name="stage" value="2-practice"> ステージ2：練習</label><br>
+    <label><input type="radio" name="stage" value="3-test"> ステージ3：テスト</label><br>
+    <label><input type="radio" name="stage" value="3-practice"> ステージ3：練習</label><br>
 
-      {% for stage_num in range(1, 4) %}
-        <label><input type="radio" name="stage" value="{{ stage_num }}-test"> ステージ{{ stage_num }}：テスト</label><br>
-        <label><input type="radio" name="stage" value="{{ stage_num }}-practice"> ステージ{{ stage_num }}：練習</label><br>
-      {% endfor %}
-    </div>
-
-    <div style="margin-top: 20px;">
-      <button type="submit">▶ この設定で学習開始</button>
-    </div>
+    <br>
+    <button type="submit">▶ この設定で学習開始</button>
   </form>
+
+  <a href="{{ url_for('dashboard') }}">← ダッシュボードに戻る</a>
 </body>
 </html>
-
