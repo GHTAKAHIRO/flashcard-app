@@ -109,12 +109,8 @@ function nextCard() {
 
     if (currentIndex >= cards.length) {
         if (isPracticeMode && wrongCards.length > 0) {
-            alert("✏️ 間違えたカードだけ再出題します");
-            cards = shuffle(wrongCards.slice());
-            wrongCards = [];
-            currentIndex = 0;
-            showingAnswer = false;
-            renderCard();
+            alert("✏️ 間違えたカードがありました。再度学習を行うには設定画面から再実行してください。");
+            window.location.href = `/prepare/${cards[0].source}`;
             return;
         } else {
             alert("✅ 学習完了！");

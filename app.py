@@ -130,7 +130,7 @@ def prepare(source):
 @app.route('/study/<source>')
 @login_required
 def study(source):
-    mode = session.get('mode', 'test')
+    mode = session.get('mode', 'test')  # 'test' または 'practice'
     page_range = session.get('page_range')
     stage = session.get('stage', 1)
     user_id = str(current_user.id)
@@ -140,39 +140,31 @@ def study(source):
             with conn.cursor() as cur:
                 query = '''
                     SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
-                    FROM image WHERE source = %s
+                    FROM image
+                    WHERE source = %s
                 '''
                 params = [source]
 
-                if mode == 'test':
-                    pass  # 全件対象（ページ範囲で絞る処理はこのあと）
-                elif mode == 'practice':
-                    # ステージ1のときは stage=1 の unknown を対象にする
-                    target_stage = stage - 1 if stage > 1 else 1
+                # ✅ 出題対象を分ける
+                if mode == 'test' and stage > 1:
+                    # 前回のテストで間違えた問題のみ対象
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
                             WHERE user_id = %s AND result = 'unknown' AND stage = %s
                         )
                     '''
-                    params.extend([user_id, target_stage])
-
-                # ページ範囲指定があればここでフィルタ
-                if page_range:
-                    # 例: "1-3,5,7" を ["1", "2", "3", "5", "7"] に展開
-                    pages = []
-                    parts = page_range.split(',')
-                    for part in parts:
-                        if '-' in part:
-                            start, end = part.split('-')
-                            pages.extend(str(i) for i in range(int(start), int(end) + 1))
-                        else:
-                            pages.append(part.strip())
-
-                    # SQL IN句に追加
-                    placeholders = ','.join(['%s'] * len(pages))
-                    query += f' AND page_number IN ({placeholders})'
-                    params.extend(pages)
+                    params.extend([user_id, stage - 1])
+                elif mode == 'practice':
+                    # 前回のテストで間違えた問題だけ練習
+                    query += '''
+                        AND id IN (
+                            SELECT card_id FROM study_log
+                            WHERE user_id = %s AND result = 'unknown' AND stage = %s
+                        )
+                    '''
+                    params.extend([user_id, stage - 1])
+                # stage==1 の test の場合は全件対象（条件追加なし）
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -182,11 +174,11 @@ def study(source):
             flash("該当するカードが見つかりませんでした。")
             return redirect(url_for('prepare', source=source))
 
-        cards_dict = [{
-            'id': c[0], 'subject': c[1], 'grade': c[2], 'source': c[3],
-            'page_number': c[4], 'problem_number': c[5], 'topic': c[6],
-            'level': c[7], 'format': c[8], 'image_problem': c[9], 'image_answer': c[10]
-        } for c in records]
+        cards_dict = [dict(
+            id=r[0], subject=r[1], grade=r[2], source=r[3],
+            page_number=r[4], problem_number=r[5], topic=r[6],
+            level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
+        ) for r in records]
 
         return render_template('index.html', cards=cards_dict, mode=mode)
 
