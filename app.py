@@ -224,7 +224,27 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for('login'))
-    
+
+# 履歴削除（教材単位）
+@app.route('/reset_history/<source>', methods=['POST'])
+@login_required
+def reset_history(source):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    DELETE FROM study_log
+                    WHERE user_id = %s AND card_id IN (
+                        SELECT id FROM image WHERE source = %s
+                    )
+                ''', (str(current_user.id), source))
+                conn.commit()
+        flash(f"{source} の学習履歴を削除しました。")
+    except Exception as e:
+        app.logger.error(f"履歴削除エラー: {e}")
+        flash("履歴の削除に失敗しました。")
+
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
