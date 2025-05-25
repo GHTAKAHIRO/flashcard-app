@@ -11,6 +11,7 @@ import logging
 import psycopg2
 from dotenv import load_dotenv
 
+# .envファイルの読み込み
 load_dotenv(dotenv_path='dbname.env')
 
 app = Flask(__name__)
@@ -18,10 +19,12 @@ CORS(app)
 app.secret_key = 'your_secret_key'
 logging.basicConfig(level=logging.DEBUG)
 
+# Flask-Login 初期化
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# DB接続情報
 DB_HOST = os.getenv('DB_HOST')
 DB_PORT = os.getenv('DB_PORT')
 DB_NAME = os.getenv('DB_NAME')
@@ -37,11 +40,13 @@ def get_db_connection():
         password=DB_PASSWORD
     )
 
+# ユーザークラス
 class User(UserMixin):
     def __init__(self, id, username):
         self.id = id
         self.username = username
 
+# ログインマネージャのコールバック
 @login_manager.user_loader
 def load_user(user_id):
     conn = get_db_connection()
@@ -54,6 +59,7 @@ def load_user(user_id):
         return User(*user)
     return None
 
+# ホームリダイレクト
 @app.route('/')
 def home():
     if current_user.is_authenticated:
@@ -61,6 +67,7 @@ def home():
     else:
         return redirect(url_for('login'))
 
+# ダッシュボード
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -75,6 +82,32 @@ def dashboard():
         app.logger.error(f"ダッシュボード取得エラー: {e}")
         flash("教材一覧の取得に失敗しました")
         return redirect(url_for('login'))
+
+# ログイン処理
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT id, username, password_hash FROM users WHERE username = %s", (username,))
+            user = cur.fetchone()
+            cur.close()
+            conn.close()
+
+            if user and check_password_hash(user[2], password):
+                login_user(User(user[0], user[1]))
+                return redirect(url_for('dashboard'))
+            else:
+                flash("ログインに失敗しました。ユーザー名またはパスワードが正しくありません。")
+        except Exception as e:
+            app.logger.error(f"ログイン時のDBエラー: {e}")
+            flash("ログイン中にエラーが発生しました")
+
+    return render_template('login.html')
 
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
@@ -166,6 +199,7 @@ def log_result():
         app.logger.error(f"ログ書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# 新規登録
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -184,24 +218,7 @@ def register():
 
     return render_template('register.html')
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id, username, password_hash FROM users WHERE username = %s", (username,))
-                user = cur.fetchone()
-
-        if user and check_password_hash(user[2], password):
-            login_user(User(user[0], user[1]))
-            return redirect(url_for('dashboard'))
-
-        flash("ログイン失敗")
-    return render_template('login.html')
-
+# ログアウト処理
 @app.route('/logout')
 @login_required
 def logout():
