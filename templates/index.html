@@ -20,10 +20,13 @@
     <button id="unknownBtn">✕</button>
   </div>
 
+  <!-- ✅ mode 変数をJavaScriptに渡す -->
   <script>
-    const rawCards = {{ cards | tojson }};
     const mode = "{{ mode }}";
   </script>
+
+  <!-- main.js 読み込み -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>

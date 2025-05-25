@@ -1,33 +1,27 @@
-// ✅ mode = 'test' or 'practice' は Flask 側から index.html に渡される
-// 例: <script>const studyMode = "{{ mode }}";</script>
+// 練習モード用 main.js（ループ対応）
 
-console.log("🚀 main.js 読み込み完了");
+console.log("🚀 main.js が Render 上で動いています！");
 
-// グローバル変数
-let cards = [];
-let currentIndex = 0;
-let showingAnswer = false;
-let cardStatus = {};  // id -> 'known' | 'unknown'
-let wrongCards = [];  // 練習モードで使う
-
-// 初期化
-window.onload = function () {
+document.addEventListener('DOMContentLoaded', function () {
     if (typeof rawCards === "undefined") {
-        console.error("❌ rawCards が未定義");
+        console.error("❌ rawCards が定義されていません！");
         return;
     }
-    console.log("✅ studyMode:", studyMode);
 
     document.getElementById('flashcard').addEventListener('click', toggleAnswer);
     document.getElementById('knownBtn').addEventListener('click', markKnown);
     document.getElementById('unknownBtn').addEventListener('click', markUnknown);
 
-    if (studyMode === 'practice') {
-        initPracticeMode(rawCards);
-    } else {
-        initTestMode(rawCards);
-    }
-};
+    isPracticeMode = typeof mode !== 'undefined' && mode === 'practice';
+    initCards(rawCards);
+});
+
+let cards = [];
+let currentIndex = 0;
+let showingAnswer = false;
+let cardStatus = {};  // id => 'known' or 'unknown'
+let wrongCards = [];
+let isPracticeMode = false;
 
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -37,30 +31,12 @@ function shuffle(array) {
     return array;
 }
 
-// ✅ テストモード：1回出題のみ
-function initTestMode(data) {
-    cards = shuffle(data);
+function initCards(data) {
+    cards = shuffle(data.slice());
     currentIndex = 0;
+    showingAnswer = false;
     cardStatus = {};
-    renderCard();
-}
-
-// ✅ 練習モード：ループ形式
-function initPracticeMode(data) {
-    wrongCards = [...data];
-    nextPracticeRound();
-}
-
-function nextPracticeRound() {
-    if (wrongCards.length === 0) {
-        alert("🎉 全問正解！練習モード終了");
-        window.location.href = `/prepare/${rawCards[0].source}`;
-        return;
-    }
-    cards = shuffle(wrongCards);
-    wrongCards = [];  // 今ラウンドでミスしたものを再格納
-    currentIndex = 0;
-    cardStatus = {};  // 今回ラウンドの成否
+    wrongCards = [];
     renderCard();
 }
 
@@ -81,14 +57,14 @@ function renderCard() {
         questionDiv.appendChild(text);
     }
 
+    cardDiv.appendChild(questionDiv);
+
     if (showingAnswer && card.image_answer) {
         const answerDiv = document.createElement('div');
         const img = document.createElement('img');
         img.src = card.image_answer;
         answerDiv.appendChild(img);
         cardDiv.appendChild(answerDiv);
-    } else {
-        cardDiv.appendChild(questionDiv);
     }
 }
 
@@ -100,41 +76,53 @@ function toggleAnswer() {
 function markKnown() {
     const id = cards[currentIndex].id;
     cardStatus[id] = 'known';
-    sendResultToServer(id, 'known');
-    moveNext();
+    sendResult(id, 'known');
+    nextCard();
 }
 
 function markUnknown() {
     const id = cards[currentIndex].id;
     cardStatus[id] = 'unknown';
-    sendResultToServer(id, 'unknown');
-    if (studyMode === 'practice') {
-        wrongCards.push(cards[currentIndex]);  // ✕のみ次ラウンド対象に
+    if (isPracticeMode) {
+        wrongCards.push(cards[currentIndex]);
     }
-    moveNext();
+    sendResult(id, 'unknown');
+    nextCard();
 }
 
-function moveNext() {
-    if (currentIndex + 1 >= cards.length) {
-        if (studyMode === 'practice') {
-            nextPracticeRound();
-        } else {
-            alert("✅ テスト完了！");
-            window.location.href = `/prepare/${cards[0].source}`;
-        }
-        return;
-    }
-    currentIndex++;
-    showingAnswer = false;
-    renderCard();
-}
-
-function sendResultToServer(cardId, result) {
+function sendResult(cardId, result) {
     fetch('/log_result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ card_id: cardId, result: result })
     }).then(res => {
-        if (!res.ok) console.error("❌ サーバー記録失敗");
-    }).catch(err => console.error("❌ fetch エラー", err));
+        if (!res.ok) {
+            console.error("❌ サーバーへの記録に失敗しました");
+        }
+    }).catch(err => {
+        console.error("エラーが発生しました:", err);
+    });
+}
+
+function nextCard() {
+    currentIndex++;
+
+    if (currentIndex >= cards.length) {
+        if (isPracticeMode && wrongCards.length > 0) {
+            alert("✏️ 間違えたカードだけ再出題します");
+            cards = shuffle(wrongCards.slice());
+            wrongCards = [];
+            currentIndex = 0;
+            showingAnswer = false;
+            renderCard();
+            return;
+        } else {
+            alert("✅ 学習完了！");
+            window.location.href = `/prepare/${cards[0].source}`;
+            return;
+        }
+    }
+
+    showingAnswer = false;
+    renderCard();
 }
