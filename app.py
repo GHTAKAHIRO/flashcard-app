@@ -225,26 +225,24 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ 出題対象を分ける
+                # ✅ 出題条件を分岐
                 if mode == 'test' and stage > 1:
-                    # 前回のテストで間違えた問題のみ対象
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'unknown' AND stage = %s
+                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
                         )
                     '''
                     params.extend([user_id, stage - 1])
                 elif mode == 'practice':
-                    # 前回のテストで間違えた問題だけ練習
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'unknown' AND stage = %s
+                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
                         )
                     '''
                     params.extend([user_id, stage - 1])
-                # stage==1 の test の場合は全件対象（条件追加なし）
+                # stage==1 の test は全件対象（追加条件なし）
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -268,6 +266,7 @@ def study(source):
         return redirect(url_for('dashboard'))
 
 
+
 @app.route('/log_result', methods=['POST'])
 @login_required
 def log_result():
@@ -275,7 +274,7 @@ def log_result():
     card_id = data.get('card_id')
     result = data.get('result')
     stage = session.get('stage', 1)
-    mode = session.get('mode', 'test')  # ✅ これを追加
+    mode = session.get('mode', 'test')  # ✅ 'test' か 'practice'
     user_id = str(current_user.id)
 
     try:
@@ -284,12 +283,13 @@ def log_result():
                 cur.execute('''
                     INSERT INTO study_log (user_id, card_id, result, stage, mode)
                     VALUES (%s, %s, %s, %s, %s)
-                ''', (user_id, card_id, result, stage, mode))  # ✅ ここも変更
+                ''', (user_id, card_id, result, stage, mode))
                 conn.commit()
         return jsonify({'status': 'ok'})
     except Exception as e:
         app.logger.error(f"ログ書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 
 # 新規登録
