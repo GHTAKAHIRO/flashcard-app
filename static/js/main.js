@@ -107,15 +107,23 @@ function nextCard() {
 
     if (currentIndex >= cards.length) {
         if (isPracticeMode) {
-            const hasWrong = Object.values(cardStatus).includes('unknown');
-            if (hasWrong) {
-                alert("✏️ 間違えたカードがありました。設定画面に戻ります。再度練習を行うには、もう一度設定してください。");
+            const nextWrongCards = cards.filter(card => cardStatus[card.id] === 'unknown');
+            if (nextWrongCards.length > 0) {
+                // ✕がある → 再出題
+                alert("✏️ 間違えたカードがあるので、再度出題します");
+                cards = shuffle(nextWrongCards);  // ✕だけに絞って再セット
+                currentIndex = 0;
+                cardStatus = {};  // リセットして再挑戦
+                renderCard();
+                return;
             } else {
+                // すべて正解 → 完了
                 alert("✅ 練習完了！すべて正解です！");
+                window.location.href = `/prepare/${cards[0].source}`;
+                return;
             }
-            window.location.href = `/prepare/${cards[0].source}`;
-            return;
         } else {
+            // テストモードは常に1周で終了
             alert("✅ テスト完了！");
             window.location.href = `/prepare/${cards[0].source}`;
             return;
@@ -125,3 +133,4 @@ function nextCard() {
     showingAnswer = false;
     renderCard();
 }
+
