@@ -2,52 +2,42 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>教材設定</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <title>学習設定</title>
 </head>
 <body>
-  <div class="header">
-    <p>📘 教材: {{ source }}</p>
-    <a href="{{ url_for('dashboard') }}">← ダッシュボードに戻る</a>
-  </div>
-
-  <h2>学習の設定</h2>
+  <h2>学習の設定をしてください</h2>
 
   <form method="POST">
-    <div>
-      <label for="page_range">ページ範囲（例: 1-5 または 2,4,6）:</label><br>
-      <input type="text" name="page_range" id="page_range" required>
-    </div>
+  <div>
+    <label for="page_range">ページ範囲（例: 1-5 または 3,7,10）:</label><br>
+    <input type="text" name="page_range" id="page_range" required>
+  </div>
 
-    <div style="margin-top: 20px;">
-      <label>ステージとモード:</label><br>
-      {% for stage in [1, 2, 3] %}
-        <label>
-          <input type="radio" name="stage" value="{{ stage }}-test"
-            {% if completed.test and stage in completed.test %}disabled{% endif %}>
-          ステージ{{ stage }} テスト
-        </label><br>
-        <label>
-          <input type="radio" name="stage" value="{{ stage }}-practice"
-            {% if completed.practice and stage in completed.practice %}disabled{% endif %}>
-          ステージ{{ stage }} 練習
-        </label><br>
-      {% endfor %}
-    </div>
+  <div style="margin-top: 10px;">
+    <label>ステージ選択:</label><br>
+<select name="stage" required>
+  <option value="1-test" {% if 1 in completed_tests %}disabled{% endif %}>
+    ステージ1：テスト {% if 1 in completed_tests %}（完了）{% endif %}
+  </option>
+  <option value="1-practice">ステージ1：練習</option>
+  <option value="2-test" {% if 2 in completed_tests %}disabled{% endif %}>
+    ステージ2：テスト {% if 2 in completed_tests %}（完了）{% endif %}
+  </option>
+  <option value="2-practice">ステージ2：練習</option>
+  <option value="3-test" {% if 3 in completed_tests %}disabled{% endif %}>
+    ステージ3：テスト {% if 3 in completed_tests %}（完了）{% endif %}
+  </option>
+  <option value="3-practice">ステージ3：練習</option>
+</select>
+  </div>
 
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul style="color: red;">
-          {% for message in messages %}
-            <li>{{ message }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
+  <div style="margin-top: 20px;">
+    <button type="submit">▶ この設定で学習開始</button>
+  </div>
+</form>
 
-    <div style="margin-top: 20px;">
-      <button type="submit">▶ この設定で学習開始</button>
-    </div>
-  </form>
+
+  <a href="{{ url_for('dashboard') }}">← ダッシュボードに戻る</a>
 </body>
 </html>
+
