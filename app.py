@@ -206,7 +206,6 @@ def prepare(source):
 
     return render_template('prepare.html', source=source, completed_tests=completed_tests)
 
-
 @app.route('/study/<source>')
 @login_required
 def study(source):
@@ -225,8 +224,9 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ 出題条件を分岐
+                # ✅ 出題対象を分ける
                 if mode == 'test' and stage > 1:
+                    # 前回のテストで間違えた問題のみ対象
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
@@ -234,15 +234,20 @@ def study(source):
                         )
                     '''
                     params.extend([user_id, stage - 1])
+
                 elif mode == 'practice':
+                    # ステージ1の場合：自分自身の unknown を出す
+                    # ステージ2,3の場合：前ステージの unknown を出す
+                    target_stage = stage if stage == 1 else stage - 1
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
                             WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
                         )
                     '''
-                    params.extend([user_id, stage - 1])
-                # stage==1 の test は全件対象（追加条件なし）
+                    params.extend([user_id, target_stage])
+
+                # その他：stage==1 の test は全件対象（条件追加なし）
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -264,8 +269,6 @@ def study(source):
         app.logger.error(f"教材取得エラー: {e}")
         flash("データの取得に失敗しました")
         return redirect(url_for('dashboard'))
-
-
 
 @app.route('/log_result', methods=['POST'])
 @login_required
