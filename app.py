@@ -112,7 +112,7 @@ def login():
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
 def prepare(source):
-    user_id = current_user.id
+    user_id = str(current_user.id)
 
     if request.method == 'POST':
         page_range = request.form.get('page_range')
@@ -227,7 +227,7 @@ def log_result():
     card_id = data.get('card_id')
     result = data.get('result')
     stage = session.get('stage', 1)
-    user_id = current_user.id
+    user_id = str(current_user.id)
 
     try:
         with get_db_connection() as conn:
