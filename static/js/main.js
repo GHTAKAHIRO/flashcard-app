@@ -1,5 +1,3 @@
-// 練習モード用 main.js（ループ対応）
-
 console.log("🚀 main.js が Render 上で動いています！");
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -108,12 +106,24 @@ function nextCard() {
     currentIndex++;
 
     if (currentIndex >= cards.length) {
-        if (isPracticeMode && wrongCards.length > 0) {
-            alert("✏️ 間違えたカードがありました。再度学習を行うには設定画面から再実行してください。");
-            window.location.href = `/prepare/${cards[0].source}`;
+        if (isPracticeMode) {
+            const nextRound = wrongCards.slice();
+            wrongCards = [];
+
+            if (nextRound.length === 0) {
+                alert("✅ 全問正解！練習完了！");
+                window.location.href = `/prepare/${cards[0].source}`;
+                return;
+            }
+
+            alert("✏️ 間違えたカードのみ再出題します！");
+            cards = shuffle(nextRound);
+            currentIndex = 0;
+            showingAnswer = false;
+            renderCard();
             return;
         } else {
-            alert("✅ 学習完了！");
+            alert("✅ テスト完了！お疲れさまでした！");
             window.location.href = `/prepare/${cards[0].source}`;
             return;
         }
