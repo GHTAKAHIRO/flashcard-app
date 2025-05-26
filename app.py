@@ -112,6 +112,8 @@ def login():
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
 def prepare(source):
+    user_id = current_user.id
+
     if request.method == 'POST':
         page_range = request.form.get('page_range')
         stage_mode = request.form.get('stage')
@@ -126,33 +128,33 @@ def prepare(source):
         session['page_range'] = page_range
         return redirect(url_for('study', source=source))
 
-    # ✅ テストモードのステージ完了状況チェック
+    # ✅ 学習済みテストステージをチェック
     completed_tests = []
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                for stage in [1, 2, 3]:
-                    # その教材のカード数
+                for stage_num in [1, 2, 3]:
+                    # 指定教材のカード数を取得
                     cur.execute('''
                         SELECT COUNT(*) FROM image
                         WHERE source = %s
                     ''', (source,))
                     total_cards = cur.fetchone()[0]
 
-                    # そのステージでの回答済みカード数
+                    # 対象ステージの known + unknown の記録数を取得（重複除外）
                     cur.execute('''
                         SELECT COUNT(DISTINCT card_id) FROM study_log
                         WHERE user_id = %s AND stage = %s AND result IN ('known', 'unknown')
                         AND card_id IN (SELECT id FROM image WHERE source = %s)
-                    ''', (current_user.id, stage, source))
-                    answered_cards = cur.fetchone()[0]
+                    ''', (user_id, stage_num, source))
+                    answered = cur.fetchone()[0]
 
-                    if total_cards > 0 and answered_cards >= total_cards:
-                        completed_tests.append(stage)
+                    if total_cards > 0 and answered == total_cards:
+                        completed_tests.append(stage_num)
 
     except Exception as e:
-        app.logger.error(f"完了チェックエラー: {e}")
-        completed_tests = []
+        app.logger.error(f"完了済みテスト判定エラー: {e}")
+        flash("テスト完了チェックでエラーが発生しました")
 
     return render_template('prepare.html', source=source, completed_tests=completed_tests)
 
