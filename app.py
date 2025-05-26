@@ -275,20 +275,22 @@ def log_result():
     card_id = data.get('card_id')
     result = data.get('result')
     stage = session.get('stage', 1)
+    mode = session.get('mode', 'test')  # ✅ これを追加
     user_id = str(current_user.id)
 
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute('''
-                    INSERT INTO study_log (user_id, card_id, result, stage)
-                    VALUES (%s, %s, %s, %s)
-                ''', (user_id, card_id, result, stage))
+                    INSERT INTO study_log (user_id, card_id, result, stage, mode)
+                    VALUES (%s, %s, %s, %s, %s)
+                ''', (user_id, card_id, result, stage, mode))  # ✅ ここも変更
                 conn.commit()
         return jsonify({'status': 'ok'})
     except Exception as e:
         app.logger.error(f"ログ書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 # 新規登録
 @app.route('/register', methods=['GET', 'POST'])
