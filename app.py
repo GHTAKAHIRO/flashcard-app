@@ -171,11 +171,9 @@ def prepare(source):
         session['page_range'] = page_range
         return redirect(url_for('study', source=source))
 
-    # ✅ 完了ステータスの取得
-    completed = get_completed_stages(current_user.id, source)
+    # ✅ 完了した test ステージを取得して渡す（練習用の制御は現状不要）
     completed_tests = get_completed_test_stages(current_user.id, source)
-
-    return render_template('prepare.html', source=source, completed=completed, completed_tests=completed_tests)
+    return render_template('prepare.html', source=source, completed_tests=completed_tests)
 
 
     # ✅ 学習済みテストステージをチェック
