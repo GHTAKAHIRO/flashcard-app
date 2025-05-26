@@ -107,23 +107,16 @@ function nextCard() {
 
     if (currentIndex >= cards.length) {
         if (isPracticeMode) {
-            const nextRound = wrongCards.slice();
-            wrongCards = [];
-
-            if (nextRound.length === 0) {
-                alert("✅ 全問正解！練習完了！");
-                window.location.href = `/prepare/${cards[0].source}`;
-                return;
+            const hasWrong = Object.values(cardStatus).includes('unknown');
+            if (hasWrong) {
+                alert("✏️ 間違えたカードがありました。設定画面に戻ります。再度練習を行うには、もう一度設定してください。");
+            } else {
+                alert("✅ 練習完了！すべて正解です！");
             }
-
-            alert("✏️ 間違えたカードのみ再出題します！");
-            cards = shuffle(nextRound);
-            currentIndex = 0;
-            showingAnswer = false;
-            renderCard();
+            window.location.href = `/prepare/${cards[0].source}`;
             return;
         } else {
-            alert("✅ テスト完了！お疲れさまでした！");
+            alert("✅ テスト完了！");
             window.location.href = `/prepare/${cards[0].source}`;
             return;
         }
