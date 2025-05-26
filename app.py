@@ -125,7 +125,37 @@ def prepare(source):
 
         session['page_range'] = page_range
         return redirect(url_for('study', source=source))
-    return render_template('prepare.html', source=source)
+
+    # ✅ テストモードのステージ完了状況チェック
+    completed_tests = []
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for stage in [1, 2, 3]:
+                    # その教材のカード数
+                    cur.execute('''
+                        SELECT COUNT(*) FROM image
+                        WHERE source = %s
+                    ''', (source,))
+                    total_cards = cur.fetchone()[0]
+
+                    # そのステージでの回答済みカード数
+                    cur.execute('''
+                        SELECT COUNT(DISTINCT card_id) FROM study_log
+                        WHERE user_id = %s AND stage = %s AND result IN ('known', 'unknown')
+                        AND card_id IN (SELECT id FROM image WHERE source = %s)
+                    ''', (current_user.id, stage, source))
+                    answered_cards = cur.fetchone()[0]
+
+                    if total_cards > 0 and answered_cards >= total_cards:
+                        completed_tests.append(stage)
+
+    except Exception as e:
+        app.logger.error(f"完了チェックエラー: {e}")
+        completed_tests = []
+
+    return render_template('prepare.html', source=source, completed_tests=completed_tests)
+
 
 @app.route('/study/<source>')
 @login_required

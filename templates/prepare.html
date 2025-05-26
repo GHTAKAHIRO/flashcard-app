@@ -8,20 +8,28 @@
   <h2>学習の設定をしてください</h2>
 
   <form method="POST">
-    <label>ページ範囲（例: 1-5 または 3,5,7）:</label><br>
-    <input type="text" name="page_range" required><br><br>
+  <div>
+    <label for="page_range">ページ範囲（例: 1-5 または 3,7,10）:</label><br>
+    <input type="text" name="page_range" id="page_range" required>
+  </div>
 
-    <label>ステージとモードの選択:</label><br>
-    <label><input type="radio" name="stage" value="1-test"> ステージ1：テスト</label><br>
-    <label><input type="radio" name="stage" value="1-practice"> ステージ1：練習</label><br>
-    <label><input type="radio" name="stage" value="2-test"> ステージ2：テスト</label><br>
-    <label><input type="radio" name="stage" value="2-practice"> ステージ2：練習</label><br>
-    <label><input type="radio" name="stage" value="3-test"> ステージ3：テスト</label><br>
-    <label><input type="radio" name="stage" value="3-practice"> ステージ3：練習</label><br>
+  <div style="margin-top: 10px;">
+    <label>ステージ選択:</label><br>
+    <select name="stage" required>
+      <option value="1-test" {% if 1 in completed_tests %}disabled{% endif %}>ステージ1：テスト{% if 1 in completed_tests %}（完了）{% endif %}</option>
+      <option value="1-practice">ステージ1：練習</option>
+      <option value="2-test" {% if 2 in completed_tests %}disabled{% endif %}>ステージ2：テスト{% if 2 in completed_tests %}（完了）{% endif %}</option>
+      <option value="2-practice">ステージ2：練習</option>
+      <option value="3-test" {% if 3 in completed_tests %}disabled{% endif %}>ステージ3：テスト{% if 3 in completed_tests %}（完了）{% endif %}</option>
+      <option value="3-practice">ステージ3：練習</option>
+    </select>
+  </div>
 
-    <br>
+  <div style="margin-top: 20px;">
     <button type="submit">▶ この設定で学習開始</button>
-  </form>
+  </div>
+</form>
+
 
   <a href="{{ url_for('dashboard') }}">← ダッシュボードに戻る</a>
 </body>
