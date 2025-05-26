@@ -59,6 +59,51 @@ def load_user(user_id):
         return User(*user)
     return None
 
+def get_completed_stages(user_id, source):
+    """指定されたユーザー・教材について、完了したステージ（test/practice）を返す"""
+    result = {'test': set(), 'practice': set()}
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            for mode in ['test', 'practice']:
+                cur.execute("""
+                    SELECT DISTINCT stage
+                    FROM study_log
+                    WHERE user_id = %s
+                      AND card_id IN (
+                          SELECT id FROM image WHERE source = %s
+                      )
+                      AND result = 'known'
+                      AND mode = %s
+                      AND stage IS NOT NULL
+                """, (str(user_id), source, mode))
+
+                rows = cur.fetchall()
+                result[mode] = {r[0] for r in rows}
+
+    return result
+
+def get_completed_test_stages(user_id, source):
+    """指定されたユーザー・教材について、完了したテストステージを返す"""
+    completed = set()
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for stage in [1, 2, 3]:
+                    cur.execute("SELECT COUNT(*) FROM image WHERE source = %s", (source,))
+                    total = cur.fetchone()[0]
+                    cur.execute('''
+                        SELECT COUNT(DISTINCT card_id) FROM study_log
+                        WHERE user_id = %s AND stage = %s AND result IN ('known', 'unknown')
+                          AND card_id IN (SELECT id FROM image WHERE source = %s)
+                    ''', (str(user_id), stage, source))
+                    answered = cur.fetchone()[0]
+                    if total > 0 and total == answered:
+                        completed.add(stage)
+    except Exception as e:
+        app.logger.error(f"完了済みテスト判定エラー: {e}")
+    return completed
+
 # ホームリダイレクト
 @app.route('/')
 def home():
@@ -112,8 +157,6 @@ def login():
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
 def prepare(source):
-    user_id = str(current_user.id)
-
     if request.method == 'POST':
         page_range = request.form.get('page_range')
         stage_mode = request.form.get('stage')
@@ -127,6 +170,11 @@ def prepare(source):
 
         session['page_range'] = page_range
         return redirect(url_for('study', source=source))
+
+    # ✅ ここで完了ステータスを取得
+    completed = get_completed_stages(current_user.id, source)
+    return render_template('prepare.html', source=source, completed=completed)
+
 
     # ✅ 学習済みテストステージをチェック
     completed_tests = []
