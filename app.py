@@ -79,6 +79,28 @@ def get_completed_practice_stage(user_id, source, stage):
 
             return total > 0 and known == total
 
+def get_completed_stages(user_id, source):
+    """指定されたユーザー・教材について、完了した test/practice ステージ番号を返す"""
+    result = {'test': set(), 'practice': set()}
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            for mode in ['test', 'practice']:
+                cur.execute('''
+                    SELECT stage, COUNT(DISTINCT card_id)
+                    FROM study_log
+                    WHERE user_id = %s AND mode = %s
+                      AND result IN ('known', 'unknown')
+                      AND card_id IN (SELECT id FROM image WHERE source = %s)
+                    GROUP BY stage
+                ''', (str(user_id), mode, source))
+                for stage, count in cur.fetchall():
+                    cur.execute('SELECT COUNT(*) FROM image WHERE source = %s', (source,))
+                    total = cur.fetchone()[0]
+                    if count == total:
+                        result[mode].add(stage)
+
+    return result
 
 def get_completed_test_stages(user_id, source):
     """指定されたユーザー・教材について、完了したテストステージを返す"""
@@ -289,8 +311,6 @@ def log_result():
     except Exception as e:
         app.logger.error(f"ログ書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
 
 # 新規登録
 @app.route('/register', methods=['GET', 'POST'])
