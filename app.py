@@ -59,29 +59,26 @@ def load_user(user_id):
         return User(*user)
     return None
 
-def get_completed_stages(user_id, source):
-    """指定されたユーザー・教材について、完了したステージ（test/practice）を返す"""
-    result = {'test': set(), 'practice': set()}
-
+def get_completed_practice_stage(user_id, source, stage):
+    """
+    練習モードで、そのステージの全問題が known かどうかを判定
+    """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            for mode in ['test', 'practice']:
-                cur.execute("""
-                    SELECT DISTINCT stage
-                    FROM study_log
-                    WHERE user_id = %s
-                      AND card_id IN (
-                          SELECT id FROM image WHERE source = %s
-                      )
-                      AND result = 'known'
-                      AND mode = %s
-                      AND stage IS NOT NULL
-                """, (str(user_id), source, mode))
+            # 対象教材の全カード数
+            cur.execute("SELECT COUNT(*) FROM image WHERE source = %s", (source,))
+            total = cur.fetchone()[0]
 
-                rows = cur.fetchall()
-                result[mode] = {r[0] for r in rows}
+            # 練習で known になったカード数（ステージ単位）
+            cur.execute("""
+                SELECT COUNT(DISTINCT card_id) FROM study_log
+                WHERE user_id = %s AND stage = %s AND result = 'known' AND mode = 'practice'
+                AND card_id IN (SELECT id FROM image WHERE source = %s)
+            """, (str(user_id), stage, source))
+            known = cur.fetchone()[0]
 
-    return result
+            return total > 0 and known == total
+
 
 def get_completed_test_stages(user_id, source):
     """指定されたユーザー・教材について、完了したテストステージを返す"""
