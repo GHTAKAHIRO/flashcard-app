@@ -228,9 +228,9 @@ def prepare(source):
 @app.route('/study/<source>')
 @login_required
 def study(source):
-    mode = session.get('mode', 'test')  # 'test' or 'practice'
-    page_range = session.get('page_range')  # 未使用なら削除可
+    mode = session.get('mode', 'test')
     stage = session.get('stage', 1)
+    source = source
     user_id = str(current_user.id)
 
     try:
@@ -243,30 +243,32 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ 出題フィルター条件を mode と stage によって切り替える
                 if mode == 'test' and stage > 1:
-                    # 2回目以降のテストは前ステージの unknown のみ出題
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
                             WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
                         )
                     '''
-                elif mode == 'practice':
-                    # 前のテストステージで間違えた問題を練習対象とする
-                    query += '''
-                        AND id IN (
-                            SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
-                        )
-                    '''
-                    params.extend([user_id, stage])
+                    params.extend([user_id, stage - 1])
 
-                # ✅ stage==1 and test の場合は全件対象（フィルターなし）
+                elif mode == 'practice':
+                    # ✕のまま残っているカードだけ再出題
+                    query += '''
+                        AND id IN (
+                            SELECT card_id FROM study_log
+                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
+                            EXCEPT
+                            SELECT card_id FROM study_log
+                            WHERE user_id = %s AND result = 'known' AND stage = %s AND mode = 'practice'
+                        )
+                    '''
+                    params.extend([user_id, stage, user_id, stage])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
                 records = cur.fetchall()
+
 
         if not records:
             flash("該当するカードが見つかりませんでした。")
