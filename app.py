@@ -252,14 +252,12 @@ def study(source):
                             WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
                         )
                     '''
-                    params.extend([user_id, stage - 1])
-
                 elif mode == 'practice':
-                    # 同じステージ内で、前の練習で unknown だったカードのみ再出題
+                    # 前のテストステージで間違えた問題を練習対象とする
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'practice'
+                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
                         )
                     '''
                     params.extend([user_id, stage])
