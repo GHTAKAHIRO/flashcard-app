@@ -228,8 +228,8 @@ def prepare(source):
 @app.route('/study/<source>')
 @login_required
 def study(source):
-    mode = session.get('mode', 'test')  # 'test' または 'practice'
-    page_range = session.get('page_range')
+    mode = session.get('mode', 'test')  # 'test' or 'practice'
+    page_range = session.get('page_range')  # 未使用なら削除可
     stage = session.get('stage', 1)
     user_id = str(current_user.id)
 
@@ -243,9 +243,9 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ 出題対象を分ける
+                # ✅ 出題フィルター条件を mode と stage によって切り替える
                 if mode == 'test' and stage > 1:
-                    # 前回のテストで間違えた問題のみ対象
+                    # 2回目以降のテストは前ステージの unknown のみ出題
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
@@ -255,18 +255,16 @@ def study(source):
                     params.extend([user_id, stage - 1])
 
                 elif mode == 'practice':
-                    # 前回のテストで "unknown" だったカードのみを対象とする
-                    prev_stage = stage - 1 if stage > 1 else 1  # ステージ1の場合は 1に固定（無限ループ回避）
+                    # 同じステージ内で、前の練習で unknown だったカードのみ再出題
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
+                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'practice'
                         )
                     '''
-                    params.extend([user_id, prev_stage])
+                    params.extend([user_id, stage])
 
-
-                # その他：stage==1 の test は全件対象（条件追加なし）
+                # ✅ stage==1 and test の場合は全件対象（フィルターなし）
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -276,6 +274,7 @@ def study(source):
             flash("該当するカードが見つかりませんでした。")
             return redirect(url_for('prepare', source=source))
 
+        # ✅ テンプレートに渡す形式に整形
         cards_dict = [dict(
             id=r[0], subject=r[1], grade=r[2], source=r[3],
             page_number=r[4], problem_number=r[5], topic=r[6],
@@ -288,6 +287,7 @@ def study(source):
         app.logger.error(f"教材取得エラー: {e}")
         flash("データの取得に失敗しました")
         return redirect(url_for('dashboard'))
+
 
 @app.route('/log_result', methods=['POST'])
 @login_required
