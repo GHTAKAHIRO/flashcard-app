@@ -123,6 +123,34 @@ def get_completed_test_stages(user_id, source):
         app.logger.error(f"完了済みテスト判定エラー: {e}")
     return completed
 
+def is_practice_stage_completed(user_id, source, stage):
+    """
+    ステージNの練習が完了したか（= テストで✕だったカードが練習で全て○になったか）
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # テストで間違えたカード（対象）
+            cur.execute('''
+                SELECT DISTINCT card_id FROM study_log
+                WHERE user_id = %s AND stage = %s AND mode = 'test' AND result = 'unknown'
+                AND card_id IN (SELECT id FROM image WHERE source = %s)
+            ''', (str(user_id), stage, source))
+            target_cards = {row[0] for row in cur.fetchall()}
+
+            if not target_cards:
+                return False  # テストで✕のカードがないなら未完了とみなす
+
+            # 練習で○になったカード（同じステージ内）
+            cur.execute('''
+                SELECT DISTINCT card_id FROM study_log
+                WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'known'
+                AND card_id IN (SELECT id FROM image WHERE source = %s)
+            ''', (str(user_id), stage, source))
+            known_cards = {row[0] for row in cur.fetchall()}
+
+            return target_cards.issubset(known_cards)
+
+
 # ホームリダイレクト
 @app.route('/')
 def home():
