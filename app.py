@@ -218,10 +218,15 @@ def prepare(source):
         session['page_range'] = page_range
         return redirect(url_for('study', source=source))
 
-    # ✅ completed データを渡す
+    # --- 完了ステータスを取得 ---
     completed = get_completed_stages(current_user.id, source)
-    return render_template('prepare.html', source=source, completed=completed)
 
+    # ✅ 練習完了チェックを強化（✕→○のみ）
+    for stage in [1, 2, 3]:
+        if is_practice_stage_completed(current_user.id, source, stage):
+            completed['practice'].add(stage)
+
+    return render_template('prepare.html', source=source, completed=completed)
 
     # ✅ 学習済みテストステージをチェック
     completed_tests = []
