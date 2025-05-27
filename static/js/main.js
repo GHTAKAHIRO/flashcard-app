@@ -18,7 +18,6 @@ let cards = [];
 let currentIndex = 0;
 let showingAnswer = false;
 let cardStatus = {};  // id => 'known' or 'unknown'
-let wrongCards = [];
 let isPracticeMode = false;
 
 function shuffle(array) {
@@ -34,7 +33,6 @@ function initCards(data) {
     currentIndex = 0;
     showingAnswer = false;
     cardStatus = {};
-    wrongCards = [];
     renderCard();
 }
 
@@ -81,9 +79,6 @@ function markKnown() {
 function markUnknown() {
     const id = cards[currentIndex].id;
     cardStatus[id] = 'unknown';
-    if (isPracticeMode) {
-        wrongCards.push(cards[currentIndex]);
-    }
     sendResult(id, 'unknown');
     nextCard();
 }
@@ -107,23 +102,15 @@ function nextCard() {
 
     if (currentIndex >= cards.length) {
         if (isPracticeMode) {
-            const nextWrongCards = cards.filter(card => cardStatus[card.id] === 'unknown');
-            if (nextWrongCards.length > 0) {
-                // ✕がある → 再出題
-                alert("✏️ 間違えたカードがあるので、再度出題します");
-                cards = shuffle(nextWrongCards);  // ✕だけに絞って再セット
-                currentIndex = 0;
-                cardStatus = {};  // リセットして再挑戦
-                renderCard();
-                return;
+            const wrongCards = cards.filter(card => cardStatus[card.id] === 'unknown');
+            if (wrongCards.length > 0) {
+                alert("✏️ 間違えたカードがあります。設定画面から再度練習してください。");
             } else {
-                // すべて正解 → 完了
                 alert("✅ 練習完了！すべて正解です！");
-                window.location.href = `/prepare/${cards[0].source}`;
-                return;
             }
+            window.location.href = `/prepare/${cards[0].source}`;
+            return;
         } else {
-            // テストモードは常に1周で終了
             alert("✅ テスト完了！");
             window.location.href = `/prepare/${cards[0].source}`;
             return;
@@ -133,4 +120,3 @@ function nextCard() {
     showingAnswer = false;
     renderCard();
 }
-
