@@ -103,34 +103,49 @@ def get_completed_stages(user_id, source):
     return result
 
 def get_completed_test_stages(user_id, source):
-    """指定された教材について、完了したテストステージを返す（2回目以降も対応）"""
+    """指定教材について、完了したテストステージ（1〜3）を返す（前ステージの✕対応済）"""
     completed = set()
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 for stage in [1, 2, 3]:
-                    # ステージ1は教材全体が対象
                     if stage == 1:
-                        cur.execute("SELECT COUNT(*) FROM image WHERE source = %s", (source,))
+                        # ステージ1は全問題が対象
+                        cur.execute('SELECT COUNT(*) FROM image WHERE source = %s', (source,))
                         total = cur.fetchone()[0]
-                    else:
-                        # 2回目以降は前の test の unknown のみが対象
+
                         cur.execute('''
-                            SELECT COUNT(DISTINCT card_id) FROM study_log
+                            SELECT COUNT(DISTINCT card_id)
+                            FROM study_log
+                            WHERE user_id = %s AND stage = %s AND mode = 'test'
+                            AND card_id IN (SELECT id FROM image WHERE source = %s)
+                        ''', (str(user_id), stage, source))
+                        answered = cur.fetchone()[0]
+
+                    else:
+                        # 前のステージの ✕（unknown）だけが対象
+                        cur.execute('''
+                            SELECT card_id
+                            FROM study_log
                             WHERE user_id = %s AND stage = %s AND result = 'unknown' AND mode = 'test'
                             AND card_id IN (SELECT id FROM image WHERE source = %s)
                         ''', (str(user_id), stage - 1, source))
-                        total = cur.fetchone()[0]
+                        target_ids = [row[0] for row in cur.fetchall()]
 
-                    # 該当ステージの回答済み数
-                    cur.execute('''
-                        SELECT COUNT(DISTINCT card_id) FROM study_log
-                        WHERE user_id = %s AND stage = %s AND mode = 'test'
-                        AND card_id IN (SELECT id FROM image WHERE source = %s)
-                    ''', (str(user_id), stage, source))
-                    answered = cur.fetchone()[0]
+                        if not target_ids:
+                            continue  # 前ステージに✕がない → 出題なし → 完了扱いしない
 
-                    if total > 0 and total == answered:
+                        # 現ステージでの回答済み（known/unknown 両方を対象）
+                        cur.execute('''
+                            SELECT COUNT(DISTINCT card_id)
+                            FROM study_log
+                            WHERE user_id = %s AND stage = %s AND mode = 'test'
+                            AND card_id = ANY(%s)
+                        ''', (str(user_id), stage, target_ids))
+                        answered = cur.fetchone()[0]
+                        total = len(target_ids)
+
+                    if total > 0 and answered == total:
                         completed.add(stage)
 
     except Exception as e:
