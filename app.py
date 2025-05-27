@@ -255,16 +255,16 @@ def study(source):
                     params.extend([user_id, stage - 1])
 
                 elif mode == 'practice':
-                    # ステージ1の場合：自分自身の unknown を出す
-                    # ステージ2,3の場合：前ステージの unknown を出す
-                    target_stage = stage if stage == 1 else stage - 1
+                    # 前回のテストで "unknown" だったカードのみを対象とする
+                    prev_stage = stage - 1 if stage > 1 else 1  # ステージ1の場合は 1に固定（無限ループ回避）
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
                             WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
                         )
                     '''
-                    params.extend([user_id, target_stage])
+                    params.extend([user_id, prev_stage])
+
 
                 # その他：stage==1 の test は全件対象（条件追加なし）
 
