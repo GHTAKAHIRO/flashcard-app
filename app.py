@@ -103,25 +103,40 @@ def get_completed_stages(user_id, source):
     return result
 
 def get_completed_test_stages(user_id, source):
-    """指定されたユーザー・教材について、完了したテストステージを返す"""
+    """指定された教材について、完了したテストステージを返す（2回目以降も対応）"""
     completed = set()
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 for stage in [1, 2, 3]:
-                    cur.execute("SELECT COUNT(*) FROM image WHERE source = %s", (source,))
-                    total = cur.fetchone()[0]
+                    # ステージ1は教材全体が対象
+                    if stage == 1:
+                        cur.execute("SELECT COUNT(*) FROM image WHERE source = %s", (source,))
+                        total = cur.fetchone()[0]
+                    else:
+                        # 2回目以降は前の test の unknown のみが対象
+                        cur.execute('''
+                            SELECT COUNT(DISTINCT card_id) FROM study_log
+                            WHERE user_id = %s AND stage = %s AND result = 'unknown' AND mode = 'test'
+                            AND card_id IN (SELECT id FROM image WHERE source = %s)
+                        ''', (str(user_id), stage - 1, source))
+                        total = cur.fetchone()[0]
+
+                    # 該当ステージの回答済み数
                     cur.execute('''
                         SELECT COUNT(DISTINCT card_id) FROM study_log
-                        WHERE user_id = %s AND stage = %s AND result IN ('known', 'unknown')
-                          AND card_id IN (SELECT id FROM image WHERE source = %s)
+                        WHERE user_id = %s AND stage = %s AND mode = 'test'
+                        AND card_id IN (SELECT id FROM image WHERE source = %s)
                     ''', (str(user_id), stage, source))
                     answered = cur.fetchone()[0]
+
                     if total > 0 and total == answered:
                         completed.add(stage)
+
     except Exception as e:
         app.logger.error(f"完了済みテスト判定エラー: {e}")
     return completed
+
 
 def is_practice_stage_completed(user_id, source, stage):
     """
