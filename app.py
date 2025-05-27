@@ -80,27 +80,55 @@ def get_completed_practice_stage(user_id, source, stage):
             return total > 0 and known == total
 
 def get_completed_stages(user_id, source):
-    """指定されたユーザー・教材について、完了した test/practice ステージ番号を返す"""
     result = {'test': set(), 'practice': set()}
+    user_id_str = str(user_id)
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            for mode in ['test', 'practice']:
+            for stage in [1, 2, 3]:
+                # ✅ テスト完了判定
+                if stage == 1:
+                    cur.execute('SELECT id FROM image WHERE source = %s', (source,))
+                    target_test = {row[0] for row in cur.fetchall()}
+                else:
+                    cur.execute('''
+                        SELECT card_id FROM study_log
+                        WHERE user_id = %s AND stage = %s AND result = 'unknown' AND mode = 'test'
+                        AND card_id IN (SELECT id FROM image WHERE source = %s)
+                    ''', (user_id_str, stage - 1, source))
+                    target_test = {row[0] for row in cur.fetchall()}
+
+                if target_test:
+                    cur.execute('''
+                        SELECT COUNT(DISTINCT card_id) FROM study_log
+                        WHERE user_id = %s AND stage = %s AND mode = 'test'
+                        AND card_id = ANY(%s)
+                    ''', (user_id_str, stage, list(target_test)))
+                    answered = cur.fetchone()[0]
+                    if answered == len(target_test):
+                        result['test'].add(stage)
+
+                # ✅ 練習完了判定（テストで×だったカードがすべて練習で○になったか）
                 cur.execute('''
-                    SELECT stage, COUNT(DISTINCT card_id)
-                    FROM study_log
-                    WHERE user_id = %s AND mode = %s
-                      AND result IN ('known', 'unknown')
-                      AND card_id IN (SELECT id FROM image WHERE source = %s)
-                    GROUP BY stage
-                ''', (str(user_id), mode, source))
-                for stage, count in cur.fetchall():
-                    cur.execute('SELECT COUNT(*) FROM image WHERE source = %s', (source,))
-                    total = cur.fetchone()[0]
-                    if count == total:
-                        result[mode].add(stage)
+                    SELECT card_id FROM study_log
+                    WHERE user_id = %s AND stage = %s AND result = 'unknown' AND mode = 'test'
+                    AND card_id IN (SELECT id FROM image WHERE source = %s)
+                ''', (user_id_str, stage, source))
+                target_practice = {row[0] for row in cur.fetchall()}
+
+                if target_practice:
+                    cur.execute('''
+                        SELECT card_id FROM study_log
+                        WHERE user_id = %s AND stage = %s AND result = 'known' AND mode = 'practice'
+                        AND card_id IN (SELECT id FROM image WHERE source = %s)
+                    ''', (user_id_str, stage, source))
+                    known_cards = {row[0] for row in cur.fetchall()}
+
+                    if target_practice.issubset(known_cards):
+                        result['practice'].add(stage)
 
     return result
+
 
 def get_completed_test_stages(user_id, source):
     """
