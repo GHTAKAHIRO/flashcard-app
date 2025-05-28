@@ -367,7 +367,7 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ page_range によるフィルタ処理（文字列型 page_number に対応）
+                # ✅ ページ範囲フィルタ
                 page_conditions = []
                 if page_range:
                     for part in page_range.split(','):
@@ -386,9 +386,8 @@ def study(source):
                     query += f' AND page_number IN ({placeholders})'
                     params.extend(page_conditions)
 
-                # ✅ 出題条件：mode × stage に応じたフィルタ
+                # ✅ モードとステージに応じた出題フィルタ
                 if mode == 'test' and stage > 1:
-                    # 前ステージの unknown のみ
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
@@ -397,25 +396,23 @@ def study(source):
                     '''
                     params.extend([user_id, stage - 1])
 
-        elif mode == 'practice':
-            if stage == 1:
-                # 初回練習は、テストで間違えたカードを対象にする
-                query += '''
-                    AND id IN (
-                        SELECT card_id FROM study_log
-                        WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
-                    )
-                '''
-                params.extend([user_id])
-            else:
-                # 2回目以降は、前回の練習で間違えたカードを対象にする
-                query += '''
-                    AND id IN (
-                        SELECT card_id FROM study_log
-                        WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
-                    )
-                '''
-                params.extend([user_id, stage])
+                elif mode == 'practice':
+                    if stage == 1:
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM study_log
+                                WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
+                            )
+                        '''
+                        params.append(user_id)
+                    else:
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
+                            )
+                        '''
+                        params.extend([user_id, stage])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -425,7 +422,6 @@ def study(source):
             flash("該当するカードが見つかりませんでした。")
             return redirect(url_for('prepare', source=source))
 
-        # ✅ テンプレート向けに辞書形式で整形
         cards_dict = [dict(
             id=r[0], subject=r[1], grade=r[2], source=r[3],
             page_number=r[4], problem_number=r[5], topic=r[6],
