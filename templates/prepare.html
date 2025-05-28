@@ -16,20 +16,28 @@
     <div style="margin-top: 10px;">
       <label>ステージ選択:</label><br>
 
-      {% set test_completed = completed.get('test', set()) %}
-      {% set practice_completed = completed.get('practice', set()) %}
-
-      {% for stage in [1, 2, 3] %}
-        <option value="{{ stage }}-test"
-          {% if stage in test_completed %}disabled{% endif %}>
-          ステージ{{ stage }}：テスト {% if stage in test_completed %}（完了）{% endif %}
+      <select name="stage" required>
+        <option value="1-test" {% if 1 in completed['test'] %}disabled{% endif %}>
+          ステージ1：テスト {% if 1 in completed['test'] %}（完了）{% endif %}
+        </option>
+        <option value="1-practice" {% if 1 in completed['practice'] %}disabled{% endif %}>
+          ステージ1：練習 {% if 1 in completed['practice'] %}（完了）{% endif %}
         </option>
 
-        <option value="{{ stage }}-practice"
-          {% if stage in practice_completed %}disabled{% endif %}>
-          ステージ{{ stage }}：練習 {% if stage in practice_completed %}（完了）{% endif %}
+        <option value="2-test" {% if 2 in completed['test'] %}disabled{% endif %}>
+          ステージ2：テスト {% if 2 in completed['test'] %}（完了）{% endif %}
         </option>
-      {% endfor %}
+        <option value="2-practice" {% if 2 in completed['practice'] %}disabled{% endif %}>
+          ステージ2：練習 {% if 2 in completed['practice'] %}（完了）{% endif %}
+        </option>
+
+        <option value="3-test" {% if 3 in completed['test'] %}disabled{% endif %}>
+          ステージ3：テスト {% if 3 in completed['test'] %}（完了）{% endif %}
+        </option>
+        <option value="3-practice" {% if 3 in completed['practice'] %}disabled{% endif %}>
+          ステージ3：練習 {% if 3 in completed['practice'] %}（完了）{% endif %}
+        </option>
+      </select>
     </div>
 
     <div style="margin-top: 20px;">
@@ -46,7 +54,8 @@
 
       form.addEventListener("submit", function (e) {
         const value = pageRangeInput.value.trim();
-        if (!value) return;
+
+        if (!value) return;  // 空欄は全ページ対象として許可
 
         const parts = value.split(",");
         const rangePattern = /^\d+\s*-\s*\d+$/;
@@ -65,7 +74,7 @@
             const [start, end] = part.split("-").map(s => parseInt(s.trim(), 10));
             if (start > end) {
               e.preventDefault();
-              alert(`ページ範囲「${part}」は 開始ページ <= 終了ページ にしてください。`);
+              alert(`ページ範囲「${part}」は 開始ページ ≦ 終了ページ にしてください。`);
               pageRangeInput.focus();
               return;
             }
@@ -74,6 +83,5 @@
       });
     });
   </script>
-
 </body>
 </html>
