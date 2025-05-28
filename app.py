@@ -257,9 +257,12 @@ def login():
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
 def prepare(source):
+    user_id = str(current_user.id)
+
     if request.method == 'POST':
         page_range = request.form.get('page_range')
         stage_mode = request.form.get('stage')
+
         if '-' in stage_mode:
             stage_str, mode = stage_mode.split('-')
             session['stage'] = int(stage_str)
@@ -269,47 +272,43 @@ def prepare(source):
             return redirect(url_for('prepare', source=source))
 
         session['page_range'] = page_range
+
+        # ✅ user_settingsに保存または更新
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        INSERT INTO user_settings (user_id, source, page_range)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (user_id, source)
+                        DO UPDATE SET page_range = EXCLUDED.page_range
+                    ''', (user_id, source, page_range))
+                    conn.commit()
+        except Exception as e:
+            app.logger.error(f"user_settings保存エラー: {e}")
+
         return redirect(url_for('study', source=source))
 
-    # --- 完了ステータスを取得 ---
-    completed = get_completed_stages(current_user.id, source)
-
-    # ✅ 練習完了チェックを強化（✕→○のみ）
-    for stage in [1, 2, 3]:
-        if is_practice_stage_completed(current_user.id, source, stage):
-            completed['practice'].add(stage)
-
-    return render_template('prepare.html', source=source, completed=completed)
-
-    # ✅ 学習済みテストステージをチェック
-    completed_tests = []
+    # ✅ GET時: 以前保存されたページ範囲を取得
+    saved_page_range = ''
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                for stage_num in [1, 2, 3]:
-                    # 指定教材のカード数を取得
-                    cur.execute('''
-                        SELECT COUNT(*) FROM image
-                        WHERE source = %s
-                    ''', (source,))
-                    total_cards = cur.fetchone()[0]
-
-                    # 対象ステージの known + unknown の記録数を取得（重複除外）
-                    cur.execute('''
-                        SELECT COUNT(DISTINCT card_id) FROM study_log
-                        WHERE user_id = %s AND stage = %s AND result IN ('known', 'unknown')
-                        AND card_id IN (SELECT id FROM image WHERE source = %s)
-                    ''', (user_id, stage_num, source))
-                    answered = cur.fetchone()[0]
-
-                    if total_cards > 0 and answered == total_cards:
-                        completed_tests.append(stage_num)
-
+                cur.execute('''
+                    SELECT page_range FROM user_settings
+                    WHERE user_id = %s AND source = %s
+                ''', (user_id, source))
+                result = cur.fetchone()
+                if result:
+                    saved_page_range = result[0]
     except Exception as e:
-        app.logger.error(f"完了済みテスト判定エラー: {e}")
-        flash("テスト完了チェックでエラーが発生しました")
+        app.logger.error(f"user_settings取得エラー: {e}")
 
-    return render_template('prepare.html', source=source, completed_tests=completed_tests)
+    # ✅ テスト・練習の完了状況を取得
+    completed = get_completed_stages(user_id, source)
+
+    return render_template('prepare.html', source=source, completed=completed, saved_page_range=saved_page_range)
+
 
 @app.route('/study/<source>')
 @login_required
