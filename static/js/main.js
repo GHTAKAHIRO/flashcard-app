@@ -87,7 +87,12 @@ function sendResult(cardId, result) {
     fetch('/log_result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card_id: cardId, result: result })
+        body: JSON.stringify({
+            card_id: cardId,
+            result: result,
+            stage: stage,
+            mode: mode
+        })
     }).then(res => {
         if (!res.ok) {
             console.error("❌ サーバーへの記録に失敗しました");

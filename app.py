@@ -513,9 +513,11 @@ def log_result():
     data = request.get_json()
     card_id = data.get('card_id')
     result = data.get('result')
-    stage = session.get('stage', 1)
-    mode = session.get('mode', 'test')  # ✅ 'test' か 'practice'
+    stage = data.get('stage')
+    mode = data.get('mode')
     user_id = str(current_user.id)
+
+    print(f"[LOG] user_id={user_id} card_id={card_id} result={result} stage={stage} mode={mode}")
 
     try:
         with get_db_connection() as conn:
@@ -529,6 +531,7 @@ def log_result():
     except Exception as e:
         app.logger.error(f"ログ書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 # 新規登録
 @app.route('/register', methods=['GET', 'POST'])
