@@ -10,7 +10,9 @@
   <form method="POST">
     <div>
     <label for="page_range">ページ範囲:</label>
-    <input type="text" id="page_range" name="page_range" value="{{ saved_page_range }}">
+    <input type="text" id="page_range" name="page_range" placeholder="例: 2-4">
+    <small>半角で入力してください。「2-4」と入力すると２ページ～４ページの問題のみが対象になります。</small>
+
     </div>
 
     <div style="margin-top: 10px;">

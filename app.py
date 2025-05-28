@@ -313,9 +313,9 @@ def prepare(source):
 @app.route('/study/<source>')
 @login_required
 def study(source):
-    mode = session.get('mode', 'test')
+    mode = session.get('mode', 'test')  # 'test' or 'practice'
+    page_range = session.get('page_range')  # e.g., '2-4'
     stage = session.get('stage', 1)
-    source = source
     user_id = str(current_user.id)
 
     try:
@@ -328,6 +328,7 @@ def study(source):
                 '''
                 params = [source]
 
+                # ✅ 出題対象のフィルタ（mode × stage）
                 if mode == 'test' and stage > 1:
                     query += '''
                         AND id IN (
@@ -338,28 +339,35 @@ def study(source):
                     params.extend([user_id, stage - 1])
 
                 elif mode == 'practice':
-                    # ✕のまま残っているカードだけ再出題
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
-                            EXCEPT
-                            SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'known' AND stage = %s AND mode = 'practice'
+                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'practice'
                         )
                     '''
-                    params.extend([user_id, stage, user_id, stage])
+                    params.extend([user_id, stage])
+
+                # ✅ ページ範囲のフィルタ追加（page_numberは文字列型想定）
+                if page_range and '-' in page_range:
+                    try:
+                        start, end = page_range.split('-')
+                        pages = [str(p) for p in range(int(start), int(end) + 1)]
+                        placeholders = ','.join(['%s'] * len(pages))
+                        query += f' AND page_number IN ({placeholders})'
+                        params.extend(pages)
+                    except ValueError:
+                        flash("ページ範囲の形式が不正です（例: 2-4）")
+                        return redirect(url_for('prepare', source=source))
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
                 records = cur.fetchall()
 
-
         if not records:
             flash("該当するカードが見つかりませんでした。")
             return redirect(url_for('prepare', source=source))
 
-        # ✅ テンプレートに渡す形式に整形
+        # ✅ 辞書形式でテンプレートへ渡す
         cards_dict = [dict(
             id=r[0], subject=r[1], grade=r[2], source=r[3],
             page_number=r[4], problem_number=r[5], topic=r[6],
