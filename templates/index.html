@@ -21,10 +21,11 @@
   </div>
 
   <!-- ✅ ここに追加：Flaskから渡されたデータをJSに渡す -->
-  <script>
-    const rawCards = {{ cards | tojson }};
-    const mode = "{{ mode }}";
-  </script>
+<script>
+  const rawCards = {{ cards | tojson }};
+  const mode = "{{ mode }}";
+  const stage = {{ session['stage'] | default(1) }};
+</script>
 
   <!-- main.js の読み込みはこの後 -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
