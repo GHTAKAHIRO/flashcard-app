@@ -400,8 +400,13 @@ def prepare(source):
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
 
-    # ✅ 完了判定に page_range を渡すよう修正
-    completed = get_completed_stages(user_id, source, saved_page_range)
+        completed = get_completed_stages(user_id, source, saved_page_range)
+
+        # Jinjaで安全に扱うためにset化
+        completed = {
+            "test": set(completed.get("test", [])),
+            "practice": set(completed.get("practice", []))
+        }
 
     return render_template(
         'prepare.html',
