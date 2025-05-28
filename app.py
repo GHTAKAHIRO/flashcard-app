@@ -113,61 +113,59 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
             return target_cards.issubset(known_cards)
         
 
-def get_completed_stages(user_id, source, page_range):
-    """ユーザー・教材・ページ範囲に対して完了した test/practice ステージを返す"""
-    result = {'test': set(), 'practice': set()}
+def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
+    """
+    練習モードで、そのステージの出題対象カードが全て known か判定。
+    """
     user_id = str(user_id)
 
-    # ページ範囲をパース（例: '2-4,6' → ['2', '3', '4', '6']）
-    page_numbers = []
-    if page_range:
-        for part in page_range.split(','):
-            part = part.strip()
-            if '-' in part:
-                try:
-                    start, end = part.split('-')
-                    page_numbers.extend([str(i) for i in range(int(start), int(end) + 1)])
-                except ValueError:
-                    continue
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # 対象カード（前回unknown）
+            if stage == 1:
+                cur.execute('''
+                    SELECT card_id FROM study_log
+                    WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
+                ''', (user_id,))
             else:
-                page_numbers.append(part)
+                cur.execute('''
+                    SELECT card_id FROM study_log
+                    WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
+                ''', (user_id, stage - 1))
 
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # 対象カードの id を取得
-                if page_numbers:
-                    cur.execute('''
-                        SELECT id FROM image
-                        WHERE source = %s AND page_number::text = ANY(%s)
-                    ''', (source, page_numbers))
-                else:
-                    cur.execute('SELECT id FROM image WHERE source = %s', (source,))
-                all_card_ids = [row[0] for row in cur.fetchall()]
-                total = len(all_card_ids)
+            target_cards = {row[0] for row in cur.fetchall()}
 
-                if total == 0:
-                    return result  # 対象カードが存在しない場合、何も完了していない
+            if not target_cards:
+                return False
 
-                for mode in ['test', 'practice']:
-                    # ステージごとの回答数を集計
-                    cur.execute(f'''
-                        SELECT stage, COUNT(DISTINCT card_id)
-                        FROM study_log
-                        WHERE user_id = %s AND mode = %s
-                          AND result IN ('known', 'unknown')
-                          AND card_id = ANY(%s)
-                        GROUP BY stage
-                    ''', (user_id, mode, all_card_ids))
+            # ページ範囲フィルタ（任意）
+            if page_numbers:
+                placeholders = ','.join(['%s'] * len(page_numbers))
+                cur.execute(f'''
+                    SELECT id FROM image
+                    WHERE source = %s AND page_number IN ({placeholders})
+                ''', [source] + page_numbers)
+                valid_ids = {row[0] for row in cur.fetchall()}
+                target_cards = target_cards & valid_ids
 
-                    for stage, count in cur.fetchall():
-                        if count == total:
-                            result[mode].add(stage)
+            if not target_cards:
+                return False
 
-    except Exception as e:
-        app.logger.error(f"完了ステージ取得エラー: {e}")
+            # ✅ 最新の practice 結果を取得（同じ card_id のうち最大の id の結果）
+            cur.execute('''
+                SELECT DISTINCT ON (card_id) card_id, result
+                FROM study_log
+                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                ORDER BY card_id, id DESC
+            ''', (user_id, stage))
+            latest_results = {row[0]: row[1] for row in cur.fetchall()}
 
-    return result
+            # 出題対象カードすべてが latest result で known なら完了
+            for cid in target_cards:
+                if latest_results.get(cid) != 'known':
+                    return False
+
+            return True
 
 
 def get_completed_test_stages(user_id, source, page_numbers=None):
