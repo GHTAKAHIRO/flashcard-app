@@ -349,11 +349,13 @@ def login():
 
     return render_template('login.html')
 
+
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
 def prepare(source):
     user_id = str(current_user.id)
 
+    # --- POST時（学習設定の保存と遷移） ---
     if request.method == 'POST':
         page_range = request.form.get('page_range', '').strip()
         stage_mode = request.form.get('stage')
@@ -384,7 +386,7 @@ def prepare(source):
 
         return redirect(url_for('study', source=source))
 
-    # === GET時の処理 ===
+    # --- GET時 ---
     saved_page_range = ''
     try:
         with get_db_connection() as conn:
@@ -396,17 +398,20 @@ def prepare(source):
                 result = cur.fetchone()
                 if result:
                     saved_page_range = result[0]
-                    session['page_range'] = saved_page_range  # セッションに反映
+                    session['page_range'] = saved_page_range  # セッションにも反映
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
 
-        completed = get_completed_stages(user_id, source, saved_page_range)
-
-        # Jinjaで安全に扱うためにset化
+    # ✅ GET時は completed を毎回取得（例外関係なく）
+    try:
+        completed_raw = get_completed_stages(user_id, source, saved_page_range)
         completed = {
-            "test": set(completed.get("test", [])),
-            "practice": set(completed.get("practice", []))
+            "test": set(completed_raw.get("test", [])),
+            "practice": set(completed_raw.get("practice", []))
         }
+    except Exception as e:
+        app.logger.error(f"完了ステージ取得エラー: {e}")
+        completed = {"test": set(), "practice": set()}
 
     return render_template(
         'prepare.html',
