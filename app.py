@@ -131,7 +131,7 @@ def get_completed_stages(user_id, source, page_range):
                           AND result IN ('known', 'unknown')
                           AND card_id IN (
                               SELECT id FROM image
-                              WHERE source = %s AND page_number = ANY(%s)
+                              ... WHERE source = %s AND page_number::text = ANY(ARRAY[%s, %s, ...])
                           )
                         GROUP BY stage
                     ''', (user_id, mode, source, page_numbers))
@@ -139,7 +139,8 @@ def get_completed_stages(user_id, source, page_range):
                     for stage, count in cur.fetchall():
                         cur.execute('''
                             SELECT COUNT(*) FROM image
-                            WHERE source = %s AND page_number = ANY(%s)
+                            ... WHERE source = %s AND page_number::text = ANY(ARRAY[%s, %s, ...])
+
                         ''', (source, page_numbers))
                         total = cur.fetchone()[0]
                         if total > 0 and count == total:

@@ -9,8 +9,8 @@
 
   <form method="POST">
     <div>
-    <label for="page_range">ページ範囲:</label>
-    <input type="text" id="page_range" name="page_range" placeholder="例: 2-4">
+      <label for="page_range">ページ範囲:</label>
+      <input type="text" id="page_range" name="page_range" placeholder="例: 2-4" value="{{ saved_page_range }}">
     </div>
 
     <div style="margin-top: 10px;">
@@ -47,42 +47,41 @@
   <a href="{{ url_for('dashboard') }}">← ダッシュボードに戻る</a>
 
   <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const form = document.querySelector("form");
-    const pageRangeInput = document.getElementById("page_range");
+    document.addEventListener("DOMContentLoaded", function () {
+      const form = document.querySelector("form");
+      const pageRangeInput = document.getElementById("page_range");
 
-    form.addEventListener("submit", function (e) {
+      form.addEventListener("submit", function (e) {
         const value = pageRangeInput.value.trim();
 
         if (!value) return;  // 空ならチェックしない（全ページ対象）
 
-        // カンマ区切りで分割し、それぞれが「数字」または「数字-数字」の形式かをチェック
         const parts = value.split(",");
         const rangePattern = /^\d+\s*-\s*\d+$/;
         const numberPattern = /^\d+$/;
 
         for (let part of parts) {
-            part = part.trim();
-            if (!(rangePattern.test(part) || numberPattern.test(part))) {
-                e.preventDefault();
-                alert("ページ範囲は「2-4,6,8-10」のように入力してください（半角数字とハイフン、カンマ）。");
-                pageRangeInput.focus();
-                return;
-            }
+          part = part.trim();
+          if (!(rangePattern.test(part) || numberPattern.test(part))) {
+            e.preventDefault();
+            alert("ページ範囲は「2-4,6,8-10」のように入力してください（半角数字とハイフン、カンマ）。");
+            pageRangeInput.focus();
+            return;
+          }
 
-            if (rangePattern.test(part)) {
-                const [start, end] = part.split("-").map(s => parseInt(s.trim(), 10));
-                if (start > end) {
-                    e.preventDefault();
-                    alert(`ページ範囲「${part}」は開始ページ <= 終了ページにしてください。`);
-                    pageRangeInput.focus();
-                    return;
-                }
+          if (rangePattern.test(part)) {
+            const [start, end] = part.split("-").map(s => parseInt(s.trim(), 10));
+            if (start > end) {
+              e.preventDefault();
+              alert(`ページ範囲「${part}」は開始ページ <= 終了ページにしてください。`);
+              pageRangeInput.focus();
+              return;
             }
+          }
         }
+      });
     });
-});
-</script>
+  </script>
 
 </body>
 </html>
