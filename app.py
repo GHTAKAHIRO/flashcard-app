@@ -106,7 +106,7 @@ def get_completed_stages(user_id, source, page_range):
     result = {'test': set(), 'practice': set()}
     user_id = str(user_id)
 
-    # ページ範囲（例: '2-4,6'）→ ['2', '3', '4', '6']
+    # ページ範囲をパース（例: '2-4,6' → ['2', '3', '4', '6']）
     page_numbers = []
     if page_range:
         for part in page_range.split(','):
@@ -123,27 +123,33 @@ def get_completed_stages(user_id, source, page_range):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                for mode in ['test', 'practice']:
+                # 対象カードの id を取得
+                if page_numbers:
                     cur.execute('''
+                        SELECT id FROM image
+                        WHERE source = %s AND page_number::text = ANY(%s)
+                    ''', (source, page_numbers))
+                else:
+                    cur.execute('SELECT id FROM image WHERE source = %s', (source,))
+                all_card_ids = [row[0] for row in cur.fetchall()]
+                total = len(all_card_ids)
+
+                if total == 0:
+                    return result  # 対象カードが存在しない場合、何も完了していない
+
+                for mode in ['test', 'practice']:
+                    # ステージごとの回答数を集計
+                    cur.execute(f'''
                         SELECT stage, COUNT(DISTINCT card_id)
                         FROM study_log
                         WHERE user_id = %s AND mode = %s
                           AND result IN ('known', 'unknown')
-                          AND card_id IN (
-                              SELECT id FROM image
-                              ... WHERE source = %s AND page_number::text = ANY(ARRAY[%s, %s, ...])
-                          )
+                          AND card_id = ANY(%s)
                         GROUP BY stage
-                    ''', (user_id, mode, source, page_numbers))
+                    ''', (user_id, mode, all_card_ids))
 
                     for stage, count in cur.fetchall():
-                        cur.execute('''
-                            SELECT COUNT(*) FROM image
-                            ... WHERE source = %s AND page_number::text = ANY(ARRAY[%s, %s, ...])
-
-                        ''', (source, page_numbers))
-                        total = cur.fetchone()[0]
-                        if total > 0 and count == total:
+                        if count == total:
                             result[mode].add(stage)
 
     except Exception as e:
@@ -391,19 +397,25 @@ def study(source):
                     '''
                     params.extend([user_id, stage - 1])
 
-                elif mode == 'practice':
-                    if stage == 1:
-                        # 初回練習は全カードを対象
-                        pass
-                    else:
-                        # 2回目以降のみ unknown 絞り込み
-                        query += '''
-                            AND id IN (
-                                SELECT card_id FROM study_log
-                                WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
-                            )
-                        '''
-                        params.extend([user_id, stage])
+        elif mode == 'practice':
+            if stage == 1:
+                # 初回練習は、テストで間違えたカードを対象にする
+                query += '''
+                    AND id IN (
+                        SELECT card_id FROM study_log
+                        WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
+                    )
+                '''
+                params.extend([user_id])
+            else:
+                # 2回目以降は、前回の練習で間違えたカードを対象にする
+                query += '''
+                    AND id IN (
+                        SELECT card_id FROM study_log
+                        WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
+                    )
+                '''
+                params.extend([user_id, stage])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
