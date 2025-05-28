@@ -101,18 +101,19 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
             return valid_ids.issubset(known_cards)
         
 
-def get_completed_stages(user_id, source, page_range=None):
-    """指定されたユーザー・教材について、完了した test/practice ステージ番号を返す（オプションでページ範囲付き）"""
+def get_completed_stages(user_id, source, page_range=''):
+    """指定されたユーザー・教材について、完了した test/practice ステージ番号を返す（ページ範囲対応）"""
     result = {'test': set(), 'practice': set()}
 
+    # ページ番号を抽出
     page_numbers = []
     if page_range:
         for part in page_range.split(','):
             part = part.strip()
             if '-' in part:
                 try:
-                    start, end = part.split('-')
-                    page_numbers.extend([str(i) for i in range(int(start), int(end) + 1)])
+                    start, end = map(int, part.split('-'))
+                    page_numbers.extend([str(i) for i in range(start, end + 1)])
                 except ValueError:
                     continue
             else:
@@ -122,38 +123,46 @@ def get_completed_stages(user_id, source, page_range=None):
         with conn.cursor() as cur:
             for mode in ['test', 'practice']:
                 if page_numbers:
-                    cur.execute('''
+                    placeholders = ','.join(['%s'] * len(page_numbers))
+                    # 各ステージでの回答済カード数を取得
+                    cur.execute(f'''
                         SELECT stage, COUNT(DISTINCT card_id)
                         FROM study_log
                         WHERE user_id = %s AND mode = %s
                           AND result IN ('known', 'unknown')
                           AND card_id IN (
                             SELECT id FROM image
-                            WHERE source = %s AND page_number IN %s
+                            WHERE source = %s AND page_number IN ({placeholders})
                           )
                         GROUP BY stage
-                    ''', (str(user_id), mode, source, tuple(page_numbers)))
-                else:
-                    cur.execute('''
-                        SELECT stage, COUNT(DISTINCT card_id)
-                        FROM study_log
-                        WHERE user_id = %s AND mode = %s
-                          AND result IN ('known', 'unknown')
-                          AND card_id IN (
-                            SELECT id FROM image
-                            WHERE source = %s
-                          )
-                        GROUP BY stage
-                    ''', (str(user_id), mode, source))
+                    ''', [str(user_id), mode, source] + page_numbers)
 
-                for stage, count in cur.fetchall():
-                    if page_numbers:
-                        cur.execute('SELECT COUNT(*) FROM image WHERE source = %s AND page_number IN %s',
-                                    (source, tuple(page_numbers)))
-                    else:
-                        cur.execute('SELECT COUNT(*) FROM image WHERE source = %s', (source,))
+                    answered_per_stage = {row[0]: row[1] for row in cur.fetchall()}
+
+                    # 各ステージの対象カード数
+                    cur.execute(f'''
+                        SELECT COUNT(*) FROM image
+                        WHERE source = %s AND page_number IN ({placeholders})
+                    ''', [source] + page_numbers)
                     total = cur.fetchone()[0]
-                    if count == total:
+
+                else:
+                    cur.execute(f'''
+                        SELECT stage, COUNT(DISTINCT card_id)
+                        FROM study_log
+                        WHERE user_id = %s AND mode = %s
+                          AND result IN ('known', 'unknown')
+                          AND card_id IN (SELECT id FROM image WHERE source = %s)
+                        GROUP BY stage
+                    ''', [str(user_id), mode, source])
+
+                    answered_per_stage = {row[0]: row[1] for row in cur.fetchall()}
+
+                    cur.execute('SELECT COUNT(*) FROM image WHERE source = %s', (source,))
+                    total = cur.fetchone()[0]
+
+                for stage, count in answered_per_stage.items():
+                    if total > 0 and count == total:
                         result[mode].add(stage)
 
     return result
@@ -335,8 +344,10 @@ def prepare(source):
                 result = cur.fetchone()
                 if result:
                     saved_page_range = result[0]
+                    session['page_range'] = saved_page_range  # ← これを追加
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
+
 
     # ✅ 完了状況の取得に page_range を使う
     completed = get_completed_stages(user_id, source, saved_page_range)
