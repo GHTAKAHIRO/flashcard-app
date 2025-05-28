@@ -74,31 +74,51 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
     練習モードで、そのステージの全問題が known かどうかを判定。
     ページ範囲（page_numbers）が指定されている場合、それに限定して判定。
     """
+    user_id = str(user_id)
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # 対象カードを取得
+            # まず対象カード（テストで unknown だったもの or 前回の practice の unknown）
+            if stage == 1:
+                # ステージ1: テストの unknown を対象
+                cur.execute("""
+                    SELECT card_id FROM study_log
+                    WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
+                """, (user_id,))
+            else:
+                # ステージ2以降: 前回の practice で unknown だったカード
+                cur.execute("""
+                    SELECT card_id FROM study_log
+                    WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
+                """, (user_id, stage - 1))
+
+            target_cards = {row[0] for row in cur.fetchall()}
+
+            if not target_cards:
+                return False  # 対象がなければ完了していないとみなす
+
+            # ページ範囲によるフィルタ（必要な場合）
             if page_numbers:
                 placeholders = ','.join(['%s'] * len(page_numbers))
                 cur.execute(f'''
                     SELECT id FROM image
                     WHERE source = %s AND page_number IN ({placeholders})
                 ''', [source] + page_numbers)
-            else:
-                cur.execute("SELECT id FROM image WHERE source = %s", (source,))
-            valid_ids = {row[0] for row in cur.fetchall()}
+                valid_ids = {row[0] for row in cur.fetchall()}
+                # フィルタ適用
+                target_cards = target_cards & valid_ids
 
-            if not valid_ids:
-                return False  # 出題カードが存在しない場合は未完了
+            if not target_cards:
+                return False
 
-            # 練習で known になったカード（ステージ単位）
+            # そのカードが known になっているか
             cur.execute("""
                 SELECT DISTINCT card_id FROM study_log
-                WHERE user_id = %s AND stage = %s AND result = 'known' AND mode = 'practice'
-            """, (str(user_id), stage))
+                WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'known'
+            """, (user_id, stage))
             known_cards = {row[0] for row in cur.fetchall()}
 
-            # 対象カードのすべてが known になっていれば完了
-            return valid_ids.issubset(known_cards)
+            return target_cards.issubset(known_cards)
         
 
 def get_completed_stages(user_id, source, page_range):
@@ -398,6 +418,7 @@ def study(source):
 
                 elif mode == 'practice':
                     if stage == 1:
+                        # 初回練習は、テストで間違えたカードを対象にする
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM study_log
@@ -406,13 +427,15 @@ def study(source):
                         '''
                         params.append(user_id)
                     else:
+                        # 2回目以降は、前回の練習で間違えたカードを対象にする
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM study_log
-                                WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
                             )
                         '''
                         params.extend([user_id, stage])
+
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
