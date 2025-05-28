@@ -314,7 +314,7 @@ def prepare(source):
 @login_required
 def study(source):
     mode = session.get('mode', 'test')  # 'test' or 'practice'
-    page_range = session.get('page_range')  # e.g., '2-4'
+    page_range = session.get('page_range', '').strip()  # 例: '2-4,6'
     stage = session.get('stage', 1)
     user_id = str(current_user.id)
 
@@ -328,7 +328,28 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ 出題対象のフィルタ（mode × stage）
+                # ✅ page_rangeによるページ番号フィルタ（文字列対応）
+                page_conditions = []
+                if page_range:
+                    for part in page_range.split(','):
+                        part = part.strip()
+                        if '-' in part:
+                            try:
+                                start, end = part.split('-')
+                                start = int(start.strip())
+                                end = int(end.strip())
+                                page_conditions.extend([str(i) for i in range(start, end + 1)])
+                            except ValueError:
+                                pass
+                        else:
+                            page_conditions.append(part)
+
+                if page_conditions:
+                    placeholders = ','.join(['%s'] * len(page_conditions))
+                    query += f' AND page_number IN ({placeholders})'
+                    params.extend(page_conditions)
+
+                # ✅ 出題フィルター（mode と stage に応じて）
                 if mode == 'test' and stage > 1:
                     query += '''
                         AND id IN (
@@ -347,18 +368,6 @@ def study(source):
                     '''
                     params.extend([user_id, stage])
 
-                # ✅ ページ範囲のフィルタ追加（page_numberは文字列型想定）
-                if page_range and '-' in page_range:
-                    try:
-                        start, end = page_range.split('-')
-                        pages = [str(p) for p in range(int(start), int(end) + 1)]
-                        placeholders = ','.join(['%s'] * len(pages))
-                        query += f' AND page_number IN ({placeholders})'
-                        params.extend(pages)
-                    except ValueError:
-                        flash("ページ範囲の形式が不正です（例: 2-4）")
-                        return redirect(url_for('prepare', source=source))
-
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
                 records = cur.fetchall()
@@ -367,7 +376,7 @@ def study(source):
             flash("該当するカードが見つかりませんでした。")
             return redirect(url_for('prepare', source=source))
 
-        # ✅ 辞書形式でテンプレートへ渡す
+        # ✅ テンプレートに渡す形式に整形
         cards_dict = [dict(
             id=r[0], subject=r[1], grade=r[2], source=r[3],
             page_number=r[4], problem_number=r[5], topic=r[6],
