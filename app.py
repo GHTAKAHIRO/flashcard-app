@@ -418,7 +418,7 @@ def study(source):
 
                 elif mode == 'practice':
                     if stage == 1:
-                        # 初回練習は、テストで間違えたカードを対象にする
+                        # 初回練習：テストで ✕ だったカード
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM study_log
@@ -427,14 +427,14 @@ def study(source):
                         '''
                         params.append(user_id)
                     else:
-                        # 2回目以降は、前回の練習で間違えたカードを対象にする
+                        # 2回目以降：前回の練習で ✕ だったカード（stage - 1）
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM study_log
-                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
                             )
                         '''
-                        params.extend([user_id, stage])
+                        params.extend([user_id, stage - 1])
 
 
                 query += ' ORDER BY id DESC'
