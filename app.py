@@ -392,14 +392,18 @@ def study(source):
                     params.extend([user_id, stage - 1])
 
                 elif mode == 'practice':
-                    # 同ステージ内の practice unknown のみ
-                    query += '''
-                        AND id IN (
-                            SELECT card_id FROM study_log
-                            WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
-                        )
-                    '''
-                    params.extend([user_id, stage])
+                    if stage == 1:
+                        # 初回練習は全カードを対象
+                        pass
+                    else:
+                        # 2回目以降のみ unknown 絞り込み
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
+                            )
+                        '''
+                        params.extend([user_id, stage])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
