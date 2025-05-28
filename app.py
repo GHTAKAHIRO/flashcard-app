@@ -71,33 +71,26 @@ def parse_page_range(page_range_str):
 
 def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
     """
-    練習モードで、そのステージの全問題が known かどうかを判定。
-    ページ範囲（page_numbers）が指定されている場合、それに限定して判定。
+    練習モードの完了判定：そのステージの出題対象カードすべてが known かどうか
     """
     user_id = str(user_id)
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # まず対象カード（テストで unknown だったもの or 前回の practice の unknown）
+            # 出題対象カード = テストの unknown or 前回の練習の unknown
             if stage == 1:
-                # ステージ1: テストの unknown を対象
-                cur.execute("""
+                cur.execute('''
                     SELECT card_id FROM study_log
                     WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
-                """, (user_id,))
+                ''', (user_id,))
             else:
-                # ステージ2以降: 前回の practice で unknown だったカード
-                cur.execute("""
+                cur.execute('''
                     SELECT card_id FROM study_log
                     WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
-                """, (user_id, stage - 1))
+                ''', (user_id, stage - 1))
 
             target_cards = {row[0] for row in cur.fetchall()}
 
-            if not target_cards:
-                return False  # 対象がなければ完了していないとみなす
-
-            # ページ範囲によるフィルタ（必要な場合）
             if page_numbers:
                 placeholders = ','.join(['%s'] * len(page_numbers))
                 cur.execute(f'''
@@ -105,17 +98,16 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
                     WHERE source = %s AND page_number IN ({placeholders})
                 ''', [source] + page_numbers)
                 valid_ids = {row[0] for row in cur.fetchall()}
-                # フィルタ適用
-                target_cards = target_cards & valid_ids
+                target_cards = target_cards & valid_ids  # フィルタ適用
 
             if not target_cards:
                 return False
 
-            # そのカードが known になっているか
-            cur.execute("""
+            # 実際に known になったカード
+            cur.execute('''
                 SELECT DISTINCT card_id FROM study_log
                 WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'known'
-            """, (user_id, stage))
+            ''', (user_id, stage))
             known_cards = {row[0] for row in cur.fetchall()}
 
             return target_cards.issubset(known_cards)
@@ -387,7 +379,7 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ ページ範囲フィルタ
+                # ページ範囲指定がある場合
                 page_conditions = []
                 if page_range:
                     for part in page_range.split(','):
@@ -406,8 +398,9 @@ def study(source):
                     query += f' AND page_number IN ({placeholders})'
                     params.extend(page_conditions)
 
-                # ✅ モードとステージに応じた出題フィルタ
+                # 出題対象フィルタ
                 if mode == 'test' and stage > 1:
+                    # テスト2回目以降 → 前ステージの unknown のみ
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
@@ -418,7 +411,7 @@ def study(source):
 
                 elif mode == 'practice':
                     if stage == 1:
-                        # 初回練習：テストで ✕ だったカード
+                        # 練習1回目：テストの unknown を対象
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM study_log
@@ -427,7 +420,7 @@ def study(source):
                         '''
                         params.append(user_id)
                     else:
-                        # 2回目以降：前回の練習で ✕ だったカード（stage - 1）
+                        # 練習2回目以降：前回の練習で unknown だったカード
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM study_log
@@ -435,7 +428,6 @@ def study(source):
                             )
                         '''
                         params.extend([user_id, stage - 1])
-
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
