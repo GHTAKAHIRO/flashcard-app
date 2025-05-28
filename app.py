@@ -101,69 +101,52 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
             return valid_ids.issubset(known_cards)
         
 
-def get_completed_stages(user_id, source, page_range=''):
-    """指定されたユーザー・教材について、完了した test/practice ステージ番号を返す（ページ範囲対応）"""
+def get_completed_stages(user_id, source, page_range):
+    """ユーザー・教材・ページ範囲に対して完了した test/practice ステージを返す"""
     result = {'test': set(), 'practice': set()}
+    user_id = str(user_id)
 
-    # ページ番号を抽出
+    # ページ範囲（例: '2-4,6'）→ ['2', '3', '4', '6']
     page_numbers = []
     if page_range:
         for part in page_range.split(','):
             part = part.strip()
             if '-' in part:
                 try:
-                    start, end = map(int, part.split('-'))
-                    page_numbers.extend([str(i) for i in range(start, end + 1)])
+                    start, end = part.split('-')
+                    page_numbers.extend([str(i) for i in range(int(start), int(end) + 1)])
                 except ValueError:
                     continue
             else:
                 page_numbers.append(part)
 
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            for mode in ['test', 'practice']:
-                if page_numbers:
-                    placeholders = ','.join(['%s'] * len(page_numbers))
-                    # 各ステージでの回答済カード数を取得
-                    cur.execute(f'''
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for mode in ['test', 'practice']:
+                    cur.execute('''
                         SELECT stage, COUNT(DISTINCT card_id)
                         FROM study_log
                         WHERE user_id = %s AND mode = %s
                           AND result IN ('known', 'unknown')
                           AND card_id IN (
-                            SELECT id FROM image
-                            WHERE source = %s AND page_number IN ({placeholders})
+                              SELECT id FROM image
+                              WHERE source = %s AND page_number = ANY(%s)
                           )
                         GROUP BY stage
-                    ''', [str(user_id), mode, source] + page_numbers)
+                    ''', (user_id, mode, source, page_numbers))
 
-                    answered_per_stage = {row[0]: row[1] for row in cur.fetchall()}
+                    for stage, count in cur.fetchall():
+                        cur.execute('''
+                            SELECT COUNT(*) FROM image
+                            WHERE source = %s AND page_number = ANY(%s)
+                        ''', (source, page_numbers))
+                        total = cur.fetchone()[0]
+                        if total > 0 and count == total:
+                            result[mode].add(stage)
 
-                    # 各ステージの対象カード数
-                    cur.execute(f'''
-                        SELECT COUNT(*) FROM image
-                        WHERE source = %s AND page_number IN ({placeholders})
-                    ''', [source] + page_numbers)
-                    total = cur.fetchone()[0]
-
-                else:
-                    cur.execute(f'''
-                        SELECT stage, COUNT(DISTINCT card_id)
-                        FROM study_log
-                        WHERE user_id = %s AND mode = %s
-                          AND result IN ('known', 'unknown')
-                          AND card_id IN (SELECT id FROM image WHERE source = %s)
-                        GROUP BY stage
-                    ''', [str(user_id), mode, source])
-
-                    answered_per_stage = {row[0]: row[1] for row in cur.fetchall()}
-
-                    cur.execute('SELECT COUNT(*) FROM image WHERE source = %s', (source,))
-                    total = cur.fetchone()[0]
-
-                for stage, count in answered_per_stage.items():
-                    if total > 0 and count == total:
-                        result[mode].add(stage)
+    except Exception as e:
+        app.logger.error(f"完了ステージ取得エラー: {e}")
 
     return result
 
@@ -303,7 +286,7 @@ def prepare(source):
     user_id = str(current_user.id)
 
     if request.method == 'POST':
-        page_range = request.form.get('page_range')
+        page_range = request.form.get('page_range', '').strip()
         stage_mode = request.form.get('stage')
 
         if '-' in stage_mode:
@@ -316,7 +299,7 @@ def prepare(source):
 
         session['page_range'] = page_range
 
-        # ✅ user_settingsに保存または更新
+        # user_settings に保存
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
@@ -332,7 +315,7 @@ def prepare(source):
 
         return redirect(url_for('study', source=source))
 
-    # ✅ GET時: 以前保存されたページ範囲を取得
+    # === GET時の処理 ===
     saved_page_range = ''
     try:
         with get_db_connection() as conn:
@@ -344,23 +327,26 @@ def prepare(source):
                 result = cur.fetchone()
                 if result:
                     saved_page_range = result[0]
-                    session['page_range'] = saved_page_range  # ← これを追加
+                    session['page_range'] = saved_page_range  # セッションに反映
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
 
-
-    # ✅ 完了状況の取得に page_range を使う
+    # ✅ 完了判定に page_range を渡すよう修正
     completed = get_completed_stages(user_id, source, saved_page_range)
 
-
-    return render_template('prepare.html', source=source, completed=completed, saved_page_range=saved_page_range)
+    return render_template(
+        'prepare.html',
+        source=source,
+        completed=completed,
+        saved_page_range=saved_page_range
+    )
 
 
 @app.route('/study/<source>')
 @login_required
 def study(source):
     mode = session.get('mode', 'test')  # 'test' or 'practice'
-    page_range = session.get('page_range', '').strip()  # 例: '2-4,6'
+    page_range = session.get('page_range', '').strip()
     stage = session.get('stage', 1)
     user_id = str(current_user.id)
 
@@ -374,16 +360,14 @@ def study(source):
                 '''
                 params = [source]
 
-                # ✅ page_rangeによるページ番号フィルタ（文字列対応）
+                # ✅ page_range によるフィルタ処理（文字列型 page_number に対応）
                 page_conditions = []
                 if page_range:
                     for part in page_range.split(','):
                         part = part.strip()
                         if '-' in part:
                             try:
-                                start, end = part.split('-')
-                                start = int(start.strip())
-                                end = int(end.strip())
+                                start, end = map(int, part.split('-'))
                                 page_conditions.extend([str(i) for i in range(start, end + 1)])
                             except ValueError:
                                 pass
@@ -395,21 +379,23 @@ def study(source):
                     query += f' AND page_number IN ({placeholders})'
                     params.extend(page_conditions)
 
-                # ✅ 出題フィルター（mode と stage に応じて）
+                # ✅ 出題条件：mode × stage に応じたフィルタ
                 if mode == 'test' and stage > 1:
+                    # 前ステージの unknown のみ
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'test'
+                            WHERE user_id = %s AND stage = %s AND mode = 'test' AND result = 'unknown'
                         )
                     '''
                     params.extend([user_id, stage - 1])
 
                 elif mode == 'practice':
+                    # 同ステージ内の practice unknown のみ
                     query += '''
                         AND id IN (
                             SELECT card_id FROM study_log
-                            WHERE user_id = %s AND result = 'unknown' AND stage = %s AND mode = 'practice'
+                            WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
                         )
                     '''
                     params.extend([user_id, stage])
@@ -422,7 +408,7 @@ def study(source):
             flash("該当するカードが見つかりませんでした。")
             return redirect(url_for('prepare', source=source))
 
-        # ✅ テンプレートに渡す形式に整形
+        # ✅ テンプレート向けに辞書形式で整形
         cards_dict = [dict(
             id=r[0], subject=r[1], grade=r[2], source=r[3],
             page_number=r[4], problem_number=r[5], topic=r[6],
