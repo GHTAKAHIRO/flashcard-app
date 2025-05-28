@@ -166,6 +166,64 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
                     return False
 
             return True
+        
+
+def get_completed_stages(user_id, source, page_range):
+    """test / practice 各ステージで、対象カードが全て known or unknown として記録されているかを判定"""
+    result = {'test': set(), 'practice': set()}
+    user_id = str(user_id)
+
+    # ページ範囲パース
+    page_numbers = []
+    if page_range:
+        for part in page_range.split(','):
+            part = part.strip()
+            if '-' in part:
+                try:
+                    start, end = map(int, part.split('-'))
+                    page_numbers.extend([str(i) for i in range(start, end + 1)])
+                except ValueError:
+                    continue
+            else:
+                page_numbers.append(part)
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 対象カードを取得
+                if page_numbers:
+                    cur.execute('''
+                        SELECT id FROM image
+                        WHERE source = %s AND page_number::text = ANY(%s)
+                    ''', (source, page_numbers))
+                else:
+                    cur.execute('SELECT id FROM image WHERE source = %s', (source,))
+                card_ids = [row[0] for row in cur.fetchall()]
+                total = len(card_ids)
+
+                if total == 0:
+                    return result
+
+                for mode in ['test', 'practice']:
+                    cur.execute(f'''
+                        SELECT stage, COUNT(DISTINCT card_id)
+                        FROM (
+                            SELECT DISTINCT ON (card_id) card_id, stage
+                            FROM study_log
+                            WHERE user_id = %s AND mode = %s AND card_id = ANY(%s)
+                            ORDER BY card_id, id DESC
+                        ) AS latest
+                        GROUP BY stage
+                    ''', (user_id, mode, card_ids))
+
+                    for stage, count in cur.fetchall():
+                        if count == total:
+                            result[mode].add(stage)
+
+    except Exception as e:
+        app.logger.error(f"完了ステージ取得エラー: {e}")
+
+    return result
 
 
 def get_completed_test_stages(user_id, source, page_numbers=None):
