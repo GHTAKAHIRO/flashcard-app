@@ -121,7 +121,7 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # 対象カード（前回unknown）
+            # 出題対象：ステージ1→testのunknown、ステージ2以降→前回practiceのunknown
             if stage == 1:
                 cur.execute('''
                     SELECT card_id FROM study_log
@@ -134,11 +134,10 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
                 ''', (user_id, stage - 1))
 
             target_cards = {row[0] for row in cur.fetchall()}
-
             if not target_cards:
                 return False
 
-            # ページ範囲フィルタ（任意）
+            # ページ範囲フィルタ
             if page_numbers:
                 placeholders = ','.join(['%s'] * len(page_numbers))
                 cur.execute(f'''
@@ -151,7 +150,7 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
             if not target_cards:
                 return False
 
-            # ✅ 最新の practice 結果を取得（同じ card_id のうち最大の id の結果）
+            # ✅ 最新のpractice結果のみ取得
             cur.execute('''
                 SELECT DISTINCT ON (card_id) card_id, result
                 FROM study_log
@@ -160,12 +159,7 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
             ''', (user_id, stage))
             latest_results = {row[0]: row[1] for row in cur.fetchall()}
 
-            # 出題対象カードすべてが latest result で known なら完了
-            for cid in target_cards:
-                if latest_results.get(cid) != 'known':
-                    return False
-
-            return True
+            return all(latest_results.get(cid) == 'known' for cid in target_cards)
         
 
 def get_completed_stages(user_id, source, page_range):
