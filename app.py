@@ -101,32 +101,59 @@ def get_completed_practice_stage(user_id, source, stage, page_numbers=None):
             return valid_ids.issubset(known_cards)
         
 
-def get_completed_stages(user_id, source, page_numbers=None):
+def get_completed_stages(user_id, source, page_range=None):
+    """指定されたユーザー・教材について、完了した test/practice ステージ番号を返す（オプションでページ範囲付き）"""
     result = {'test': set(), 'practice': set()}
+
+    page_numbers = []
+    if page_range:
+        for part in page_range.split(','):
+            part = part.strip()
+            if '-' in part:
+                try:
+                    start, end = part.split('-')
+                    page_numbers.extend([str(i) for i in range(int(start), int(end) + 1)])
+                except ValueError:
+                    continue
+            else:
+                page_numbers.append(part)
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             for mode in ['test', 'practice']:
-                cur.execute('''
-                    SELECT stage, card_id
-                    FROM study_log
-                    WHERE user_id = %s AND mode = %s AND result IN ('known', 'unknown')
-                ''', (str(user_id), mode))
-                stage_to_cards = {}
-                for stage, card_id in cur.fetchall():
-                    stage_to_cards.setdefault(stage, set()).add(card_id)
+                if page_numbers:
+                    cur.execute('''
+                        SELECT stage, COUNT(DISTINCT card_id)
+                        FROM study_log
+                        WHERE user_id = %s AND mode = %s
+                          AND result IN ('known', 'unknown')
+                          AND card_id IN (
+                            SELECT id FROM image
+                            WHERE source = %s AND page_number IN %s
+                          )
+                        GROUP BY stage
+                    ''', (str(user_id), mode, source, tuple(page_numbers)))
+                else:
+                    cur.execute('''
+                        SELECT stage, COUNT(DISTINCT card_id)
+                        FROM study_log
+                        WHERE user_id = %s AND mode = %s
+                          AND result IN ('known', 'unknown')
+                          AND card_id IN (
+                            SELECT id FROM image
+                            WHERE source = %s
+                          )
+                        GROUP BY stage
+                    ''', (str(user_id), mode, source))
 
-                for stage, card_ids in stage_to_cards.items():
+                for stage, count in cur.fetchall():
                     if page_numbers:
-                        placeholders = ','.join(['%s'] * len(page_numbers))
-                        cur.execute(
-                            f'SELECT id FROM image WHERE source = %s AND page_number IN ({placeholders})',
-                            [source] + page_numbers
-                        )
+                        cur.execute('SELECT COUNT(*) FROM image WHERE source = %s AND page_number IN %s',
+                                    (source, tuple(page_numbers)))
                     else:
-                        cur.execute('SELECT id FROM image WHERE source = %s', (source,))
-                    valid_ids = {row[0] for row in cur.fetchall()}
-                    if valid_ids and card_ids.issuperset(valid_ids):
+                        cur.execute('SELECT COUNT(*) FROM image WHERE source = %s', (source,))
+                    total = cur.fetchone()[0]
+                    if count == total:
                         result[mode].add(stage)
 
     return result
