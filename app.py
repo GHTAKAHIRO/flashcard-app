@@ -311,8 +311,9 @@ def prepare(source):
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
 
-    # ✅ テスト・練習の完了状況を取得
-    completed = get_completed_stages(user_id, source, page_range)
+    # ✅ 完了状況の取得に page_range を使う
+    completed = get_completed_stages(user_id, source, saved_page_range)
+
 
     return render_template('prepare.html', source=source, completed=completed, saved_page_range=saved_page_range)
 
