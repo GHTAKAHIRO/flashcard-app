@@ -104,20 +104,33 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                         )
                     '''
                     params.extend([user_id, stage - 1])
+                    
 
                 if mode == 'practice':
-                    query += '''
-                        AND id IN (
-                            SELECT card_id FROM (
-                                SELECT DISTINCT ON (card_id) card_id, result
+                    if stage == 1:
+                        # ステージ1練習: ステージ1のテストで間違えた問題
+                        query += '''
+                            AND id IN (
+                                SELECT card_id
                                 FROM study_log
-                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                                ORDER BY card_id, id DESC
-                            ) AS latest
-                            WHERE result = 'unknown'
-                        )
-                    '''
-                    params.extend([user_id, stage])
+                                WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
+                            )
+                        '''
+                        params.extend([user_id])
+                    else:
+                        # ステージ2,3の練習: そのステージのpracticeで unknown のままのカード
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT DISTINCT ON (card_id) card_id, result
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                    ORDER BY card_id, id DESC
+                                ) AS latest
+                                WHERE result = 'unknown'
+                            )
+                        '''
+                        params.extend([user_id, stage])
 
 
                 query += ' ORDER BY id DESC'
