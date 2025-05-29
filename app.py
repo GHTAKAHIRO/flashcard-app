@@ -106,32 +106,19 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                     params.extend([user_id, stage - 1])
 
                 if mode == 'practice':
-                    if stage == 1:
-                        query += '''
-                            AND id IN (
-                                SELECT card_id FROM (
-                                    SELECT DISTINCT ON (card_id) card_id, result
-                                    FROM study_log
-                                    WHERE user_id = %s AND stage = %s AND mode = 'test'
-                                    ORDER BY card_id, id DESC
-                                ) AS latest
-                                WHERE result = 'unknown'
-                            )
-                        '''
-                        params.extend([user_id, stage])
-                    else:
-                        query += '''
-                            AND id IN (
-                                SELECT card_id FROM (
-                                    SELECT DISTINCT ON (card_id) card_id, result
-                                    FROM study_log
-                                    WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                                    ORDER BY card_id, id DESC
-                                ) AS latest
-                                WHERE result = 'unknown'
-                            )
-                        '''
-                        params.extend([user_id, stage])
+                    query += '''
+                        AND id IN (
+                            SELECT card_id FROM (
+                                SELECT card_id, result
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                ORDER BY id DESC
+                            ) AS latest
+                            GROUP BY card_id
+                            HAVING bool_and(result = 'unknown')
+                        )
+                    '''
+                    params.extend([user_id, stage])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -175,31 +162,42 @@ def get_completed_stages(user_id, source, page_range):
                     ''', (source, page_numbers))
                 else:
                     cur.execute('SELECT id FROM image WHERE source = %s', (source,))
-                card_ids = [row[0] for row in cur.fetchall()]
-
-                if not card_ids:
-                    return result
+                all_card_ids = [row[0] for row in cur.fetchall()]
 
                 for stage in [1, 2, 3]:
-                    cur.execute('''
-                        SELECT COUNT(DISTINCT card_id)
-                        FROM study_log
-                        WHERE user_id = %s AND mode = 'test' AND stage = %s AND card_id = ANY(%s)
-                    ''', (user_id, stage, card_ids))
-                    tested_count = cur.fetchone()[0]
+                    if stage == 1:
+                        target_card_ids = all_card_ids
+                    else:
+                        cur.execute('''
+                            SELECT DISTINCT card_id
+                            FROM study_log
+                            WHERE user_id = %s AND stage = %s AND mode = 'test' AND result = 'unknown'
+                        ''', (user_id, stage - 1))
+                        target_card_ids = [r[0] for r in cur.fetchall()]
 
-                    if tested_count == len(card_ids):
-                        result['test'].add(stage)
+                    if target_card_ids:
+                        cur.execute('''
+                            SELECT COUNT(DISTINCT card_id)
+                            FROM study_log
+                            WHERE user_id = %s AND mode = 'test' AND stage = %s AND card_id = ANY(%s)
+                        ''', (user_id, stage, target_card_ids))
+                        tested_count = cur.fetchone()[0]
+
+                        if tested_count == len(target_card_ids):
+                            result['test'].add(stage)
 
                     cur.execute('''
-                        SELECT DISTINCT ON (card_id) card_id, result
+                        SELECT card_id, result
                         FROM study_log
                         WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                        ORDER BY card_id, id DESC
+                        ORDER BY id DESC
                     ''', (user_id, stage))
-                    latest_results = {r[0]: r[1] for r in cur.fetchall()}
+                    latest = {}
+                    for card_id, result_value in cur.fetchall():
+                        if card_id not in latest:
+                            latest[card_id] = result_value
 
-                    if latest_results and all(res == 'known' for res in latest_results.values()):
+                    if latest and all(v == 'known' for v in latest.values()):
                         result['practice'].add(stage)
 
     except Exception as e:
@@ -222,6 +220,7 @@ def study(source):
         return redirect(url_for('prepare', source=source))
 
     return render_template('index.html', cards=cards_dict, mode=mode)
+
 
 
 # ホームリダイレクト
