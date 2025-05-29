@@ -79,21 +79,30 @@ def build_test_filter_subquery(stage, user_id):
         ''', [user_id, stage - 1]
 
 def build_practice_filter_subquery(stage, user_id):
-    return '''
-        AND id IN (
-            SELECT card_id FROM (
-                SELECT DISTINCT ON (card_id) card_id, result, mode, stage
-                FROM study_log
-                WHERE user_id = %s AND (
-                    (stage = 1 AND mode = 'test')
-                    OR (stage = %s AND mode = 'practice')
-                )
-                ORDER BY card_id, id DESC
-            ) AS latest
-            WHERE result = 'unknown'
-        )
-    ''', [user_id, stage - 1]
-
+    if stage == 1:
+        return '''
+            AND id IN (
+                SELECT card_id FROM (
+                    SELECT DISTINCT ON (card_id) card_id, result
+                    FROM study_log
+                    WHERE user_id = %s AND stage = 1 AND mode = 'test'
+                    ORDER BY card_id, id DESC
+                ) AS latest
+                WHERE result = 'unknown'
+            )
+        ''', [user_id]
+    else:
+        return '''
+            AND id IN (
+                SELECT card_id FROM (
+                    SELECT DISTINCT ON (card_id) card_id, result
+                    FROM study_log
+                    WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                    ORDER BY card_id, id DESC
+                ) AS latest
+                WHERE result = 'unknown'
+            )
+        ''', [user_id, stage - 1]
 
 def get_study_cards(source, stage, mode, page_range, user_id):
     try:
@@ -231,7 +240,6 @@ def study(source):
         return redirect(url_for('prepare', source=source))
 
     return render_template('index.html', cards=cards_dict, mode=mode)
-
 
 
 # ホームリダイレクト
