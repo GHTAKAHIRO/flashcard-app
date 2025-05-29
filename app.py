@@ -91,6 +91,7 @@ def build_practice_filter_subquery(stage, user_id):
         )
     ''', [user_id, stage]
 
+
 def get_study_cards(source, stage, mode, page_range, user_id):
     try:
         with get_db_connection() as conn:
@@ -102,7 +103,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                 '''
                 params = [source]
 
-                # ページ範囲の条件
+                # --- ページ範囲条件の追加 ---
                 page_conditions = []
                 if page_range:
                     for part in page_range.split(','):
@@ -121,7 +122,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                     query += f' AND page_number IN ({placeholders})'
                     params.extend(page_conditions)
 
-                # フィルター条件の追加
+                # --- モード別フィルター ---
                 if mode == 'test':
                     if stage > 1:
                         query += '''
@@ -131,10 +132,16 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                             )
                         '''
                         params.extend([user_id, stage - 1])
-
                 elif mode == 'practice':
-                    if stage == 1:
-                        # 練習ステージ1では、直前のテストの✕を出題
+                    # 該当ステージでの練習ログが存在するか確認
+                    cur.execute('''
+                        SELECT COUNT(*) FROM study_log
+                        WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                    ''', (user_id, stage))
+                    practice_log_count = cur.fetchone()[0]
+
+                    if practice_log_count == 0:
+                        # 初回練習：前のテストでunknownだったカード
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -148,7 +155,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                         '''
                         params.extend([user_id, stage])
                     else:
-                        # 練習ステージ2以降では、前回の練習の✕を出題（同じstageの前の周回の結果を見ている）
+                        # 2周目以降：この練習内で最新が unknown のみ
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -173,6 +180,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
         ) for r in records]
 
         return cards_dict
+
     except Exception as e:
         app.logger.error(f"教材取得エラー: {e}")
         return None
