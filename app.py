@@ -121,42 +121,28 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                     params.extend(page_conditions)
 
                 if mode == 'test':
-                    filter_sql, filter_params = build_test_filter_subquery(stage, user_id)
-                    query += filter_sql
-                    params.extend(filter_params)
+                    if stage > 1:
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'test' AND result = 'unknown'
+                            )
+                        '''
+                        params.extend([user_id, stage - 1])
                 elif mode == 'practice':
-                    if stage == 1:
-                        # 初回の練習：直前のテストの✕だけ
-                        filter_sql = '''
-                            AND id IN (
-                                SELECT card_id FROM (
-                                    SELECT DISTINCT ON (card_id) card_id, result
-                                    FROM study_log
-                                    WHERE user_id = %s AND stage = %s AND mode = 'test'
-                                    ORDER BY card_id, id DESC
-                                ) AS latest
-                                WHERE result = 'unknown'
-                            )
-                        '''
-                        params.append(user_id)
-                        params.append(stage)
-                        query += filter_sql
-                    else:
-                        # 2周目以降の練習：直前の練習の✕だけ
-                        filter_sql = '''
-                            AND id IN (
-                                SELECT card_id FROM (
-                                    SELECT DISTINCT ON (card_id) card_id, result
-                                    FROM study_log
-                                    WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                                    ORDER BY card_id, id DESC
-                                ) AS latest
-                                WHERE result = 'unknown'
-                            )
-                        '''
-                        params.append(user_id)
-                        params.append(stage)
-                        query += filter_sql
+                    # 対象は現在のステージで直近の "✕"（unknown）のカードだけ
+                    query += '''
+                        AND id IN (
+                            SELECT card_id FROM (
+                                SELECT DISTINCT ON (card_id) card_id, result
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                ORDER BY card_id, id DESC
+                            ) AS latest
+                            WHERE result = 'unknown'
+                        )
+                    '''
+                    params.extend([user_id, stage])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -172,6 +158,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
     except Exception as e:
         app.logger.error(f"教材取得エラー: {e}")
         return None
+
 
 def get_completed_stages(user_id, source, page_range):
     result = {'test': set(), 'practice': set()}
