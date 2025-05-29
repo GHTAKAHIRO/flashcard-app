@@ -79,20 +79,15 @@ def build_test_filter_subquery(stage, user_id):
         ''', [user_id, stage - 1]
 
 def build_practice_filter_subquery(stage, user_id):
-    if stage == 1:
-        return '''
-            AND id IN (
-                SELECT card_id FROM study_log
-                WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
-            )
-        ''', [user_id]
-    else:
-        return '''
-            AND id IN (
-                SELECT card_id FROM study_log
-                WHERE user_id = %s AND stage = %s AND mode = 'practice' AND result = 'unknown'
-            )
-        ''', [user_id, stage - 1]
+    return '''
+        AND id IN (
+            SELECT card_id FROM study_log
+            WHERE user_id = %s AND (
+                (stage = 1 AND mode = 'test')
+                OR (stage = %s AND mode = 'practice')
+            ) AND result = 'unknown'
+        )
+    ''', [user_id, stage - 1]
 
 def get_study_cards(source, stage, mode, page_range, user_id):
     try:
@@ -194,7 +189,6 @@ def get_completed_stages(user_id, source, page_range):
 
                         latest_results = cur.fetchall()
 
-                        # 修正：すべての対象カードに記録があれば完了とみなす
                         if len(latest_results) == total:
                             result[mode].add(stage)
 
