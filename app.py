@@ -79,30 +79,17 @@ def build_test_filter_subquery(stage, user_id):
         ''', [user_id, stage - 1]
 
 def build_practice_filter_subquery(stage, user_id):
-    if stage == 1:
-        return '''
-            AND id IN (
-                SELECT card_id FROM (
-                    SELECT DISTINCT ON (card_id) card_id, result
-                    FROM study_log
-                    WHERE user_id = %s AND stage = 1 AND mode = 'test'
-                    ORDER BY card_id, id DESC
-                ) AS latest
-                WHERE result = 'unknown'
-            )
-        ''', [user_id]
-    else:
-        return '''
-            AND id IN (
-                SELECT card_id FROM (
-                    SELECT DISTINCT ON (card_id) card_id, result
-                    FROM study_log
-                    WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                    ORDER BY card_id, id DESC
-                ) AS latest
-                WHERE result = 'unknown'
-            )
-        ''', [user_id, stage - 1]
+    return '''
+        AND id IN (
+            SELECT card_id FROM (
+                SELECT DISTINCT ON (card_id) card_id, result
+                FROM study_log
+                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                ORDER BY card_id, id DESC
+            ) AS latest
+            WHERE result = 'unknown'
+        )
+    ''', [user_id, stage]
 
 def get_study_cards(source, stage, mode, page_range, user_id):
     try:
@@ -199,25 +186,16 @@ def get_completed_stages(user_id, source, page_range):
                     if count == len(card_ids):
                         result['test'].add(stage)
 
-                    # practice完了：testのunknownが全てpracticeでknown
-                    cur.execute('''
-                        SELECT card_id FROM study_log
-                        WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
-                    ''', (user_id,))
-                    unknown_ids = {r[0] for r in cur.fetchall() if r[0] in card_ids}
-
-                    if not unknown_ids:
-                        continue
-
+                    # practice完了：このステージでunknownがない
                     cur.execute('''
                         SELECT DISTINCT ON (card_id) card_id, result
                         FROM study_log
                         WHERE user_id = %s AND stage = %s AND mode = 'practice'
                         ORDER BY card_id, id DESC
                     ''', (user_id, stage))
-                    latest_results = {r[0]: r[1] for r in cur.fetchall() if r[0] in unknown_ids}
+                    latest_results = {r[0]: r[1] for r in cur.fetchall() if r[0] in card_ids}
 
-                    if all(latest_results.get(cid) == 'known' for cid in unknown_ids):
+                    if all(res == 'known' for res in latest_results.values()):
                         result['practice'].add(stage)
 
     except Exception as e:
@@ -240,6 +218,7 @@ def study(source):
         return redirect(url_for('prepare', source=source))
 
     return render_template('index.html', cards=cards_dict, mode=mode)
+
 
 
 # ホームリダイレクト
