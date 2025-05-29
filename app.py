@@ -119,6 +119,8 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                     placeholders = ','.join(['%s'] * len(page_conditions))
                     query += f' AND page_number IN ({placeholders})'
                     params.extend(page_conditions)
+                else:
+                    query += ' AND false'
 
                 if mode == 'test':
                     if stage > 1:
