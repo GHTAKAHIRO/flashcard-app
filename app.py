@@ -84,15 +84,16 @@ def build_practice_filter_subquery(stage, user_id):
             SELECT card_id FROM (
                 SELECT DISTINCT ON (card_id) card_id, result, mode, stage
                 FROM study_log
-                WHERE user_id = %s
+                WHERE user_id = %s AND (
+                    (stage = 1 AND mode = 'test')
+                    OR (stage = %s AND mode = 'practice')
+                )
                 ORDER BY card_id, id DESC
             ) AS latest
-            WHERE (
-                (stage = 1 AND mode = 'test' AND result = 'unknown')
-                OR (stage = %s AND mode = 'practice' AND result = 'unknown')
-            )
+            WHERE result = 'unknown'
         )
     ''', [user_id, stage - 1]
+
 
 def get_study_cards(source, stage, mode, page_range, user_id):
     try:
