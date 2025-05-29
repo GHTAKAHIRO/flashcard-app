@@ -102,6 +102,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                 '''
                 params = [source]
 
+                # ページ範囲の条件
                 page_conditions = []
                 if page_range:
                     for part in page_range.split(','):
@@ -119,9 +120,8 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                     placeholders = ','.join(['%s'] * len(page_conditions))
                     query += f' AND page_number IN ({placeholders})'
                     params.extend(page_conditions)
-                else:
-                    query += ' AND false'
 
+                # フィルター条件の追加
                 if mode == 'test':
                     if stage > 1:
                         query += '''
@@ -131,23 +131,36 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                             )
                         '''
                         params.extend([user_id, stage - 1])
-                else:
-                    # 2周目以降の練習：この練習ステージ内で最新が unknown のもののみ
-                    filter_sql = '''
-                        AND id IN (
-                            SELECT card_id
-                            FROM (
-                                SELECT card_id, result
-                                FROM study_log
-                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                                ORDER BY id DESC
-                            ) AS logs
-                            GROUP BY card_id, result
-                            HAVING bool_and(result = 'unknown')
-                        )
-                    '''
 
-                    params.extend([user_id, stage])
+                elif mode == 'practice':
+                    if stage == 1:
+                        # 練習ステージ1では、直前のテストの✕を出題
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT DISTINCT ON (card_id) card_id, result
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = %s AND mode = 'test'
+                                    ORDER BY card_id, id DESC
+                                ) AS latest
+                                WHERE result = 'unknown'
+                            )
+                        '''
+                        params.extend([user_id, stage])
+                    else:
+                        # 練習ステージ2以降では、前回の練習の✕を出題（同じstageの前の周回の結果を見ている）
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT DISTINCT ON (card_id) card_id, result
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                    ORDER BY card_id, id DESC
+                                ) AS latest
+                                WHERE result = 'unknown'
+                            )
+                        '''
+                        params.extend([user_id, stage])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
