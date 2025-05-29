@@ -109,16 +109,16 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                     query += '''
                         AND id IN (
                             SELECT card_id FROM (
-                                SELECT card_id, result
+                                SELECT DISTINCT ON (card_id) card_id, result
                                 FROM study_log
                                 WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                                ORDER BY id DESC
+                                ORDER BY card_id, id DESC
                             ) AS latest
-                            GROUP BY card_id
-                            HAVING bool_and(result = 'unknown')
+                            WHERE result = 'unknown'
                         )
                     '''
                     params.extend([user_id, stage])
+
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
