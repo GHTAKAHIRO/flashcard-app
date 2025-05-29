@@ -81,8 +81,13 @@ def build_test_filter_subquery(stage, user_id):
 def build_practice_filter_subquery(stage, user_id):
     return '''
         AND id IN (
-            SELECT card_id FROM study_log
-            WHERE user_id = %s AND (
+            SELECT card_id FROM (
+                SELECT DISTINCT ON (card_id) card_id, result, mode, stage
+                FROM study_log
+                WHERE user_id = %s
+                ORDER BY card_id, id DESC
+            ) AS latest
+            WHERE (
                 (stage = 1 AND mode = 'test')
                 OR (stage = %s AND mode = 'practice')
             ) AND result = 'unknown'
@@ -189,7 +194,7 @@ def get_completed_stages(user_id, source, page_range):
 
                         latest_results = cur.fetchall()
 
-                        if len(latest_results) == total:
+                        if len(latest_results) == total and all(r[1] == 'known' for r in latest_results):
                             result[mode].add(stage)
 
     except Exception as e:
