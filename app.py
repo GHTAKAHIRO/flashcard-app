@@ -91,7 +91,6 @@ def build_practice_filter_subquery(stage, user_id):
         )
     ''', [user_id, stage]
 
-
 def get_study_cards(source, stage, mode, page_range, user_id):
     try:
         with get_db_connection() as conn:
@@ -103,7 +102,6 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                 '''
                 params = [source]
 
-                # --- ページ範囲条件の追加 ---
                 page_conditions = []
                 if page_range:
                     for part in page_range.split(','):
@@ -122,27 +120,13 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                     query += f' AND page_number IN ({placeholders})'
                     params.extend(page_conditions)
 
-                # --- モード別フィルター ---
                 if mode == 'test':
-                    if stage > 1:
-                        query += '''
-                            AND id IN (
-                                SELECT card_id FROM study_log
-                                WHERE user_id = %s AND stage = %s AND mode = 'test' AND result = 'unknown'
-                            )
-                        '''
-                        params.extend([user_id, stage - 1])
+                    filter_sql, filter_params = build_test_filter_subquery(stage, user_id)
+                    query += filter_sql
+                    params.extend(filter_params)
                 elif mode == 'practice':
-                    # 該当ステージでの練習ログが存在するか確認
-                    cur.execute('''
-                        SELECT COUNT(*) FROM study_log
-                        WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                    ''', (user_id, stage))
-                    practice_log_count = cur.fetchone()[0]
-
-                    if practice_log_count == 0:
-                        # 初回練習：前のテストでunknownだったカード
-                        query += '''
+                    if stage == 1:
+                        filter_sql = '''
                             AND id IN (
                                 SELECT card_id FROM (
                                     SELECT DISTINCT ON (card_id) card_id, result
@@ -153,10 +137,11 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                                 WHERE result = 'unknown'
                             )
                         '''
-                        params.extend([user_id, stage])
+                        params.append(user_id)
+                        params.append(stage)
+                        query += filter_sql
                     else:
-                        # 2周目以降：この練習内で最新が unknown のみ
-                        query += '''
+                        filter_sql = '''
                             AND id IN (
                                 SELECT card_id FROM (
                                     SELECT DISTINCT ON (card_id) card_id, result
@@ -167,7 +152,9 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                                 WHERE result = 'unknown'
                             )
                         '''
-                        params.extend([user_id, stage])
+                        params.append(user_id)
+                        params.append(stage)
+                        query += filter_sql
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -180,11 +167,9 @@ def get_study_cards(source, stage, mode, page_range, user_id):
         ) for r in records]
 
         return cards_dict
-
     except Exception as e:
         app.logger.error(f"教材取得エラー: {e}")
         return None
-
 
 def get_completed_stages(user_id, source, page_range):
     result = {'test': set(), 'practice': set()}
@@ -219,25 +204,32 @@ def get_completed_stages(user_id, source, page_range):
                     return result
 
                 for stage in [1, 2, 3]:
-                    # test完了：全カードにログがある
                     cur.execute('''
-                        SELECT COUNT(DISTINCT card_id) FROM study_log
-                        WHERE user_id = %s AND mode = 'test' AND stage = %s AND card_id = ANY(%s)
-                    ''', (user_id, stage, card_ids))
-                    count = cur.fetchone()[0]
-                    if count == len(card_ids):
-                        result['test'].add(stage)
+                        SELECT DISTINCT card_id
+                        FROM study_log
+                        WHERE user_id = %s AND stage = %s AND mode = 'test'
+                    ''', (user_id, stage))
+                    tested_card_ids = [row[0] for row in cur.fetchall()]
 
-                    # practice完了：このステージでunknownがない
+                    if tested_card_ids:
+                        cur.execute('''
+                            SELECT COUNT(DISTINCT card_id)
+                            FROM study_log
+                            WHERE user_id = %s AND mode = 'test' AND stage = %s AND card_id = ANY(%s)
+                        ''', (user_id, stage, tested_card_ids))
+                        count = cur.fetchone()[0]
+                        if count == len(tested_card_ids):
+                            result['test'].add(stage)
+
                     cur.execute('''
                         SELECT DISTINCT ON (card_id) card_id, result
                         FROM study_log
                         WHERE user_id = %s AND stage = %s AND mode = 'practice'
                         ORDER BY card_id, id DESC
                     ''', (user_id, stage))
-                    latest_results = {r[0]: r[1] for r in cur.fetchall() if r[0] in card_ids}
+                    latest_results = {r[0]: r[1] for r in cur.fetchall()}
 
-                    if all(res == 'known' for res in latest_results.values()) and latest_results:
+                    if latest_results and all(res == 'known' for res in latest_results.values()):
                         result['practice'].add(stage)
 
     except Exception as e:
@@ -260,7 +252,6 @@ def study(source):
         return redirect(url_for('prepare', source=source))
 
     return render_template('index.html', cards=cards_dict, mode=mode)
-
 
 
 # ホームリダイレクト
