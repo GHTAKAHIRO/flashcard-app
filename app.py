@@ -91,6 +91,7 @@ def build_practice_filter_subquery(stage, user_id):
         )
     ''', [user_id, stage]
 
+
 def get_study_cards(source, stage, mode, page_range, user_id):
     try:
         with get_db_connection() as conn:
@@ -102,6 +103,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                 '''
                 params = [source]
 
+                # --- ページ範囲条件の追加 ---
                 page_conditions = []
                 if page_range:
                     for part in page_range.split(','):
@@ -120,13 +122,27 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                     query += f' AND page_number IN ({placeholders})'
                     params.extend(page_conditions)
 
+                # --- モード別フィルター ---
                 if mode == 'test':
-                    filter_sql, filter_params = build_test_filter_subquery(stage, user_id)
-                    query += filter_sql
-                    params.extend(filter_params)
+                    if stage > 1:
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'test' AND result = 'unknown'
+                            )
+                        '''
+                        params.extend([user_id, stage - 1])
                 elif mode == 'practice':
-                    if stage == 1:
-                        filter_sql = '''
+                    # 該当ステージでの練習ログが存在するか確認
+                    cur.execute('''
+                        SELECT COUNT(*) FROM study_log
+                        WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                    ''', (user_id, stage))
+                    practice_log_count = cur.fetchone()[0]
+
+                    if practice_log_count == 0:
+                        # 初回練習：前のテストでunknownだったカード
+                        query += '''
                             AND id IN (
                                 SELECT card_id FROM (
                                     SELECT DISTINCT ON (card_id) card_id, result
@@ -137,11 +153,10 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                                 WHERE result = 'unknown'
                             )
                         '''
-                        params.append(user_id)
-                        params.append(stage)
-                        query += filter_sql
+                        params.extend([user_id, stage])
                     else:
-                        filter_sql = '''
+                        # 2周目以降：この練習内で最新が unknown のみ
+                        query += '''
                             AND id IN (
                                 SELECT card_id FROM (
                                     SELECT DISTINCT ON (card_id) card_id, result
@@ -152,9 +167,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                                 WHERE result = 'unknown'
                             )
                         '''
-                        params.append(user_id)
-                        params.append(stage)
-                        query += filter_sql
+                        params.extend([user_id, stage])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -167,9 +180,11 @@ def get_study_cards(source, stage, mode, page_range, user_id):
         ) for r in records]
 
         return cards_dict
+
     except Exception as e:
         app.logger.error(f"教材取得エラー: {e}")
         return None
+
 
 def get_completed_stages(user_id, source, page_range):
     result = {'test': set(), 'practice': set()}
@@ -204,32 +219,30 @@ def get_completed_stages(user_id, source, page_range):
                     return result
 
                 for stage in [1, 2, 3]:
+                    # 対象カード数
+                    target_card_ids = card_ids
+
+                    # 出題済みカード数
                     cur.execute('''
-                        SELECT DISTINCT card_id
+                        SELECT COUNT(DISTINCT card_id)
                         FROM study_log
-                        WHERE user_id = %s AND stage = %s AND mode = 'test'
-                    ''', (user_id, stage))
-                    tested_card_ids = [row[0] for row in cur.fetchall()]
+                        WHERE user_id = %s AND stage = %s AND mode = 'test' AND card_id = ANY(%s)
+                    ''', (user_id, stage, card_ids))
+                    tested_count = cur.fetchone()[0]
 
-                    if tested_card_ids:
-                        cur.execute('''
-                            SELECT COUNT(DISTINCT card_id)
-                            FROM study_log
-                            WHERE user_id = %s AND mode = 'test' AND stage = %s AND card_id = ANY(%s)
-                        ''', (user_id, stage, tested_card_ids))
-                        count = cur.fetchone()[0]
-                        if count == len(tested_card_ids):
-                            result['test'].add(stage)
+                    if tested_count == len(card_ids):
+                        result['test'].add(stage)
 
+                    # practice完了：このステージでunknownがない
                     cur.execute('''
                         SELECT DISTINCT ON (card_id) card_id, result
                         FROM study_log
                         WHERE user_id = %s AND stage = %s AND mode = 'practice'
                         ORDER BY card_id, id DESC
                     ''', (user_id, stage))
-                    latest_results = {r[0]: r[1] for r in cur.fetchall()}
+                    latest_results = {r[0]: r[1] for r in cur.fetchall() if r[0] in card_ids}
 
-                    if latest_results and all(res == 'known' for res in latest_results.values()):
+                    if all(res == 'known' for res in latest_results.values()) and latest_results:
                         result['practice'].add(stage)
 
     except Exception as e:
@@ -252,6 +265,7 @@ def study(source):
         return redirect(url_for('prepare', source=source))
 
     return render_template('index.html', cards=cards_dict, mode=mode)
+
 
 
 # ホームリダイレクト
