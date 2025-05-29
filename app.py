@@ -92,7 +92,7 @@ def build_practice_filter_subquery(stage, user_id):
                 OR (stage = %s AND mode = 'practice')
             ) AND result = 'unknown'
         )
-    ''', [user_id, stage - 1]
+    ''', [user_id, stage if stage > 1 else 1]
 
 def get_study_cards(source, stage, mode, page_range, user_id):
     try:
@@ -175,10 +175,6 @@ def get_completed_stages(user_id, source, page_range):
                 else:
                     cur.execute('SELECT id FROM image WHERE source = %s', (source,))
                 card_ids = [row[0] for row in cur.fetchall()]
-                total = len(card_ids)
-
-                if total == 0:
-                    return result
 
                 for mode in ['test', 'practice']:
                     for stage in [1, 2, 3]:
@@ -193,8 +189,9 @@ def get_completed_stages(user_id, source, page_range):
                         ''', (user_id, mode, stage, card_ids))
 
                         latest_results = cur.fetchall()
+                        target_ids = {r[0] for r in latest_results if r[1] == 'known'}
 
-                        if len(latest_results) == total and all(r[1] == 'known' for r in latest_results):
+                        if target_ids and all(cid in target_ids for cid in card_ids):
                             result[mode].add(stage)
 
     except Exception as e:
