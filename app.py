@@ -129,19 +129,22 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                             )
                         '''
                         params.extend([user_id, stage - 1])
-                elif mode == 'practice':
-                    # 対象は現在のステージで直近の "✕"（unknown）のカードだけ
-                    query += '''
+                else:
+                    # 2周目以降の練習：この練習ステージ内で最新が unknown のもののみ
+                    filter_sql = '''
                         AND id IN (
-                            SELECT card_id FROM (
-                                SELECT DISTINCT ON (card_id) card_id, result
+                            SELECT card_id
+                            FROM (
+                                SELECT card_id, result
                                 FROM study_log
                                 WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                                ORDER BY card_id, id DESC
-                            ) AS latest
-                            WHERE result = 'unknown'
+                                ORDER BY id DESC
+                            ) AS logs
+                            GROUP BY card_id, result
+                            HAVING bool_and(result = 'unknown')
                         )
                     '''
+
                     params.extend([user_id, stage])
 
                 query += ' ORDER BY id DESC'
