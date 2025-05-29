@@ -194,7 +194,8 @@ def get_completed_stages(user_id, source, page_range):
 
                         latest_results = cur.fetchall()
 
-                        if len(latest_results) == total and all(r[1] == 'known' for r in latest_results):
+                        # 修正：すべての対象カードに記録があれば完了とみなす
+                        if len(latest_results) == total:
                             result[mode].add(stage)
 
     except Exception as e:
