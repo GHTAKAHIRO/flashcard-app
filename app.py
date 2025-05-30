@@ -505,17 +505,11 @@ def prepare(source):
                 result = cur.fetchone()
                 if result:
                     saved_page_range = result[0]
-                    session['page_range'] = saved_page_range  # セッションにも反映
+                    session['page_range'] = saved_page_range
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
 
-    # ここでデバッグログ出力
-    app.logger.error(f"[DEBUG] user_id: {user_id}")
-    app.logger.error(f"[DEBUG] source: {source}")
-    app.logger.error(f"[DEBUG] saved_page_range: '{saved_page_range}'")
-
-    # ✅ GET時は completed を毎回取得（例外関係なく）
-# ✅ GET時は completed を毎回取得（例外関係なく）
+    # ✅ GET時は completed を毎回取得
     try:
         completed_raw = get_completed_stages(user_id, source, saved_page_range)
         completed = {
@@ -531,6 +525,14 @@ def prepare(source):
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
         completed = {"test": set(), "practice": set(), "perfect_completion": False}
+
+    # ← ここが重要！必ず return が実行される
+    return render_template(
+        'prepare.html',
+        source=source,
+        completed=completed,
+        saved_page_range=saved_page_range
+    )
 
 @app.route('/log_result', methods=['POST'])
 @login_required
