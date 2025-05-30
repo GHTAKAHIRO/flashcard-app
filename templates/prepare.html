@@ -204,7 +204,7 @@
       </div>
 
       <!-- Stage 2 -->
-      {% if 1 in completed['test'] %}
+      {% if 1 in completed['test'] and not completed.get('perfect_completion') %}
       <div class="{% if 2 in completed['test'] and 2 in completed['practice'] %}completed-stage{% elif 1 in completed['practice'] %}current-stage{% else %}future-stage{% endif %}">
         <div class="stage-title">
           <div class="stage-number {% if 2 in completed['test'] and 2 in completed['practice'] %}completed-number{% elif 1 not in completed['practice'] %}future-number{% endif %}">2</div>
@@ -229,7 +229,7 @@
         </div>
         {% endif %}
 
-        {% if 2 in completed['test'] %}
+        {% if 2 in completed['test'] and not completed.get('perfect_completion') %}
           {% if 2 not in completed['practice'] %}
           <div class="option">
             <input type="radio" name="stage" value="2-practice" id="stage2-practice">
@@ -248,7 +248,7 @@
       {% endif %}
 
       <!-- Stage 3 -->
-      {% if 2 in completed['test'] %}
+      {% if 2 in completed['test'] and not completed.get('perfect_completion') %}
       <div class="{% if 3 in completed['test'] and 3 in completed['practice'] %}completed-stage{% elif 2 in completed['practice'] %}current-stage{% else %}future-stage{% endif %}">
         <div class="stage-title">
           <div class="stage-number {% if 3 in completed['test'] and 3 in completed['practice'] %}completed-number{% elif 2 not in completed['practice'] %}future-number{% endif %}">3</div>
@@ -273,7 +273,7 @@
         </div>
         {% endif %}
 
-        {% if 3 in completed['test'] %}
+        {% if 3 in completed['test'] and not completed.get('perfect_completion') %}
           {% if 3 not in completed['practice'] %}
           <div class="option">
             <input type="radio" name="stage" value="3-practice" id="stage3-practice">
@@ -292,7 +292,13 @@
       {% endif %}
 
       <!-- 完了メッセージ -->
-      {% if 3 in completed['test'] and 3 in completed['practice'] %}
+      {% if completed.get('perfect_completion') %}
+      <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #ffd700, #ffed4e); color: #333; border-radius: 15px; margin-top: 20px; border: 3px solid #ffc107;">
+        <h3>🏆 素晴らしい！満点達成！</h3>
+        <p><strong>テストで満点を取ったため、全ての学習が完了しました！</strong></p>
+        <p>復習したい場合は、いつでも練習モードを選択できます。</p>
+      </div>
+      {% elif 3 in completed['test'] and 3 in completed['practice'] %}
       <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #28a745, #20c997); color: white; border-radius: 10px; margin-top: 20px;">
         <h3>🎊 おめでとうございます！</h3>
         <p>全ての学習を完了しました。復習したい場合は、いつでも練習モードを選択できます。</p>
