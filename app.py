@@ -134,8 +134,9 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                         params.append(user_id)
                 
                 elif mode == 'practice':
+                    # 練習モード: 段階的絞り込み方式
                     if stage == 1:
-                        # Stage 1 練習: Stage 1 テストで×だった問題のみ
+                        # Stage 1 練習: Stage 1 テストで×だった問題から、まだ○になっていない問題
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -143,13 +144,22 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                                            ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
                                     FROM study_log
                                     WHERE user_id = %s AND stage = 1 AND mode = 'test'
-                                ) AS ranked
+                                ) AS test_ranked
                                 WHERE rn = 1 AND result = 'unknown'
                             )
+                            AND id NOT IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 1 AND mode = 'practice'
+                                ) AS practice_ranked
+                                WHERE rn = 1 AND result = 'known'
+                            )
                         '''
-                        params.append(user_id)
+                        params.extend([user_id, user_id])
                     elif stage == 2:
-                        # Stage 2 練習: Stage 2 テストで×だった問題のみ
+                        # Stage 2 練習: Stage 2 テストで×だった問題から、まだ○になっていない問題
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -157,13 +167,22 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                                            ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
                                     FROM study_log
                                     WHERE user_id = %s AND stage = 2 AND mode = 'test'
-                                ) AS ranked
+                                ) AS test_ranked
                                 WHERE rn = 1 AND result = 'unknown'
                             )
+                            AND id NOT IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 2 AND mode = 'practice'
+                                ) AS practice_ranked
+                                WHERE rn = 1 AND result = 'known'
+                            )
                         '''
-                        params.append(user_id)
+                        params.extend([user_id, user_id])
                     elif stage == 3:
-                        # Stage 3 練習: Stage 3 テストで×だった問題のみ
+                        # Stage 3 練習: Stage 3 テストで×だった問題から、まだ○になっていない問題
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -171,11 +190,20 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                                            ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
                                     FROM study_log
                                     WHERE user_id = %s AND stage = 3 AND mode = 'test'
-                                ) AS ranked
+                                ) AS test_ranked
                                 WHERE rn = 1 AND result = 'unknown'
                             )
+                            AND id NOT IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 3 AND mode = 'practice'
+                                ) AS practice_ranked
+                                WHERE rn = 1 AND result = 'known'
+                            )
                         '''
-                        params.append(user_id)
+                        params.extend([user_id, user_id])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -263,7 +291,7 @@ def get_completed_stages(user_id, source, page_range):
                         if tested_count == len(target_card_ids):
                             result['test'].add(stage)
 
-                    # 練習完了判定
+                    # 練習完了判定（新仕様）
                     if target_card_ids:
                         # 各ステージのテストで×だった問題を取得
                         if stage == 1:
@@ -300,7 +328,7 @@ def get_completed_stages(user_id, source, page_range):
                         practice_target_cards = [r[0] for r in cur.fetchall()]
                         
                         if practice_target_cards:
-                            # 練習で全問題が○になったかチェック
+                            # 練習で全問題が最終的に○になったかチェック（新仕様）
                             cur.execute('''
                                 SELECT card_id FROM (
                                     SELECT card_id, result,
@@ -308,14 +336,13 @@ def get_completed_stages(user_id, source, page_range):
                                     FROM study_log
                                     WHERE user_id = %s AND stage = %s AND mode = 'practice' AND card_id = ANY(%s)
                                 ) AS ranked
-                                WHERE rn = 1
+                                WHERE rn = 1 AND result = 'known'
                             ''', (user_id, stage, practice_target_cards))
                             
-                            latest_practice_results = cur.fetchall()
+                            completed_practice_cards = [r[0] for r in cur.fetchall()]
                             
-                            # 全ての対象カードに練習履歴があり、かつ全て○の場合に完了
-                            if (len(latest_practice_results) == len(practice_target_cards) and 
-                                all(r[1] == 'known' for r in latest_practice_results)):
+                            # 全ての対象カードが練習で○になった場合に完了
+                            if len(completed_practice_cards) == len(practice_target_cards):
                                 result['practice'].add(stage)
                         else:
                             # テストで×の問題がない場合は練習完了
