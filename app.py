@@ -632,19 +632,40 @@ def logout():
 @app.route('/reset_history/<source>', methods=['POST'])
 @login_required
 def reset_history(source):
+    user_id = str(current_user.id)
+    app.logger.error(f"[DEBUG] 履歴削除開始: user_id={user_id}, source={source}")
+    
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # 削除前の件数確認
+                cur.execute('''
+                    SELECT COUNT(*) FROM study_log
+                    WHERE user_id = %s AND card_id IN (
+                        SELECT id FROM image WHERE source = %s
+                    )
+                ''', (user_id, source))
+                before_count = cur.fetchone()[0]
+                app.logger.error(f"[DEBUG] 削除前の履歴件数: {before_count}")
+                
+                # 削除実行
                 cur.execute('''
                     DELETE FROM study_log
                     WHERE user_id = %s AND card_id IN (
                         SELECT id FROM image WHERE source = %s
                     )
-                ''', (str(current_user.id), source))
+                ''', (user_id, source))
+                
+                deleted_count = cur.rowcount
                 conn.commit()
+                
+                app.logger.error(f"[DEBUG] 削除された件数: {deleted_count}")
+                
         flash(f"{source} の学習履歴を削除しました。")
     except Exception as e:
         app.logger.error(f"履歴削除エラー: {e}")
+        import traceback
+        app.logger.error(f"[DEBUG] スタックトレース: {traceback.format_exc()}")
         flash("履歴の削除に失敗しました。")
 
     return redirect(url_for('dashboard'))
