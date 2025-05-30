@@ -502,6 +502,11 @@ def prepare(source):
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
 
+    # ここでデバッグログ出力
+    app.logger.error(f"[DEBUG] user_id: {user_id}")
+    app.logger.error(f"[DEBUG] source: {source}")
+    app.logger.error(f"[DEBUG] saved_page_range: '{saved_page_range}'")
+
     # ✅ GET時は completed を毎回取得（例外関係なく）
     try:
         completed_raw = get_completed_stages(user_id, source, saved_page_range)
