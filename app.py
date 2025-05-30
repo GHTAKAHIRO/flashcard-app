@@ -554,20 +554,24 @@ def prepare(source):
         app.logger.error(f"user_settings取得エラー: {e}")
 
     # ✅ GET時は completed を毎回取得
-    try:
-        completed_raw = get_completed_stages(user_id, source, saved_page_range)
-        completed = {
-            "test": set(completed_raw.get("test", [])),
-            "practice": set(completed_raw.get("practice", [])),
-            "perfect_completion": completed_raw.get("perfect_completion", False)
-        }
-        
-        
-    except Exception as e:
-        app.logger.error(f"完了ステージ取得エラー: {e}")
-        completed = {"test": set(), "practice": set(), "perfect_completion": False}
-
+try:
+    completed_raw = get_completed_stages(user_id, source, saved_page_range)
+    completed = {
+        "test": set(completed_raw.get("test", [])),
+        "practice": set(completed_raw.get("practice", [])),
+        "perfect_completion": completed_raw.get("perfect_completion", False),
+        "practice_history": completed_raw.get("practice_history", {})  # ← この行が追加されているか
+    }
+    
+    # デバッグ用ログ（これが追加されているか）
+    app.logger.error(f"[DEBUG] practice_history: {completed.get('practice_history', {})}")
+    app.logger.error(f"[DEBUG] completed_raw全体: {completed_raw}")
+    
+except Exception as e:
+    app.logger.error(f"完了ステージ取得エラー: {e}")
+    completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}  # ← practice_history追加
     # ← ここが重要！必ず return が実行される
+    
     return render_template(
         'prepare.html',
         source=source,
