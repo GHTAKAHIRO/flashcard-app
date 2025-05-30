@@ -67,7 +67,7 @@ def parse_page_range(page_range_str):
             pages.add(part.strip())
     return list(pages)
 
-def get_study_cards(source, stage, mode, page_range, user_id, difficulty=''):  # difficulty引数追加
+def get_study_cards(source, stage, mode, page_range, user_id, difficulty=''):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -106,11 +106,111 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty=''):  #
                     query += f' AND level IN ({difficulty_placeholders})'
                     params.extend(difficulty_list)
 
-                # 以下、既存のモード・ステージ別の条件（変更なし）
+                # モード・ステージ別の条件
                 if mode == 'test':
-                    # 既存のテストモード処理...
+                    if stage == 1:
+                        # Stage 1 テスト: 全問題対象（ページ範囲内）
+                        pass  # 既にページ範囲で絞り込み済み
+                    elif stage == 2:
+                        # Stage 2 テスト: Stage 1 テストで×だった問題のみ
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 1 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                        '''
+                        params.append(user_id)
+                    elif stage == 3:
+                        # Stage 3 テスト: Stage 2 テストで×だった問題のみ
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 2 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                        '''
+                        params.append(user_id)
+                
                 elif mode == 'practice':
-                    # 既存の練習モード処理...
+                    # 練習モード: 段階的絞り込み方式
+                    if stage == 1:
+                        # Stage 1 練習: Stage 1 テストで×だった問題から、まだ○になっていない問題
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 1 AND mode = 'test'
+                                ) AS test_ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                            AND id NOT IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 1 AND mode = 'practice'
+                                ) AS practice_ranked
+                                WHERE rn = 1 AND result = 'known'
+                            )
+                        '''
+                        params.extend([user_id, user_id])
+                    elif stage == 2:
+                        # Stage 2 練習: Stage 2 テストで×だった問題から、まだ○になっていない問題
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 2 AND mode = 'test'
+                                ) AS test_ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                            AND id NOT IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 2 AND mode = 'practice'
+                                ) AS practice_ranked
+                                WHERE rn = 1 AND result = 'known'
+                            )
+                        '''
+                        params.extend([user_id, user_id])
+                    elif stage == 3:
+                        # Stage 3 練習: Stage 3 テストで×だった問題から、まだ○になっていない問題
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 3 AND mode = 'test'
+                                ) AS test_ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                            AND id NOT IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 3 AND mode = 'practice'
+                                ) AS practice_ranked
+                                WHERE rn = 1 AND result = 'known'
+                            )
+                        '''
+                        params.extend([user_id, user_id])
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
