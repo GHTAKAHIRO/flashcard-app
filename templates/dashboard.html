@@ -4,29 +4,194 @@
     <meta charset="UTF-8" />
     <title>教材を選ぶ</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .source-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .source-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 15px;
+        }
+        .page-range-section {
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .page-range-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .page-range-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .start-button {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .start-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,123,255,0.3);
+        }
+        .reset-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .reset-button:hover {
+            background: #c82333;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .error-message {
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
-    <p>ようこそ、{{ current_user.username }} さん</p>
+        <p>ようこそ、{{ current_user.username }} さん</p>
         <a href="{{ url_for('logout') }}">ログアウト</a>
     </div>
 
-    <h2>学習する教材を選んでください</h2>
-<ul>
-  {% for s in sources %}
-    <li>
-      📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）
+    <h2>📚 学習する教材を選んでください</h2>
 
-      <!-- 学習リンク -->
-      <a href="{{ url_for('prepare', source=s.source) }}">[この教材で学習する]</a>
+    {% for s in sources %}
+    <div class="source-card">
+        <div class="source-title">
+            📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）
+        </div>
+        
+        <form method="POST" action="{{ url_for('set_page_range_and_prepare', source=s.source) }}" class="page-range-form">
+            <div class="page-range-section">
+                <label for="page_range_{{ loop.index }}"><strong>📖 学習するページ範囲:</strong></label>
+                <input type="text" 
+                       id="page_range_{{ loop.index }}" 
+                       name="page_range" 
+                       class="page-range-input"
+                       placeholder="例: 1-10, 15, 20-25"
+                       value="{{ saved_ranges.get(s.source, '') if saved_ranges else '' }}">
+                <div class="help-text">
+                    空欄の場合は全ページが対象になります。複数範囲はカンマ区切りで入力してください。
+                </div>
+                <div class="error-message" id="error_{{ loop.index }}"></div>
+            </div>
+            
+            <div class="action-buttons">
+                <button type="submit" class="start-button">🚀 この設定で学習開始</button>
+                
+                <form method="POST" action="{{ url_for('reset_history', source=s.source) }}" style="display: inline;">
+                    <button type="submit" 
+                            class="reset-button"
+                            onclick="return confirm('{{ s.source }} の学習履歴をすべて削除します。よろしいですか？')">
+                        🗑 履歴削除
+                    </button>
+                </form>
+            </div>
+        </form>
+    </div>
+    {% endfor %}
 
-      <!-- 履歴削除ボタン（フォーム） -->
-      <form method="POST" action="{{ url_for('reset_history', source=s.source) }}" style="display: inline;">
-        <button type="submit" onclick="return confirm('この教材の履歴をすべて削除します。よろしいですか？')">🗑 履歴削除</button>
-      </form>
-    </li>
-  {% endfor %}
-</ul>
-
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = document.querySelectorAll('.page-range-form');
+            
+            forms.forEach((form, index) => {
+                const input = form.querySelector('.page-range-input');
+                const errorDiv = document.getElementById(`error_${index + 1}`);
+                
+                function validatePageRange(value) {
+                    if (!value.trim()) return { valid: true }; // 空欄は許可
+                    
+                    const parts = value.split(',');
+                    const rangePattern = /^\d+\s*-\s*\d+$/;
+                    const numberPattern = /^\d+$/;
+                    
+                    for (let part of parts) {
+                        part = part.trim();
+                        if (!(rangePattern.test(part) || numberPattern.test(part))) {
+                            return {
+                                valid: false,
+                                message: "ページ範囲は「1-10,15,20-25」のように入力してください"
+                            };
+                        }
+                        
+                        if (rangePattern.test(part)) {
+                            const [start, end] = part.split('-').map(s => parseInt(s.trim(), 10));
+                            if (start > end) {
+                                return {
+                                    valid: false,
+                                    message: `「${part}」は開始ページ ≦ 終了ページにしてください`
+                                };
+                            }
+                        }
+                    }
+                    return { valid: true };
+                }
+                
+                // リアルタイムバリデーション
+                input.addEventListener('input', function() {
+                    const validation = validatePageRange(this.value);
+                    if (!validation.valid) {
+                        errorDiv.textContent = validation.message;
+                        errorDiv.style.display = 'block';
+                        input.style.borderColor = '#dc3545';
+                    } else {
+                        errorDiv.style.display = 'none';
+                        input.style.borderColor = '#ced4da';
+                    }
+                });
+                
+                // フォーム送信時のバリデーション
+                form.addEventListener('submit', function(e) {
+                    const validation = validatePageRange(input.value);
+                    if (!validation.valid) {
+                        e.preventDefault();
+                        errorDiv.textContent = validation.message;
+                        errorDiv.style.display = 'block';
+                        input.style.borderColor = '#dc3545';
+                        input.focus();
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

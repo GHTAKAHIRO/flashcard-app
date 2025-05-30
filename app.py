@@ -414,6 +414,7 @@ def home():
     else:
         return redirect(url_for('login'))
 
+
 # ダッシュボード
 @app.route('/dashboard')
 @login_required
@@ -424,11 +425,42 @@ def dashboard():
                 cur.execute('SELECT DISTINCT source, subject, grade FROM image ORDER BY source')
                 rows = cur.fetchall()
                 sources = [{"source": r[0], "subject": r[1], "grade": r[2]} for r in rows]
-        return render_template('dashboard.html', sources=sources)
+                
+                # 保存されたページ範囲を取得
+                user_id = str(current_user.id)
+                cur.execute('SELECT source, page_range FROM user_settings WHERE user_id = %s', (user_id,))
+                saved_ranges = dict(cur.fetchall())
+                
+        return render_template('dashboard.html', sources=sources, saved_ranges=saved_ranges)
     except Exception as e:
         app.logger.error(f"ダッシュボード取得エラー: {e}")
         flash("教材一覧の取得に失敗しました")
         return redirect(url_for('login'))
+
+
+@app.route('/set_page_range_and_prepare/<source>', methods=['POST'])
+@login_required
+def set_page_range_and_prepare(source):
+    page_range = request.form.get('page_range', '').strip()
+    user_id = str(current_user.id)
+    
+    # ページ範囲を保存
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    INSERT INTO user_settings (user_id, source, page_range)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (user_id, source)
+                    DO UPDATE SET page_range = EXCLUDED.page_range
+                ''', (user_id, source, page_range))
+                conn.commit()
+    except Exception as e:
+        app.logger.error(f"user_settings保存エラー: {e}")
+        flash("設定の保存に失敗しました")
+    
+    return redirect(url_for('prepare', source=source))
+
 
 # ログイン処理
 @app.route('/login', methods=['GET', 'POST'])

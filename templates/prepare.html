@@ -204,7 +204,7 @@
       </div>
 
       <!-- Stage 2 -->
-      {% if 1 in completed['test'] and not completed.get('perfect_completion') %}
+      {% if 1 in completed['practice'] and not completed.get('perfect_completion') %}
       <div class="{% if 2 in completed['test'] and 2 in completed['practice'] %}completed-stage{% elif 1 in completed['practice'] %}current-stage{% else %}future-stage{% endif %}">
         <div class="stage-title">
           <div class="stage-number {% if 2 in completed['test'] and 2 in completed['practice'] %}completed-number{% elif 1 not in completed['practice'] %}future-number{% endif %}">2</div>
@@ -248,7 +248,7 @@
       {% endif %}
 
       <!-- Stage 3 -->
-      {% if 2 in completed['test'] and not completed.get('perfect_completion') %}
+      {% if 2 in completed['practice'] and not completed.get('perfect_completion') %}
       <div class="{% if 3 in completed['test'] and 3 in completed['practice'] %}completed-stage{% elif 2 in completed['practice'] %}current-stage{% else %}future-stage{% endif %}">
         <div class="stage-title">
           <div class="stage-number {% if 3 in completed['test'] and 3 in completed['practice'] %}completed-number{% elif 2 not in completed['practice'] %}future-number{% endif %}">3</div>
