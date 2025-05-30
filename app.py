@@ -527,9 +527,9 @@ def prepare(source):
     app.logger.error(f"[DEBUG] 最終的なcompleted: {completed}")
     app.logger.error(f"[DEBUG] perfect_completion: {completed_raw.get('perfect_completion', 'キーなし')}")
     
-except Exception as e:
-    app.logger.error(f"完了ステージ取得エラー: {e}")
-    completed = {"test": set(), "practice": set(), "perfect_completion": False}  # ← ここも修正
+    except Exception as e:
+        app.logger.error(f"完了ステージ取得エラー: {e}")
+        completed = {"test": set(), "practice": set(), "perfect_completion": False}  # ← ここも修正
 
     return render_template(
         'prepare.html',
