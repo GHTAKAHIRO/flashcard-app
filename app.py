@@ -257,7 +257,7 @@ def get_completed_stages(user_id, source, page_range):
                     elif stage == 2:
                         # Stage 1 テストが完了している場合のみチェック
                         if 1 not in result['test']:
-                            continue  # Stage 1 テスト未完了なので Stage 2 はスキップ
+                            continue
                         
                         # Stage 1 テストで×だった問題が対象
                         cur.execute('''
@@ -273,7 +273,7 @@ def get_completed_stages(user_id, source, page_range):
                     elif stage == 3:
                         # Stage 2 テストが完了している場合のみチェック
                         if 2 not in result['test']:
-                            continue  # Stage 2 テスト未完了なので Stage 3 はスキップ
+                            continue
                         
                         # Stage 2 テストで×だった問題が対象
                         cur.execute('''
@@ -312,12 +312,18 @@ def get_completed_stages(user_id, source, page_range):
                             ''', (user_id, stage, list(target_card_ids)))
                             perfect_count = cur.fetchone()[0]
                             
+                            app.logger.error(f"[DEBUG] ステージ{stage} perfect_count: {perfect_count}, target_count: {len(target_card_ids)}")
+                            
                             # 満点の場合は全学習完了とみなす
                             if perfect_count == len(target_card_ids):
                                 result['perfect_completion'] = True
-                                # 満点なので以降のステージの練習も完了扱い
-                                for future_stage in range(stage, 4):
-                                    result['practice'].add(future_stage)
+                                app.logger.error(f"[DEBUG] ステージ{stage}で満点達成！")
+                                
+                                # 満点達成ステージまでの全ての練習を完了扱いにする
+                                for completed_stage in range(1, stage + 1):
+                                    result['practice'].add(completed_stage)
+                                    app.logger.error(f"[DEBUG] ステージ{completed_stage}の練習を完了扱いに追加")
+                                
                                 break  # 満点なので以降のステージは不要
 
                     elif stage > 1:
@@ -384,8 +390,12 @@ def get_completed_stages(user_id, source, page_range):
                                 # テストで×の問題がない場合（満点）は練習完了
                                 result['practice'].add(stage)
 
+                app.logger.error(f"[DEBUG] 最終result: {result}")
+
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
+        import traceback
+        app.logger.error(f"[DEBUG] スタックトレース: {traceback.format_exc()}")
 
     return result
 
