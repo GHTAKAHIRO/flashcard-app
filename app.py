@@ -223,8 +223,6 @@ def get_study_cards(source, stage, mode, page_range, user_id):
 def get_completed_stages(user_id, source, page_range):
     result = {'test': set(), 'practice': set(), 'perfect_completion': False}
     user_id = str(user_id)
-    
-    app.logger.error(f"[DEBUG] get_completed_stages 開始: user_id={user_id}, source={source}, page_range='{page_range}'")
 
     page_numbers = []
     if page_range:
@@ -238,8 +236,6 @@ def get_completed_stages(user_id, source, page_range):
                     continue
             else:
                 page_numbers.append(part)
-    
-    app.logger.error(f"[DEBUG] page_numbers: {page_numbers}")
 
     try:
         with get_db_connection() as conn:
@@ -253,16 +249,16 @@ def get_completed_stages(user_id, source, page_range):
                 else:
                     cur.execute('SELECT id FROM image WHERE source = %s', (source,))
                 all_card_ids = [row[0] for row in cur.fetchall()]
-                
-                app.logger.error(f"[DEBUG] all_card_ids: {all_card_ids}")
 
                 for stage in [1, 2, 3]:
-                    app.logger.error(f"[DEBUG] ステージ{stage}の処理開始")
-                    
                     # 各ステージのテスト対象カードを決定
                     if stage == 1:
                         target_card_ids = all_card_ids
                     elif stage == 2:
+                        # Stage 1 テストが完了している場合のみチェック
+                        if 1 not in result['test']:
+                            continue  # Stage 1 テスト未完了なので Stage 2 はスキップ
+                        
                         # Stage 1 テストで×だった問題が対象
                         cur.execute('''
                             SELECT card_id FROM (
@@ -275,6 +271,10 @@ def get_completed_stages(user_id, source, page_range):
                         ''', (user_id,))
                         target_card_ids = [r[0] for r in cur.fetchall()]
                     elif stage == 3:
+                        # Stage 2 テストが完了している場合のみチェック
+                        if 2 not in result['test']:
+                            continue  # Stage 2 テスト未完了なので Stage 3 はスキップ
+                        
                         # Stage 2 テストで×だった問題が対象
                         cur.execute('''
                             SELECT card_id FROM (
@@ -287,8 +287,6 @@ def get_completed_stages(user_id, source, page_range):
                         ''', (user_id,))
                         target_card_ids = [r[0] for r in cur.fetchall()]
 
-                    app.logger.error(f"[DEBUG] ステージ{stage} target_card_ids: {target_card_ids}")
-
                     # テストが完了しているかチェック
                     if target_card_ids:
                         cur.execute('''
@@ -297,12 +295,9 @@ def get_completed_stages(user_id, source, page_range):
                             WHERE user_id = %s AND mode = 'test' AND stage = %s AND card_id = ANY(%s)
                         ''', (user_id, stage, list(target_card_ids)))
                         tested_count = cur.fetchone()[0]
-                        
-                        app.logger.error(f"[DEBUG] ステージ{stage} tested_count: {tested_count}")
 
                         if tested_count == len(target_card_ids):
                             result['test'].add(stage)
-                            app.logger.error(f"[DEBUG] ステージ{stage} テスト完了")
                             
                             # 満点判定（テスト完了後に全問正解かチェック）
                             cur.execute('''
@@ -317,29 +312,80 @@ def get_completed_stages(user_id, source, page_range):
                             ''', (user_id, stage, list(target_card_ids)))
                             perfect_count = cur.fetchone()[0]
                             
-                            app.logger.error(f"[DEBUG] ステージ{stage} perfect_count: {perfect_count}")
-                            
                             # 満点の場合は全学習完了とみなす
                             if perfect_count == len(target_card_ids):
                                 result['perfect_completion'] = True
-                                app.logger.error(f"[DEBUG] ステージ{stage} 満点達成！")
                                 # 満点なので以降のステージの練習も完了扱い
                                 for future_stage in range(stage, 4):
                                     result['practice'].add(future_stage)
                                 break  # 満点なので以降のステージは不要
 
-                    else:
-                        # 対象カードがない場合（前ステージで満点だった場合）
+                    elif stage > 1:
+                        # Stage 2, 3 で対象カードがない場合は前ステージで満点だった
                         result['test'].add(stage)
                         result['practice'].add(stage)
-                        app.logger.error(f"[DEBUG] ステージ{stage} 対象カードなし→完了扱い")
 
-                app.logger.error(f"[DEBUG] 最終結果: {result}")
+                # 満点でない場合の通常の練習完了判定
+                if not result['perfect_completion']:
+                    for stage in [1, 2, 3]:
+                        if stage in result['test']:  # テストが完了している場合のみ
+                            # 各ステージのテストで×だった問題を取得
+                            if stage == 1:
+                                cur.execute('''
+                                    SELECT card_id FROM (
+                                        SELECT card_id, result,
+                                               ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                        FROM study_log
+                                        WHERE user_id = %s AND stage = 1 AND mode = 'test'
+                                    ) AS ranked
+                                    WHERE rn = 1 AND result = 'unknown'
+                                ''', (user_id,))
+                            elif stage == 2:
+                                cur.execute('''
+                                    SELECT card_id FROM (
+                                        SELECT card_id, result,
+                                               ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                        FROM study_log
+                                        WHERE user_id = %s AND stage = 2 AND mode = 'test'
+                                    ) AS ranked
+                                    WHERE rn = 1 AND result = 'unknown'
+                                ''', (user_id,))
+                            elif stage == 3:
+                                cur.execute('''
+                                    SELECT card_id FROM (
+                                        SELECT card_id, result,
+                                               ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                        FROM study_log
+                                        WHERE user_id = %s AND stage = 3 AND mode = 'test'
+                                    ) AS ranked
+                                    WHERE rn = 1 AND result = 'unknown'
+                                ''', (user_id,))
+                            
+                            practice_target_cards = [r[0] for r in cur.fetchall()]
+                            
+                            if practice_target_cards:
+                                # 練習で全問題が最終的に○になったかチェック
+                                cur.execute('''
+                                    SELECT card_id FROM (
+                                        SELECT card_id, result,
+                                               ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                        FROM study_log
+                                        WHERE user_id = %s AND stage = %s AND mode = 'practice' AND card_id = ANY(%s)
+                                    ) AS ranked
+                                    WHERE rn = 1 AND result = 'known'
+                                ''', (user_id, stage, practice_target_cards))
+                                
+                                completed_practice_cards = [r[0] for r in cur.fetchall()]
+                                
+                                # 全ての対象カードが練習で○になった場合に完了
+                                if len(completed_practice_cards) == len(practice_target_cards):
+                                    result['practice'].add(stage)
+                            else:
+                                # テストで×の問題がない場合（満点）は練習完了
+                                result['practice'].add(stage)
 
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
-        import traceback
-        app.logger.error(f"[DEBUG] スタックトレース: {traceback.format_exc()}")
 
     return result
 
