@@ -523,6 +523,15 @@ def prepare(source):
             "practice": set(completed_raw.get("practice", []))
         }
         print(f"[DEBUG] completed: {completed}")  # ← これを追加
+
+
+        # ← ここに追加 ↓
+        app.logger.error(f"[DEBUG] completed_raw: {completed_raw}")
+        app.logger.error(f"[DEBUG] 最終的なcompleted: {completed}")
+        app.logger.error(f"[DEBUG] perfect_completion: {completed_raw.get('perfect_completion', 'キーなし')}")
+        # ← ここまで追加 ↑
+
+        
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
         completed = {"test": set(), "practice": set()}
