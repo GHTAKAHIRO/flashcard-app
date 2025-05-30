@@ -289,8 +289,29 @@
       <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #ffd700, #ffed4e); color: #333; border-radius: 15px; margin-top: 20px; border: 3px solid #ffc107;">
         <h3>🏆 素晴らしい！満点達成！</h3>
         <p><strong>テストで満点を取ったため、全ての学習が完了しました！</strong></p>
-        <p>復習したい場合は、いつでも練習モードを選択できます。</p>
+        <p>復習したい場合は、下記の練習モードをいつでも選択できます。</p>
       </div>
+      
+      <!-- 満点達成後の復習用練習モード表示 -->
+      {% for stage in [1, 2, 3] %}
+        {% if stage in completed['practice'] %}
+        <div class="completed-stage" style="margin-top: 15px;">
+          <div class="stage-title">
+            <div class="stage-number completed-number">{{ stage }}</div>
+            ステージ{{ stage }}: 復習練習
+          </div>
+          
+          <div class="option">
+            <input type="radio" name="stage" value="{{ stage }}-practice" id="review-stage{{ stage }}-practice">
+            <label for="review-stage{{ stage }}-practice">
+              <strong>📝 練習（復習モード）</strong>
+              <div class="description">{% if stage == 1 %}基礎問題{% elif stage == 2 %}応用問題{% else %}発展問題{% endif %}を復習できます</div>
+            </label>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+      
       {% elif 3 in completed['test'] and 3 in completed['practice'] %}
       <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #28a745, #20c997); color: white; border-radius: 10px; margin-top: 20px;">
         <h3>🎊 おめでとうございます！</h3>
