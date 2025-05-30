@@ -505,10 +505,12 @@ def prepare(source):
     # ✅ GET時は completed を毎回取得（例外関係なく）
     try:
         completed_raw = get_completed_stages(user_id, source, saved_page_range)
+        print(f"[DEBUG] completed_raw: {completed_raw}")  # ← これを追加
         completed = {
             "test": set(completed_raw.get("test", [])),
             "practice": set(completed_raw.get("practice", []))
         }
+        print(f"[DEBUG] completed: {completed}")  # ← これを追加
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
         completed = {"test": set(), "practice": set()}
