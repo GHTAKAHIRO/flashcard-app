@@ -78,6 +78,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                 '''
                 params = [source]
 
+                # ページ範囲の処理
                 page_conditions = []
                 if page_range:
                     for part in page_range.split(','):
@@ -98,38 +99,83 @@ def get_study_cards(source, stage, mode, page_range, user_id):
                 else:
                     query += ' AND false'
 
+                # モード・ステージ別の条件
                 if mode == 'test':
-                    if stage > 1:
-                        query += '''
-                            AND id IN (
-                                SELECT card_id FROM study_log
-                                WHERE user_id = %s AND stage = %s AND mode = 'test' AND result = 'unknown'
-                            )
-                        '''
-                        params.extend([user_id, stage - 1])
-                elif mode == 'practice':
                     if stage == 1:
-                        query += '''
-                            AND id IN (
-                                SELECT card_id
-                                FROM study_log
-                                WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
-                            )
-                        '''
-                        params.append(user_id)
-                    else:
+                        # Stage 1 テスト: 全問題対象（ページ範囲内）
+                        pass  # 既にページ範囲で絞り込み済み
+                    elif stage == 2:
+                        # Stage 2 テスト: Stage 1 テストで×だった問題のみ
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
                                     SELECT card_id, result,
                                            ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
                                     FROM study_log
-                                    WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                    WHERE user_id = %s AND stage = 1 AND mode = 'test'
                                 ) AS ranked
                                 WHERE rn = 1 AND result = 'unknown'
                             )
                         '''
-                        params.extend([user_id, stage])
+                        params.append(user_id)
+                    elif stage == 3:
+                        # Stage 3 テスト: Stage 2 テストで×だった問題のみ
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 2 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                        '''
+                        params.append(user_id)
+                
+                elif mode == 'practice':
+                    if stage == 1:
+                        # Stage 1 練習: Stage 1 テストで×だった問題のみ
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 1 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                        '''
+                        params.append(user_id)
+                    elif stage == 2:
+                        # Stage 2 練習: Stage 2 テストで×だった問題のみ
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 2 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                        '''
+                        params.append(user_id)
+                    elif stage == 3:
+                        # Stage 3 練習: Stage 3 テストで×だった問題のみ
+                        query += '''
+                            AND id IN (
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 3 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            )
+                        '''
+                        params.append(user_id)
 
                 query += ' ORDER BY id DESC'
                 cur.execute(query, params)
@@ -166,6 +212,7 @@ def get_completed_stages(user_id, source, page_range):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # 対象となる全カードIDを取得
                 if page_numbers:
                     cur.execute('''
                         SELECT id FROM image
@@ -176,16 +223,35 @@ def get_completed_stages(user_id, source, page_range):
                 all_card_ids = [row[0] for row in cur.fetchall()]
 
                 for stage in [1, 2, 3]:
+                    # テスト完了判定
                     if stage == 1:
                         target_card_ids = all_card_ids
-                    else:
+                    elif stage == 2:
+                        # Stage 1 テストで×だった問題が対象
                         cur.execute('''
-                            SELECT DISTINCT card_id
-                            FROM study_log
-                            WHERE user_id = %s AND stage = %s AND mode = 'test' AND result = 'unknown'
-                        ''', (user_id, stage - 1))
+                            SELECT card_id FROM (
+                                SELECT card_id, result,
+                                       ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = 1 AND mode = 'test'
+                            ) AS ranked
+                            WHERE rn = 1 AND result = 'unknown'
+                        ''', (user_id,))
+                        target_card_ids = [r[0] for r in cur.fetchall()]
+                    elif stage == 3:
+                        # Stage 2 テストで×だった問題が対象
+                        cur.execute('''
+                            SELECT card_id FROM (
+                                SELECT card_id, result,
+                                       ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = 2 AND mode = 'test'
+                            ) AS ranked
+                            WHERE rn = 1 AND result = 'unknown'
+                        ''', (user_id,))
                         target_card_ids = [r[0] for r in cur.fetchall()]
 
+                    # テストが完了しているかチェック
                     if target_card_ids:
                         cur.execute('''
                             SELECT COUNT(DISTINCT card_id)
@@ -197,20 +263,69 @@ def get_completed_stages(user_id, source, page_range):
                         if tested_count == len(target_card_ids):
                             result['test'].add(stage)
 
-                    cur.execute('''
-                        SELECT DISTINCT ON (card_id) card_id, result
-                        FROM study_log
-                        WHERE user_id = %s AND stage = %s AND mode = 'practice'
-                        ORDER BY card_id, id DESC
-                    ''', (user_id, stage))
-                    latest = cur.fetchall()
-                    if latest and all(r[1] == 'known' for r in latest):
-                        result['practice'].add(stage)
+                    # 練習完了判定
+                    if target_card_ids:
+                        # 各ステージのテストで×だった問題を取得
+                        if stage == 1:
+                            cur.execute('''
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 1 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            ''', (user_id,))
+                        elif stage == 2:
+                            cur.execute('''
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 2 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            ''', (user_id,))
+                        elif stage == 3:
+                            cur.execute('''
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = 3 AND mode = 'test'
+                                ) AS ranked
+                                WHERE rn = 1 AND result = 'unknown'
+                            ''', (user_id,))
+                        
+                        practice_target_cards = [r[0] for r in cur.fetchall()]
+                        
+                        if practice_target_cards:
+                            # 練習で全問題が○になったかチェック
+                            cur.execute('''
+                                SELECT card_id FROM (
+                                    SELECT card_id, result,
+                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                    FROM study_log
+                                    WHERE user_id = %s AND stage = %s AND mode = 'practice' AND card_id = ANY(%s)
+                                ) AS ranked
+                                WHERE rn = 1
+                            ''', (user_id, stage, practice_target_cards))
+                            
+                            latest_practice_results = cur.fetchall()
+                            
+                            # 全ての対象カードに練習履歴があり、かつ全て○の場合に完了
+                            if (len(latest_practice_results) == len(practice_target_cards) and 
+                                all(r[1] == 'known' for r in latest_practice_results)):
+                                result['practice'].add(stage)
+                        else:
+                            # テストで×の問題がない場合は練習完了
+                            result['practice'].add(stage)
 
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
 
     return result
+
 
 @app.route('/study/<source>')
 @login_required
