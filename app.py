@@ -510,7 +510,7 @@ def prepare(source):
         page_range = request.form.get('page_range', '').strip()
         stage_mode = request.form.get('stage')
 
-        # stage_mode の None チェックを追加
+        # stage_mode の None チェック
         if not stage_mode or '-' not in stage_mode:
             flash("学習ステージを選択してください")
             return redirect(url_for('prepare', source=source))
@@ -536,7 +536,6 @@ def prepare(source):
 
         return redirect(url_for('study', source=source))
 
-
     # --- GET時 ---
     saved_page_range = ''
     try:
@@ -553,25 +552,23 @@ def prepare(source):
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
 
-    # ✅ GET時は completed を毎回取得
-try:
-    completed_raw = get_completed_stages(user_id, source, saved_page_range)
-    completed = {
-        "test": set(completed_raw.get("test", [])),
-        "practice": set(completed_raw.get("practice", [])),
-        "perfect_completion": completed_raw.get("perfect_completion", False),
-        "practice_history": completed_raw.get("practice_history", {})  # ← この行が追加されているか
-    }
-    
-    # デバッグ用ログ（これが追加されているか）
-    app.logger.error(f"[DEBUG] practice_history: {completed.get('practice_history', {})}")
-    app.logger.error(f"[DEBUG] completed_raw全体: {completed_raw}")
-    
-except Exception as e:
-    app.logger.error(f"完了ステージ取得エラー: {e}")
-    completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}  # ← practice_history追加
-    # ← ここが重要！必ず return が実行される
-    
+    try:
+        completed_raw = get_completed_stages(user_id, source, saved_page_range)
+        completed = {
+            "test": set(completed_raw.get("test", [])),
+            "practice": set(completed_raw.get("practice", [])),
+            "perfect_completion": completed_raw.get("perfect_completion", False),
+            "practice_history": completed_raw.get("practice_history", {})
+        }
+        
+        # デバッグ用ログ
+        app.logger.error(f"[DEBUG] practice_history: {completed.get('practice_history', {})}")
+        app.logger.error(f"[DEBUG] completed_raw全体: {completed_raw}")
+        
+    except Exception as e:
+        app.logger.error(f"完了ステージ取得エラー: {e}")
+        completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}
+
     return render_template(
         'prepare.html',
         source=source,
