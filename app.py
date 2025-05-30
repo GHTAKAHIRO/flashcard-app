@@ -370,39 +370,39 @@ def login():
 def prepare(source):
     user_id = str(current_user.id)
 
- # --- POST時（学習設定の保存と遷移） ---
-if request.method == 'POST':
-    page_range = request.form.get('page_range', '').strip()
-    difficulty_list = request.form.getlist('difficulty')
-    difficulty = ','.join(difficulty_list) if difficulty_list else ''
-    stage_mode = request.form.get('stage')
+    # --- POST時（学習設定の保存と遷移） ---
+    if request.method == 'POST':
+        page_range = request.form.get('page_range', '').strip()
+        difficulty_list = request.form.getlist('difficulty')
+        difficulty = ','.join(difficulty_list) if difficulty_list else ''
+        stage_mode = request.form.get('stage')
 
-    # stage_mode の None チェック
-    if not stage_mode or '-' not in stage_mode:
-        flash("学習ステージを選択してください")
-        return redirect(url_for('prepare', source=source))
+        # stage_mode の None チェック
+        if not stage_mode or '-' not in stage_mode:
+            flash("学習ステージを選択してください")
+            return redirect(url_for('prepare', source=source))
 
-    stage_str, mode = stage_mode.split('-')
-    session['stage'] = int(stage_str)
-    session['mode'] = mode
-    session['page_range'] = page_range
-    session['difficulty'] = difficulty  # 追加
+        stage_str, mode = stage_mode.split('-')
+        session['stage'] = int(stage_str)
+        session['mode'] = mode
+        session['page_range'] = page_range
+        session['difficulty'] = difficulty
 
-    # user_settings に保存
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('''
-                    INSERT INTO user_settings (user_id, source, page_range, difficulty)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (user_id, source)
-                    DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
-                ''', (user_id, source, page_range, difficulty))
-                conn.commit()
-    except Exception as e:
-        app.logger.error(f"user_settings保存エラー: {e}")
+        # user_settings に保存
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        INSERT INTO user_settings (user_id, source, page_range, difficulty)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (user_id, source)
+                        DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
+                    ''', (user_id, source, page_range, difficulty))
+                    conn.commit()
+        except Exception as e:
+            app.logger.error(f"user_settings保存エラー: {e}")
 
-    return redirect(url_for('study', source=source))
+        return redirect(url_for('study', source=source))
 
     # --- GET時 ---
     saved_page_range = ''
@@ -419,22 +419,18 @@ if request.method == 'POST':
                     saved_page_range = result[0] or ''
                     saved_difficulty = result[1] or ''
                     session['page_range'] = saved_page_range
-                    session['difficulty'] = saved_difficulty  # セッションにも保存
+                    session['difficulty'] = saved_difficulty
     except Exception as e:
         app.logger.error(f"user_settings取得エラー: {e}")
-        
+
     try:
-        completed_raw = get_completed_stages(user_id, source, saved_page_range, saved_difficulty)  # difficulty追加
+        completed_raw = get_completed_stages(user_id, source, saved_page_range, saved_difficulty)
         completed = {
             "test": set(completed_raw.get("test", [])),
             "practice": set(completed_raw.get("practice", [])),
             "perfect_completion": completed_raw.get("perfect_completion", False),
             "practice_history": completed_raw.get("practice_history", {})
         }
-        
-        # デバッグ用ログ
-        app.logger.error(f"[DEBUG] practice_history: {completed.get('practice_history', {})}")
-        app.logger.error(f"[DEBUG] completed_raw全体: {completed_raw}")
         
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
@@ -445,7 +441,7 @@ if request.method == 'POST':
         source=source,
         completed=completed,
         saved_page_range=saved_page_range,
-        saved_difficulty=saved_difficulty  # 追加
+        saved_difficulty=saved_difficulty
     )
 
 @app.route('/log_result', methods=['POST'])
