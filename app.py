@@ -510,14 +510,14 @@ def prepare(source):
         page_range = request.form.get('page_range', '').strip()
         stage_mode = request.form.get('stage')
 
-        if '-' in stage_mode:
-            stage_str, mode = stage_mode.split('-')
-            session['stage'] = int(stage_str)
-            session['mode'] = mode
-        else:
-            flash("モード選択に不備があります")
+        # stage_mode の None チェックを追加
+        if not stage_mode or '-' not in stage_mode:
+            flash("学習ステージを選択してください")
             return redirect(url_for('prepare', source=source))
 
+        stage_str, mode = stage_mode.split('-')
+        session['stage'] = int(stage_str)
+        session['mode'] = mode
         session['page_range'] = page_range
 
         # user_settings に保存
@@ -535,6 +535,7 @@ def prepare(source):
             app.logger.error(f"user_settings保存エラー: {e}")
 
         return redirect(url_for('study', source=source))
+
 
     # --- GET時 ---
     saved_page_range = ''
