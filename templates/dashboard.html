@@ -117,19 +117,28 @@
             <div class="action-buttons">
                 <button type="submit" class="start-button">🚀 この設定で学習開始</button>
                 
-                <form method="POST" action="{{ url_for('reset_history', source=s.source) }}" style="display: inline;">
-                    <button type="submit" 
-                            class="reset-button"
-                            onclick="return confirm('{{ s.source }} の学習履歴をすべて削除します。よろしいですか？')">
-                        🗑 履歴削除
-                    </button>
-                </form>
+                <!-- 履歴削除ボタン（独立したフォーム） -->
+                <button type="button" 
+                        class="reset-button"
+                        onclick="deleteHistory('{{ s.source }}')">
+                    🗑 履歴削除
+                </button>
             </div>
+        </form>
+        
+        <!-- 履歴削除用の独立したフォーム -->
+        <form id="deleteForm-{{ s.source }}" method="POST" action="{{ url_for('reset_history', source=s.source) }}" style="display: none;">
         </form>
     </div>
     {% endfor %}
 
     <script>
+        function deleteHistory(source) {
+            if (confirm(source + ' の学習履歴をすべて削除します。よろしいですか？')) {
+                document.getElementById('deleteForm-' + source).submit();
+            }
+        }
+        
         document.addEventListener('DOMContentLoaded', function() {
             const forms = document.querySelectorAll('.page-range-form');
             
