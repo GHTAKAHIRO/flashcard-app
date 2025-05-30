@@ -221,7 +221,7 @@ def get_study_cards(source, stage, mode, page_range, user_id):
         return None
 
 def get_completed_stages(user_id, source, page_range):
-    result = {'test': set(), 'practice': set(), 'perfect_completion': False}
+    result = {'test': set(), 'practice': set(), 'perfect_completion': False, 'practice_history': {}}
     user_id = str(user_id)
 
     page_numbers = []
@@ -249,6 +249,15 @@ def get_completed_stages(user_id, source, page_range):
                 else:
                     cur.execute('SELECT id FROM image WHERE source = %s', (source,))
                 all_card_ids = [row[0] for row in cur.fetchall()]
+
+                # 各ステージの練習履歴をチェック
+                for stage in [1, 2, 3]:
+                    cur.execute('''
+                        SELECT COUNT(*) FROM study_log
+                        WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                    ''', (user_id, stage))
+                    practice_count = cur.fetchone()[0]
+                    result['practice_history'][stage] = practice_count > 0
 
                 for stage in [1, 2, 3]:
                     # 各ステージのテスト対象カードを決定
@@ -312,17 +321,13 @@ def get_completed_stages(user_id, source, page_range):
                             ''', (user_id, stage, list(target_card_ids)))
                             perfect_count = cur.fetchone()[0]
                             
-                            app.logger.error(f"[DEBUG] ステージ{stage} perfect_count: {perfect_count}, target_count: {len(target_card_ids)}")
-                            
                             # 満点の場合は全学習完了とみなす
                             if perfect_count == len(target_card_ids):
                                 result['perfect_completion'] = True
-                                app.logger.error(f"[DEBUG] ステージ{stage}で満点達成！")
                                 
                                 # 満点達成ステージまでの全ての練習を完了扱いにする
                                 for completed_stage in range(1, stage + 1):
                                     result['practice'].add(completed_stage)
-                                    app.logger.error(f"[DEBUG] ステージ{completed_stage}の練習を完了扱いに追加")
                                 
                                 break  # 満点なので以降のステージは不要
 
@@ -390,12 +395,8 @@ def get_completed_stages(user_id, source, page_range):
                                 # テストで×の問題がない場合（満点）は練習完了
                                 result['practice'].add(stage)
 
-                app.logger.error(f"[DEBUG] 最終result: {result}")
-
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
-        import traceback
-        app.logger.error(f"[DEBUG] スタックトレース: {traceback.format_exc()}")
 
     return result
 
@@ -560,9 +561,6 @@ def prepare(source):
             "perfect_completion": completed_raw.get("perfect_completion", False)
         }
         
-        app.logger.error(f"[DEBUG] completed_raw: {completed_raw}")
-        app.logger.error(f"[DEBUG] 最終的なcompleted: {completed}")
-        app.logger.error(f"[DEBUG] perfect_completion: {completed_raw.get('perfect_completion', 'キーなし')}")
         
     except Exception as e:
         app.logger.error(f"完了ステージ取得エラー: {e}")
@@ -633,7 +631,6 @@ def logout():
 @login_required
 def reset_history(source):
     user_id = str(current_user.id)
-    app.logger.error(f"[DEBUG] 履歴削除開始: user_id={user_id}, source={source}")
     
     try:
         with get_db_connection() as conn:
@@ -646,7 +643,6 @@ def reset_history(source):
                     )
                 ''', (user_id, source))
                 before_count = cur.fetchone()[0]
-                app.logger.error(f"[DEBUG] 削除前の履歴件数: {before_count}")
                 
                 # 削除実行
                 cur.execute('''
@@ -659,7 +655,6 @@ def reset_history(source):
                 deleted_count = cur.rowcount
                 conn.commit()
                 
-                app.logger.error(f"[DEBUG] 削除された件数: {deleted_count}")
                 
         flash(f"{source} の学習履歴を削除しました。")
     except Exception as e:

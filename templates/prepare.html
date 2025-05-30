@@ -152,6 +152,15 @@
     </div>
     {% endif %}
 
+    <!-- ①満点達成メッセージを対象ページの直下に移動 -->
+    {% if completed.get('perfect_completion') %}
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #ffd700, #ffed4e); color: #333; border-radius: 15px; margin-bottom: 30px; border: 3px solid #ffc107;">
+      <h3>🏆 素晴らしい！満点達成！</h3>
+      <p><strong>テストで満点を取ったため、全ての学習が完了しました！</strong></p>
+      <p>復習したい場合は、下記の練習モードをいつでも選択できます。</p>
+    </div>
+    {% endif %}
+
     <!-- 非表示のページ範囲フィールド -->
     <input type="hidden" name="page_range" value="{{ saved_page_range }}">
 
@@ -159,6 +168,7 @@
       <h3>🎯 学習ステージ</h3>
       
       <!-- Stage 1 -->
+      {% if not completed.get('perfect_completion') %}
       <div class="{% if 1 in completed['test'] and 1 in completed['practice'] %}completed-stage{% else %}current-stage{% endif %}">
         <div class="stage-title">
           <div class="stage-number {% if 1 in completed['test'] and 1 in completed['practice'] %}completed-number{% endif %}">1</div>
@@ -195,6 +205,7 @@
           {% endif %}
         {% endif %}
       </div>
+      {% endif %}
 
       <!-- Stage 2 -->
       {% if 1 in completed['practice'] and not completed.get('perfect_completion') %}
@@ -284,35 +295,30 @@
       </div>
       {% endif %}
 
-      <!-- 完了メッセージ -->
+      <!-- 満点達成後の復習用練習モード表示（③履歴があるステージのみ） -->
       {% if completed.get('perfect_completion') %}
-      <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #ffd700, #ffed4e); color: #333; border-radius: 15px; margin-top: 20px; border: 3px solid #ffc107;">
-        <h3>🏆 素晴らしい！満点達成！</h3>
-        <p><strong>テストで満点を取ったため、全ての学習が完了しました！</strong></p>
-        <p>復習したい場合は、下記の練習モードをいつでも選択できます。</p>
-      </div>
-      
-      <!-- 満点達成後の復習用練習モード表示 -->
-      {% for stage in [1, 2, 3] %}
-        {% if stage in completed['practice'] %}
-        <div class="completed-stage" style="margin-top: 15px;">
-          <div class="stage-title">
-            <div class="stage-number completed-number">{{ stage }}</div>
-            ステージ{{ stage }}: 復習練習
+        {% for stage in [1, 2, 3] %}
+          {% if completed.get('practice_history', {}).get(stage, False) %}
+          <div class="completed-stage" style="margin-top: 15px;">
+            <div class="stage-title">
+              <div class="stage-number completed-number">{{ stage }}</div>
+              ステージ{{ stage }}: 復習練習
+            </div>
+            
+            <div class="option">
+              <input type="radio" name="stage" value="{{ stage }}-practice" id="review-stage{{ stage }}-practice">
+              <label for="review-stage{{ stage }}-practice">
+                <strong>📝 練習（復習モード）</strong>
+                <div class="description">{% if stage == 1 %}基礎問題{% elif stage == 2 %}応用問題{% else %}発展問題{% endif %}を復習できます</div>
+              </label>
+            </div>
           </div>
-          
-          <div class="option">
-            <input type="radio" name="stage" value="{{ stage }}-practice" id="review-stage{{ stage }}-practice">
-            <label for="review-stage{{ stage }}-practice">
-              <strong>📝 練習（復習モード）</strong>
-              <div class="description">{% if stage == 1 %}基礎問題{% elif stage == 2 %}応用問題{% else %}発展問題{% endif %}を復習できます</div>
-            </label>
-          </div>
-        </div>
-        {% endif %}
-      {% endfor %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
       
-      {% elif 3 in completed['test'] and 3 in completed['practice'] %}
+      <!-- 完了メッセージ（通常完了時） -->
+      {% if not completed.get('perfect_completion') and 3 in completed['test'] and 3 in completed['practice'] %}
       <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #28a745, #20c997); color: white; border-radius: 10px; margin-top: 20px;">
         <h3>🎊 おめでとうございます！</h3>
         <p>全ての学習を完了しました。復習したい場合は、いつでも練習モードを選択できます。</p>
