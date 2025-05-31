@@ -64,10 +64,11 @@
             background: #dc3545;
             color: white;
             border: none;
-            padding: 8px 15px;
+            padding: 6px 12px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
+            white-space: nowrap;
         }
         .reset-button:hover {
             background: #c82333;
@@ -95,8 +96,14 @@
 
     {% for s in sources %}
     <div class="source-card">
-        <div class="source-title">
-            📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）
+        <div class="source-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）</span>
+            <button type="button" 
+                    class="reset-button"
+                    onclick="deleteHistory('{{ s.source }}')"
+                    style="margin-left: 15px;">
+                🗑 履歴削除
+            </button>
         </div>
         
         <form method="POST" action="{{ url_for('set_page_range_and_prepare', source=s.source) }}" class="page-range-form">
@@ -112,17 +119,34 @@
                     空欄の場合は全ページが対象になります。複数範囲はカンマ区切りで入力してください。
                 </div>
                 <div class="error-message" id="error_{{ loop.index }}"></div>
+                
+                <div style="margin-top: 15px;">
+                    <label for="difficulty_{{ loop.index }}"><strong>🎯 難易度選択:</strong></label>
+                    <div style="display: flex; gap: 15px; margin-top: 8px; align-items: center;">
+                        <label style="display: flex; align-items: center; font-size: 14px;">
+                            <input type="checkbox" name="difficulty" value="A" style="margin-right: 5px;"
+                                   {% if saved_difficulties and 'A' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
+                            難易度A（基礎）
+                        </label>
+                        <label style="display: flex; align-items: center; font-size: 14px;">
+                            <input type="checkbox" name="difficulty" value="B" style="margin-right: 5px;"
+                                   {% if saved_difficulties and 'B' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
+                            難易度B（標準）
+                        </label>
+                        <label style="display: flex; align-items: center; font-size: 14px;">
+                            <input type="checkbox" name="difficulty" value="C" style="margin-right: 5px;"
+                                   {% if saved_difficulties and 'C' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
+                            難易度C（応用）
+                        </label>
+                    </div>
+                    <div class="help-text">
+                        何も選択しない場合は全難易度が対象になります。
+                    </div>
+                </div>
             </div>
             
             <div class="action-buttons">
                 <button type="submit" class="start-button">🚀 この設定で学習開始</button>
-                
-                <!-- 履歴削除ボタン（独立したフォーム） -->
-                <button type="button" 
-                        class="reset-button"
-                        onclick="deleteHistory('{{ s.source }}')">
-                    🗑 履歴削除
-                </button>
             </div>
         </form>
         

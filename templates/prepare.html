@@ -1,230 +1,421 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8" />
-    <title>教材を選ぶ</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .source-card {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .source-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #495057;
-            margin-bottom: 15px;
-        }
-        .page-range-section {
-            background: white;
-            border: 1px solid #ced4da;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        .page-range-input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-        .page-range-input:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-        }
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .start-button {
-            background: linear-gradient(135deg, #007bff, #0056b3);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .start-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,123,255,0.3);
-        }
-        .reset-button {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-        .reset-button:hover {
-            background: #c82333;
-        }
-        .help-text {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 5px;
-        }
-        .error-message {
-            color: #dc3545;
-            font-size: 12px;
-            margin-top: 5px;
-            display: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>学習設定</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .stage-group {
+      margin: 15px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+    }
+    .stage-title {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .option {
+      margin: 8px 0;
+    }
+    .option input[type="radio"] {
+      margin-right: 8px;
+    }
+    .completed {
+      color: #28a745;
+      font-weight: bold;
+    }
+    .unavailable {
+      color: #6c757d;
+      font-style: italic;
+    }
+    .error-message {
+      color: #dc3545;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #6c757d;
+      cursor: not-allowed;
+    }
+    .current-stage {
+      margin: 20px 0;
+      padding: 20px;
+      border: 2px solid #007bff;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #e3f2fd, #f8f9fa);
+    }
+    .completed-stage {
+      margin: 15px 0;
+      padding: 15px;
+      border: 1px solid #28a745;
+      border-radius: 8px;
+      background-color: #d4edda;
+      opacity: 0.8;
+    }
+    .future-stage {
+      margin: 15px 0;
+      padding: 15px;
+      border: 1px dashed #6c757d;
+      border-radius: 8px;
+      background-color: #f8f9fa;
+      opacity: 0.6;
+    }
+    .stage-title {
+      font-weight: bold;
+      font-size: 18px;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+    }
+    .stage-number {
+      background-color: #007bff;
+      color: white;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      font-weight: bold;
+    }
+    .completed-number {
+      background-color: #28a745;
+    }
+    .future-number {
+      background-color: #6c757d;
+    }
+    .option {
+      margin: 12px 0;
+      padding: 10px;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      background-color: white;
+    }
+    .option input[type="radio"] {
+      margin-right: 10px;
+    }
+    .option:hover {
+      background-color: #f8f9fa;
+    }
+    .option.selected {
+      border-color: #007bff;
+      background-color: #e7f3ff;
+    }
+    .completed {
+      color: #28a745;
+      font-weight: bold;
+    }
+    .next-step {
+      color: #007bff;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .unavailable {
+      color: #6c757d;
+      font-style: italic;
+    }
+    .description {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+    button {
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      color: white;
+      padding: 15px 30px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+      width: 100%;
+      transition: all 0.3s ease;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+    }
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      color: #6c757d;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      color: #007bff;
+    }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <p>ようこそ、{{ current_user.username }} さん</p>
-        <a href="{{ url_for('logout') }}">ログアウト</a>
+  <h2>📚 学習設定</h2>
+
+  <form method="POST" id="studyForm">
+    {% if saved_page_range %}
+    <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #e3f2fd, #f8f9fa); border-radius: 10px; margin-bottom: 20px; border: 1px solid #007bff;">
+      <h3 style="margin: 0; color: #007bff;">📖 対象ページ: {{ saved_page_range }}</h3>
     </div>
+    {% else %}
+    <div style="text-align: center; padding: 15px; background: linear-gradient(135deg, #fff3cd, #ffeaa7); border-radius: 10px; margin-bottom: 20px; border: 1px solid #ffc107;">
+      <h3 style="margin: 0; color: #856404;">📖 全ページ対象</h3>
+    </div>
+    {% endif %}
 
-    <h2>📚 学習する教材を選んでください</h2>
+    <!-- ①満点達成メッセージを対象ページの直下に移動 -->
+    {% if completed.get('perfect_completion') %}
+    <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #ffd700, #ffed4e); color: #333; border-radius: 15px; margin-bottom: 30px; border: 3px solid #ffc107;">
+      <h3>🏆 素晴らしい！満点達成！</h3>
+      <p><strong>テストで満点を取ったため、全ての学習が完了しました！</strong></p>
+      {% if completed.get('practice_history', {}).values()|select|list|length > 0 %}
+      <p>復習したい場合は、下記の練習モードをいつでも選択できます。</p>
+      {% else %}
+      <p>🎉 完璧です！全ての問題を一発で正解しました！</p>
+      {% endif %}
+    </div>
+    {% endif %}
 
-    {% for s in sources %}
-    <div class="source-card">
-        <div class="source-title" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）</span>
-            <button type="button" 
-                    class="reset-button"
-                    onclick="deleteHistory('{{ s.source }}')"
-                    style="margin-left: 15px;">
-                🗑 履歴削除
-            </button>
+    <!-- 非表示のページ範囲フィールド -->
+    <input type="hidden" name="page_range" value="{{ saved_page_range }}">
+
+    <div style="margin-top: 30px;">
+      <h3>🎯 学習ステージ</h3>
+      
+      <!-- Stage 1 -->
+      {% if not completed.get('perfect_completion') %}
+      <div class="{% if 1 in completed['test'] and 1 in completed['practice'] %}completed-stage{% else %}current-stage{% endif %}">
+        <div class="stage-title">
+          <div class="stage-number {% if 1 in completed['test'] and 1 in completed['practice'] %}completed-number{% endif %}">1</div>
+          ステージ1: 基礎テスト
         </div>
         
-        <form method="POST" action="{{ url_for('set_page_range_and_prepare', source=s.source) }}" class="page-range-form">
-            <div class="page-range-section">
-                <label for="page_range_{{ loop.index }}"><strong>📖 学習するページ範囲:</strong></label>
-                <input type="text" 
-                       id="page_range_{{ loop.index }}" 
-                       name="page_range" 
-                       class="page-range-input"
-                       placeholder="例: 1-10, 15, 20-25"
-                       value="{{ saved_ranges.get(s.source, '') if saved_ranges else '' }}">
-                <div class="help-text">
-                    空欄の場合は全ページが対象になります。複数範囲はカンマ区切りで入力してください。
-                </div>
-                <div class="error-message" id="error_{{ loop.index }}"></div>
-                
-                <div style="margin-top: 15px;">
-                    <label for="difficulty_{{ loop.index }}"><strong>🎯 難易度選択:</strong></label>
-                    <div style="display: flex; gap: 15px; margin-top: 8px; align-items: center;">
-                        <label style="display: flex; align-items: center; font-size: 14px;">
-                            <input type="checkbox" name="difficulty" value="A" style="margin-right: 5px;"
-                                   {% if saved_difficulties and 'A' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
-                            難易度A（基礎）
-                        </label>
-                        <label style="display: flex; align-items: center; font-size: 14px;">
-                            <input type="checkbox" name="difficulty" value="B" style="margin-right: 5px;"
-                                   {% if saved_difficulties and 'B' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
-                            難易度B（標準）
-                        </label>
-                        <label style="display: flex; align-items: center; font-size: 14px;">
-                            <input type="checkbox" name="difficulty" value="C" style="margin-right: 5px;"
-                                   {% if saved_difficulties and 'C' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
-                            難易度C（応用）
-                        </label>
-                    </div>
-                    <div class="help-text">
-                        何も選択しない場合は全難易度が対象になります。
-                    </div>
-                </div>
-            </div>
-            
-            <div class="action-buttons">
-                <button type="submit" class="start-button">🚀 この設定で学習開始</button>
-            </div>
-        </form>
-        
-        <!-- 履歴削除用の独立したフォーム -->
-        <form id="deleteForm-{{ s.source }}" method="POST" action="{{ url_for('reset_history', source=s.source) }}" style="display: none;">
-        </form>
-    </div>
-    {% endfor %}
+        {% if 1 not in completed['test'] %}
+        <div class="option">
+          <input type="radio" name="stage" value="1-test" id="stage1-test">
+          <label for="stage1-test">
+            <strong>🧪 テスト（全問題対象）</strong>
+            <div class="description">まずは全問題をテストして、知っている問題と知らない問題を仕分けします</div>
+          </label>
+        </div>
+        {% else %}
+        <div style="padding: 10px; background-color: #d4edda; border-radius: 5px; margin-bottom: 10px;">
+          <span class="completed">✅ テスト完了</span>
+        </div>
+        {% endif %}
 
-    <script>
-        function deleteHistory(source) {
-            if (confirm(source + ' の学習履歴をすべて削除します。よろしいですか？')) {
-                document.getElementById('deleteForm-' + source).submit();
-            }
-        }
+        {% if 1 in completed['test'] %}
+          {% if 1 not in completed['practice'] %}
+          <div class="option">
+            <input type="radio" name="stage" value="1-practice" id="stage1-practice">
+            <label for="stage1-practice">
+              <strong>📝 練習（×問題を段階的に学習）</strong>
+              <div class="description">テストで×だった問題を繰り返し練習して、全て○にしましょう</div>
+            </label>
+          </div>
+          {% else %}
+          <div style="padding: 10px; background-color: #d4edda; border-radius: 5px;">
+            <span class="completed">✅ 練習完了</span>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Stage 2 -->
+      {% if 1 in completed['practice'] and not completed.get('perfect_completion') %}
+      <div class="{% if 2 in completed['test'] and 2 in completed['practice'] %}completed-stage{% elif 1 in completed['practice'] %}current-stage{% else %}future-stage{% endif %}">
+        <div class="stage-title">
+          <div class="stage-number {% if 2 in completed['test'] and 2 in completed['practice'] %}completed-number{% elif 1 not in completed['practice'] %}future-number{% endif %}">2</div>
+          ステージ2: 復習テスト
+        </div>
         
-        document.addEventListener('DOMContentLoaded', function() {
-            const forms = document.querySelectorAll('.page-range-form');
+        {% if 1 in completed['practice'] and 2 not in completed['test'] %}
+        <div class="option">
+          <input type="radio" name="stage" value="2-test" id="stage2-test">
+          <label for="stage2-test">
+            <strong>🧪 テスト（ステージ1の×問題のみ）</strong>
+            <div class="description">練習の成果を確認！覚えた問題と、まだ覚えていない問題を仕分けします</div>
+          </label>
+        </div>
+        {% elif 2 in completed['test'] %}
+        <div style="padding: 10px; background-color: #d4edda; border-radius: 5px; margin-bottom: 10px;">
+          <span class="completed">✅ テスト完了</span>
+        </div>
+        {% else %}
+        <div style="padding: 10px; color: #6c757d;">
+          <span class="unavailable">ステージ1の練習完了後に利用可能</span>
+        </div>
+        {% endif %}
+
+        {% if 2 in completed['test'] and not completed.get('perfect_completion') %}
+          {% if 2 not in completed['practice'] %}
+          <div class="option">
+            <input type="radio" name="stage" value="2-practice" id="stage2-practice">
+            <label for="stage2-practice">
+              <strong>📝 練習（×問題を段階的に学習）</strong>
+              <div class="description">まだ覚えていない問題をさらに練習します</div>
+            </label>
+          </div>
+          {% else %}
+          <div style="padding: 10px; background-color: #d4edda; border-radius: 5px;">
+            <span class="completed">✅ 練習完了</span>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Stage 3 -->
+      {% if 2 in completed['practice'] and not completed.get('perfect_completion') %}
+      <div class="{% if 3 in completed['test'] and 3 in completed['practice'] %}completed-stage{% elif 2 in completed['practice'] %}current-stage{% else %}future-stage{% endif %}">
+        <div class="stage-title">
+          <div class="stage-number {% if 3 in completed['test'] and 3 in completed['practice'] %}completed-number{% elif 2 not in completed['practice'] %}future-number{% endif %}">3</div>
+          ステージ3: 最終確認
+        </div>
+        
+        {% if 2 in completed['practice'] and 3 not in completed['test'] %}
+        <div class="option">
+          <input type="radio" name="stage" value="3-test" id="stage3-test">
+          <label for="stage3-test">
+            <strong>🧪 テスト（ステージ2の×問題のみ）</strong>
+            <div class="description">最終確認テスト！本当に覚えたかチェックします</div>
+          </label>
+        </div>
+        {% elif 3 in completed['test'] %}
+        <div style="padding: 10px; background-color: #d4edda; border-radius: 5px; margin-bottom: 10px;">
+          <span class="completed">✅ テスト完了</span>
+        </div>
+        {% else %}
+        <div style="padding: 10px; color: #6c757d;">
+          <span class="unavailable">ステージ2の練習完了後に利用可能</span>
+        </div>
+        {% endif %}
+
+        {% if 3 in completed['test'] and not completed.get('perfect_completion') %}
+          {% if 3 not in completed['practice'] %}
+          <div class="option">
+            <input type="radio" name="stage" value="3-practice" id="stage3-practice">
+            <label for="stage3-practice">
+              <strong>📝 練習（最後の仕上げ）</strong>
+              <div class="description">最後の仕上げ！残った問題を完璧にしましょう</div>
+            </label>
+          </div>
+          {% else %}
+          <div style="padding: 10px; background-color: #d4edda; border-radius: 5px;">
+            <span class="completed">🎉 全ステージ完了！お疲れ様でした！</span>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- 満点達成後の復習用練習モード表示（③履歴があるステージのみ） -->
+      {% if completed.get('perfect_completion') %}
+        {% for stage in [1, 2, 3] %}
+          {% if completed.get('practice_history', {}).get(stage, False) %}
+          <div class="completed-stage" style="margin-top: 15px;">
+            <div class="stage-title">
+              <div class="stage-number completed-number">{{ stage }}</div>
+              ステージ{{ stage }}: 復習練習
+            </div>
             
-            forms.forEach((form, index) => {
-                const input = form.querySelector('.page-range-input');
-                const errorDiv = document.getElementById(`error_${index + 1}`);
-                
-                function validatePageRange(value) {
-                    if (!value.trim()) return { valid: true }; // 空欄は許可
-                    
-                    const parts = value.split(',');
-                    const rangePattern = /^\d+\s*-\s*\d+$/;
-                    const numberPattern = /^\d+$/;
-                    
-                    for (let part of parts) {
-                        part = part.trim();
-                        if (!(rangePattern.test(part) || numberPattern.test(part))) {
-                            return {
-                                valid: false,
-                                message: "ページ範囲は「1-10,15,20-25」のように入力してください"
-                            };
-                        }
-                        
-                        if (rangePattern.test(part)) {
-                            const [start, end] = part.split('-').map(s => parseInt(s.trim(), 10));
-                            if (start > end) {
-                                return {
-                                    valid: false,
-                                    message: `「${part}」は開始ページ ≦ 終了ページにしてください`
-                                };
-                            }
-                        }
-                    }
-                    return { valid: true };
-                }
-                
-                // リアルタイムバリデーション
-                input.addEventListener('input', function() {
-                    const validation = validatePageRange(this.value);
-                    if (!validation.valid) {
-                        errorDiv.textContent = validation.message;
-                        errorDiv.style.display = 'block';
-                        input.style.borderColor = '#dc3545';
-                    } else {
-                        errorDiv.style.display = 'none';
-                        input.style.borderColor = '#ced4da';
-                    }
-                });
-                
-                // フォーム送信時のバリデーション
-                form.addEventListener('submit', function(e) {
-                    const validation = validatePageRange(input.value);
-                    if (!validation.valid) {
-                        e.preventDefault();
-                        errorDiv.textContent = validation.message;
-                        errorDiv.style.display = 'block';
-                        input.style.borderColor = '#dc3545';
-                        input.focus();
-                    }
-                });
-            });
+            <div class="option">
+              <input type="radio" name="stage" value="{{ stage }}-practice" id="review-stage{{ stage }}-practice">
+              <label for="review-stage{{ stage }}-practice">
+                <strong>📝 練習（復習モード）</strong>
+              </label>
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+      
+      <!-- 完了メッセージ（通常完了時） -->
+      {% if not completed.get('perfect_completion') and 3 in completed['test'] and 3 in completed['practice'] %}
+      <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #28a745, #20c997); color: white; border-radius: 10px; margin-top: 20px;">
+        <h3>🎊 おめでとうございます！</h3>
+        <p>全ての学習を完了しました。復習したい場合は、いつでも練習モードを選択できます。</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div id="errorMessage" style="color: #dc3545; margin-top: 10px; display: none;"></div>
+
+    <!-- 学習開始ボタン（満点達成時は非表示） -->
+    {% if not completed.get('perfect_completion') %}
+    <button type="submit" id="startButton">🚀 学習開始</button>
+    {% endif %}
+  </form>
+
+  <a href="{{ url_for('dashboard') }}" class="back-link">← ダッシュボードに戻る</a>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const form = document.getElementById("studyForm");
+      const errorMessage = document.getElementById("errorMessage");
+      const options = document.querySelectorAll('.option');
+
+      // ラジオボタンの選択状態を視覚的に表示
+      document.querySelectorAll('input[name="stage"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+          options.forEach(opt => opt.classList.remove('selected'));
+          if (this.checked) {
+            this.closest('.option').classList.add('selected');
+          }
         });
-    </script>
+      });
+
+      function validateStageSelection() {
+        const selectedStage = document.querySelector('input[name="stage"]:checked');
+        if (!selectedStage) {
+          return {
+            valid: false,
+            message: "学習ステージを選択してください。"
+          };
+        }
+        return { valid: true };
+      }
+
+      // フォーム送信時のバリデーション
+      form.addEventListener("submit", function (e) {
+        const stageValidation = validateStageSelection();
+
+        if (!stageValidation.valid) {
+          e.preventDefault();
+          errorMessage.textContent = stageValidation.message;
+          errorMessage.style.display = "block";
+          return;
+        }
+
+        errorMessage.style.display = "none";
+      });
+    });
+  </script>
 </body>
 </html>
