@@ -760,9 +760,6 @@ def prepare(source):
 
 @app.route('/study/<source>')
 @login_required
-
-@app.route('/study/<source>')
-@login_required
 def study(source):
     mode = session.get('mode', 'test')
     page_range = session.get('page_range', '').strip()
@@ -834,7 +831,6 @@ def study(source):
                          current_chunk=current_chunk,
                          total_chunks=total_chunks)
 
-
 @app.route('/complete_chunk', methods=['POST'])
 @login_required
 def complete_chunk():
@@ -859,7 +855,6 @@ def complete_chunk():
     except Exception as e:
         app.logger.error(f"チャンク完了エラー: {e}")
         return jsonify({'status': 'error'}), 500
-
 
 @app.route('/log_result', methods=['POST'])
 @login_required
@@ -890,7 +885,6 @@ def log_result():
         app.logger.error(f"ログ書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
     
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
