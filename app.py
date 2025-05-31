@@ -256,12 +256,11 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
         return None
 
 def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty):
-    app.logger.error(f"[DEBUG] チャンク進捗チェック開始: user_id={user_id}, source={source}")
-    
     """チャンク進捗を取得または作成"""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # まず既存の進捗をチェック
                 cur.execute('''
                     SELECT chunk_number, total_chunks, completed 
                     FROM chunk_progress 
@@ -271,17 +270,22 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                 existing_chunks = cur.fetchall()
                 
                 if existing_chunks:
+                    # 既存の進捗がある場合はそれを返す
                     total_chunks = existing_chunks[0][1]
                     completed_chunks = [chunk[0] for chunk in existing_chunks if chunk[2]]
                     
+                    app.logger.error(f"[DEBUG] 既存チャンク進捗: 完了 {len(completed_chunks)}/{total_chunks}")
+                    
                     if len(completed_chunks) < total_chunks:
                         next_chunk = len(completed_chunks) + 1
+                        app.logger.error(f"[DEBUG] 次のチャンク: {next_chunk}")
                         return {
                             'current_chunk': next_chunk,
                             'total_chunks': total_chunks,
                             'completed_chunks': completed_chunks
                         }
                     else:
+                        app.logger.error(f"[DEBUG] 全チャンク完了")
                         return {
                             'current_chunk': None,
                             'total_chunks': total_chunks,
@@ -289,17 +293,20 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                             'all_completed': True
                         }
                 else:
+                    # 新規作成が必要
                     cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
                     
                     if not cards:
                         return None
                     
+                    # 科目を取得（最初のカードから）
                     subject = cards[0]['subject']
                     chunk_size = get_chunk_size_by_subject(subject)
                     total_chunks = math.ceil(len(cards) / chunk_size)
                     
-                    app.logger.error(f"[DEBUG] 科目={subject}, カード数={len(cards)}, チャンクサイズ={chunk_size}, 総チャンク数={total_chunks}")
+                    app.logger.error(f"[DEBUG] 新規チャンク作成: 科目={subject}, 問題数={len(cards)}, チャンクサイズ={chunk_size}, 総チャンク数={total_chunks}")
                     
+                    # chunk_progress レコードを作成
                     for chunk_num in range(1, total_chunks + 1):
                         cur.execute('''
                             INSERT INTO chunk_progress (user_id, source, stage, chunk_number, total_chunks, page_range, difficulty)
@@ -318,7 +325,7 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
     except Exception as e:
         app.logger.error(f"チャンク進捗取得エラー: {e}")
         return None
-
+    
 def get_completed_stages(user_id, source, page_range, difficulty=''):
     result = {'test': set(), 'practice': set(), 'perfect_completion': False, 'practice_history': {}}
     user_id = str(user_id)
