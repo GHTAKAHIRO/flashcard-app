@@ -277,6 +277,8 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                         # このチャンクの問題を取得
                         chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, chunk_num)
                         
+                        app.logger.error(f"[DEBUG] チャンク{chunk_num}の問題: {[card['id'] for card in chunk_cards] if chunk_cards else 'なし'}")
+                        
                         if chunk_cards:
                             # このチャンクの全問題が完了しているかチェック
                             chunk_card_ids = [card['id'] for card in chunk_cards]
@@ -287,6 +289,8 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                             ''', (user_id, stage, 'test', chunk_card_ids))
                             completed_count = cur.fetchone()[0]
                             
+                            app.logger.error(f"[DEBUG] チャンク{chunk_num}: 完了数={completed_count}/{len(chunk_card_ids)}, 問題ID={chunk_card_ids}")
+                            
                             # 全問題完了していればチャンクを完了としてマーク
                             if completed_count == len(chunk_card_ids):
                                 cur.execute('''
@@ -294,7 +298,10 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                                     SET completed = true, completed_at = CURRENT_TIMESTAMP
                                     WHERE user_id = %s AND source = %s AND stage = %s AND chunk_number = %s AND completed = false
                                 ''', (user_id, source, stage, chunk_num))
-                    
+                                app.logger.error(f"[DEBUG] チャンク{chunk_num}を完了としてマーク")
+                        else:
+                            app.logger.error(f"[DEBUG] チャンク{chunk_num}に問題がありません")
+                                                                
                     conn.commit()
                     
                     # 完了済みチャンクを再取得
