@@ -326,8 +326,34 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                             'all_completed': True
                         }
                 else:
-                    # 新規作成処理（既存のコード）
-                    # ...
+                    # 新規作成が必要
+                    cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
+                    
+                    if not cards:
+                        return None
+                    
+                    # 科目を取得（最初のカードから）
+                    subject = cards[0]['subject']
+                    chunk_size = get_chunk_size_by_subject(subject)
+                    total_chunks = math.ceil(len(cards) / chunk_size)
+                    
+                    app.logger.error(f"[DEBUG] 新規チャンク作成: 科目={subject}, 問題数={len(cards)}, チャンクサイズ={chunk_size}, 総チャンク数={total_chunks}")
+                    
+                    # chunk_progress レコードを作成
+                    for chunk_num in range(1, total_chunks + 1):
+                        cur.execute('''
+                            INSERT INTO chunk_progress (user_id, source, stage, chunk_number, total_chunks, page_range, difficulty)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (user_id, source, stage, chunk_number) DO NOTHING
+                        ''', (user_id, source, stage, chunk_num, total_chunks, page_range, difficulty))
+                    
+                    conn.commit()
+                    
+                    return {
+                        'current_chunk': 1,
+                        'total_chunks': total_chunks,
+                        'completed_chunks': []
+                    }
                     
     except Exception as e:
         app.logger.error(f"チャンク進捗取得エラー: {e}")
