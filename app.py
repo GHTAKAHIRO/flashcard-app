@@ -661,13 +661,61 @@ def study(source):
     stage = session.get('stage', 1)
     user_id = str(current_user.id)
 
-    cards_dict = get_study_cards(source, stage, mode, page_range, user_id, difficulty)
+    # チャンク進捗を取得
+    chunk_progress = get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
+    
+    if not chunk_progress:
+        flash("該当するカードが見つかりませんでした。")
+        return redirect(url_for('prepare', source=source))
+    
+    # 全チャンク完了チェック
+    if chunk_progress.get('all_completed'):
+        flash("このステージの全チャンクが完了しました！")
+        return redirect(url_for('prepare', source=source))
+    
+    current_chunk = chunk_progress['current_chunk']
+    total_chunks = chunk_progress['total_chunks']
+    
+    # 現在のチャンクの問題を取得
+    cards_dict = get_study_cards(source, stage, mode, page_range, user_id, difficulty, current_chunk)
 
     if not cards_dict:
         flash("該当するカードが見つかりませんでした。")
         return redirect(url_for('prepare', source=source))
 
-    return render_template('index.html', cards=cards_dict, mode=mode)
+    # チャンク情報をテンプレートに渡す
+    return render_template('index.html', 
+                         cards=cards_dict, 
+                         mode=mode,
+                         current_chunk=current_chunk,
+                         total_chunks=total_chunks)
+
+
+@app.route('/complete_chunk', methods=['POST'])
+@login_required
+def complete_chunk():
+    """チャンク完了処理"""
+    source = request.json.get('source')
+    stage = request.json.get('stage')
+    chunk_number = request.json.get('chunk_number')
+    user_id = str(current_user.id)
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # チャンクを完了としてマーク
+                cur.execute('''
+                    UPDATE chunk_progress 
+                    SET completed = true, completed_at = CURRENT_TIMESTAMP
+                    WHERE user_id = %s AND source = %s AND stage = %s AND chunk_number = %s
+                ''', (user_id, source, stage, chunk_number))
+                conn.commit()
+                
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        app.logger.error(f"チャンク完了エラー: {e}")
+        return jsonify({'status': 'error'}), 500
+
 
 @app.route('/log_result', methods=['POST'])
 @login_required

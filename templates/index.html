@@ -11,6 +11,14 @@
     <a href="{{ url_for('logout') }}">ログアウト</a>
   </div>
 
+  <!-- チャンク情報表示 -->
+  {% if current_chunk and total_chunks %}
+  <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #e3f2fd, #f8f9fa); border-radius: 10px; border: 1px solid #007bff;">
+    <h3 style="margin: 0; color: #007bff;">📊 チャンク {{ current_chunk }} / {{ total_chunks }}</h3>
+    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">現在のチャンクの問題数: {{ cards|length }}問</p>
+  </div>
+  {% endif %}
+
   <h2>📘 学習モード: {{ mode }}（{{ cards|length }}件）</h2>
 
   <div id="flashcard" class="card"></div>
@@ -21,14 +29,15 @@
   </div>
 
   <!-- ✅ ここに追加：Flaskから渡されたデータをJSに渡す -->
-<script>
-  const rawCards = {{ cards | tojson }};
-  const mode = "{{ mode }}";
-  const stage = {{ session['stage'] | default(1) }};
-</script>
+  <script>
+    const rawCards = {{ cards | tojson }};
+    const mode = "{{ mode }}";
+    const stage = {{ session['stage'] | default(1) }};
+    const currentChunk = {{ current_chunk | default('null') }};
+    const totalChunks = {{ total_chunks | default('null') }};
+  </script>
 
   <!-- main.js の読み込みはこの後 -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
-
 </html>
