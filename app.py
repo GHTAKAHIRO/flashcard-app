@@ -271,13 +271,12 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                 
                 if existing_chunks:
                     total_chunks = existing_chunks[0][1]
+                    completed_chunks_before = [chunk[0] for chunk in existing_chunks if chunk[2]]
                     
                     # 各チャンクの完了状況をチェック・更新
                     for chunk_num in range(1, total_chunks + 1):
                         # このチャンクの問題を取得
                         chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, chunk_num)
-                        
-                        app.logger.error(f"[DEBUG] チャンク{chunk_num}の問題: {[card['id'] for card in chunk_cards] if chunk_cards else 'なし'}")
                         
                         if chunk_cards:
                             # このチャンクの全問題が完了しているかチェック
@@ -289,8 +288,6 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                             ''', (user_id, stage, 'test', chunk_card_ids))
                             completed_count = cur.fetchone()[0]
                             
-                            app.logger.error(f"[DEBUG] チャンク{chunk_num}: 完了数={completed_count}/{len(chunk_card_ids)}, 問題ID={chunk_card_ids}")
-                            
                             # 全問題完了していればチャンクを完了としてマーク
                             if completed_count == len(chunk_card_ids):
                                 cur.execute('''
@@ -298,10 +295,7 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                                     SET completed = true, completed_at = CURRENT_TIMESTAMP
                                     WHERE user_id = %s AND source = %s AND stage = %s AND chunk_number = %s AND completed = false
                                 ''', (user_id, source, stage, chunk_num))
-                                app.logger.error(f"[DEBUG] チャンク{chunk_num}を完了としてマーク")
-                        else:
-                            app.logger.error(f"[DEBUG] チャンク{chunk_num}に問題がありません")
-                                                                
+                    
                     conn.commit()
                     
                     # 完了済みチャンクを再取得
@@ -310,28 +304,41 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                         WHERE user_id = %s AND source = %s AND stage = %s AND completed = true
                         ORDER BY chunk_number
                     ''', (user_id, source, stage))
-                    completed_chunks = [row[0] for row in cur.fetchall()]
+                    completed_chunks_after = [row[0] for row in cur.fetchall()]
                     
-                    app.logger.error(f"[DEBUG] 完了済みチャンク: {completed_chunks}/{total_chunks}")
+                    # 新しく完了したチャンクがあるかチェック
+                    newly_completed = set(completed_chunks_after) - set(completed_chunks_before)
                     
-                    if len(completed_chunks) < total_chunks:
+                    if len(completed_chunks_after) < total_chunks:
                         # 次の未完了チャンクを返す
-                        next_chunk = len(completed_chunks) + 1
-                        app.logger.error(f"[DEBUG] 次のチャンク: {next_chunk}")
-                        return {
+                        next_chunk = len(completed_chunks_after) + 1
+                        
+                        # 新しく完了したチャンクがあれば即時復習フラグを設定
+                        result = {
                             'current_chunk': next_chunk,
                             'total_chunks': total_chunks,
-                            'completed_chunks': completed_chunks
+                            'completed_chunks': completed_chunks_after
                         }
+                        
+                        if newly_completed:
+                            result['newly_completed_chunk'] = max(newly_completed)
+                            result['needs_immediate_practice'] = True
+                        
+                        return result
                     else:
                         # 全チャンク完了
-                        app.logger.error(f"[DEBUG] 全チャンク完了")
-                        return {
+                        result = {
                             'current_chunk': None,
                             'total_chunks': total_chunks,
-                            'completed_chunks': completed_chunks,
+                            'completed_chunks': completed_chunks_after,
                             'all_completed': True
                         }
+                        
+                        if newly_completed:
+                            result['newly_completed_chunk'] = max(newly_completed)
+                            result['needs_immediate_practice'] = True
+                        
+                        return result
                 else:
                     # 新規作成が必要
                     cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
@@ -343,8 +350,6 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                     subject = cards[0]['subject']
                     chunk_size = get_chunk_size_by_subject(subject)
                     total_chunks = math.ceil(len(cards) / chunk_size)
-                    
-                    app.logger.error(f"[DEBUG] 新規チャンク作成: 科目={subject}, 問題数={len(cards)}, チャンクサイズ={chunk_size}, 総チャンク数={total_chunks}")
                     
                     # chunk_progress レコードを作成
                     for chunk_num in range(1, total_chunks + 1):
@@ -364,8 +369,7 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                     
     except Exception as e:
         app.logger.error(f"チャンク進捗取得エラー: {e}")
-        return None
-    
+        return None    
     
 def get_completed_stages(user_id, source, page_range, difficulty=''):
     result = {'test': set(), 'practice': set(), 'perfect_completion': False, 'practice_history': {}}
@@ -709,20 +713,43 @@ def study(source):
         flash("該当するカードが見つかりませんでした。")
         return redirect(url_for('prepare', source=source))
     
+    # 即時復習が必要かチェック
+    if chunk_progress.get('needs_immediate_practice') and mode == 'test':
+        newly_completed_chunk = chunk_progress['newly_completed_chunk']
+        
+        # 即時復習に切り替え
+        session['mode'] = 'chunk_practice'
+        session['practicing_chunk'] = newly_completed_chunk
+        
+        flash(f"チャンク{newly_completed_chunk}のテストが完了しました！×の問題を練習しましょう。")
+        return redirect(url_for('study', source=source))
+    
     # 全チャンク完了チェック
-    if chunk_progress.get('all_completed'):
+    if chunk_progress.get('all_completed') and mode != 'chunk_practice':
         flash("このステージの全チャンクが完了しました！")
         return redirect(url_for('prepare', source=source))
     
-    current_chunk = chunk_progress['current_chunk']
-    total_chunks = chunk_progress['total_chunks']
+    # 現在のチャンクまたは練習チャンクを決定
+    if mode == 'chunk_practice':
+        current_chunk = session.get('practicing_chunk')
+        total_chunks = chunk_progress['total_chunks']
+    else:
+        current_chunk = chunk_progress['current_chunk']
+        total_chunks = chunk_progress['total_chunks']
     
-    # 現在のチャンクの問題を取得
+    # 問題を取得
     cards_dict = get_study_cards(source, stage, mode, page_range, user_id, difficulty, current_chunk)
 
     if not cards_dict:
-        flash("該当するカードが見つかりませんでした。")
-        return redirect(url_for('prepare', source=source))
+        # 即時復習で問題がない場合は次のチャンクへ
+        if mode == 'chunk_practice':
+            flash("練習完了！次のチャンクに進みます。")
+            session['mode'] = 'test'
+            session.pop('practicing_chunk', None)
+            return redirect(url_for('study', source=source))
+        else:
+            flash("該当するカードが見つかりませんでした。")
+            return redirect(url_for('prepare', source=source))
 
     # チャンク情報をテンプレートに渡す
     return render_template('index.html', 
