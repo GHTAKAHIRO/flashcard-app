@@ -153,7 +153,8 @@ def load_user(user_id):
         app.logger.error(f"ユーザー読み込みエラー: {e}")
     return None
 
-def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chunk_number=None):
+def get_study_cards_test_integrated(source, stage, mode, page_range, user_id, difficulty='', chunk_number=None):
+    """統合復習対応版のget_study_cards（テスト環境用）"""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -192,11 +193,13 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                     query += f' AND level IN ({difficulty_placeholders})'
                     params.extend(difficulty_list)
 
-                # モード・ステージ別の条件
+                # 🔥 Stage・モード別の条件（統合復習対応）
                 if mode == 'test':
                     if stage == 1:
-                        pass
+                        # Stage 1: 既存のチャンク処理
+                        pass  # チャンク分割は後で行う
                     elif stage == 2:
+                        # 🔥 Stage 2: 全チャンクのStage 1×問題すべて
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -209,7 +212,9 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                             )
                         '''
                         params.append(user_id)
+                        app.logger.debug(f"[Stage 2] Stage 1の×問題を取得: user_id={user_id}")
                     elif stage == 3:
+                        # 🔥 Stage 3: Stage 2の×問題すべて
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -222,8 +227,10 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                             )
                         '''
                         params.append(user_id)
+                        app.logger.debug(f"[Stage 3] Stage 2の×問題を取得: user_id={user_id}")
                 
                 elif mode == 'practice':
+                    # 練習モードは既存ロジック
                     if stage == 1:
                         query += '''
                             AND id IN (
@@ -292,8 +299,11 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                         params.extend([user_id, user_id])
 
                 query += ' ORDER BY id DESC'
+                
+                app.logger.debug(f"[統合復習] クエリ実行: stage={stage}, mode={mode}, params={params}")
                 cur.execute(query, params)
                 records = cur.fetchall()
+                app.logger.debug(f"[統合復習] 取得件数: {len(records)}件")
 
         cards_dict = [dict(
             id=r[0], subject=r[1], grade=r[2], source=r[3],
@@ -301,21 +311,26 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
             level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
         ) for r in records]
 
-        # チャンク分割処理
-        if chunk_number and cards_dict:
+        # 🔥 Stage 1のみチャンク分割処理
+        if stage == 1 and chunk_number and cards_dict:
             subject = cards_dict[0]['subject']
             chunks = create_chunks_for_cards(cards_dict, subject)
+            
+            app.logger.debug(f"[チャンク分割] stage={stage}, chunk_number={chunk_number}, 総チャンク数={len(chunks)}")
             
             if 1 <= chunk_number <= len(chunks):
                 return chunks[chunk_number - 1]
             else:
                 return []
         
+        # 🔥 Stage 2・3は全問題をそのまま返す（チャンク分割しない）
+        app.logger.debug(f"[統合復習] stage={stage}で{len(cards_dict)}問を返す")
         return cards_dict
+        
     except Exception as e:
-        app.logger.error(f"教材取得エラー: {e}")
+        app.logger.error(f"統合復習教材取得エラー: {e}")
         return None
-
+    
 def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty):
     """チャンク進捗を取得または作成"""
     try:
@@ -759,73 +774,96 @@ def prepare(source):
     )
 
 @app.route('/study/<source>')
-@login_required
-def study(source):
+@login_required  
+def study_test_integrated(source):
     mode = session.get('mode', 'test')
     page_range = session.get('page_range', '').strip()
     difficulty = session.get('difficulty', '').strip()
     stage = session.get('stage', 1)
     user_id = str(current_user.id)
 
-    # チャンク進捗を取得
-    chunk_progress = get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
-    
-    if not chunk_progress:
-        flash("該当するカードが見つかりませんでした。")
-        return redirect(url_for('prepare', source=source))
-    
-    # 🔥 即時復習が必要かチェック（新機能）
-    if chunk_progress.get('needs_immediate_practice') and mode == 'test':
-        newly_completed_chunk = chunk_progress['newly_completed_chunk']
+    app.logger.debug(f"[統合復習] 学習開始: stage={stage}, mode={mode}, source={source}")
+
+    # 🔥 Stage 1は既存のチャンク進捗ロジック
+    if stage == 1:
+        chunk_progress = get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
         
-        # 即時復習する×問題があるかチェック
-        practice_cards = get_chunk_practice_cards(user_id, source, stage, newly_completed_chunk, page_range, difficulty)
+        if not chunk_progress:
+            flash("該当するカードが見つかりませんでした。")
+            return redirect(url_for('prepare', source=source))
         
-        if practice_cards:
-            # 即時復習に切り替え
-            session['mode'] = 'chunk_practice'
-            session['practicing_chunk'] = newly_completed_chunk
+        # 即時復習が必要かチェック
+        if chunk_progress.get('needs_immediate_practice') and mode == 'test':
+            newly_completed_chunk = chunk_progress['newly_completed_chunk']
             
-            flash(f"🎉 チャンク{newly_completed_chunk}のテストが完了しました！×の問題を練習しましょう。")
-            return redirect(url_for('study', source=source))
+            # 即時復習する×問題があるかチェック
+            practice_cards = get_chunk_practice_cards(user_id, source, stage, newly_completed_chunk, page_range, difficulty)
+            
+            if practice_cards:
+                # 即時復習に切り替え
+                session['mode'] = 'chunk_practice'
+                session['practicing_chunk'] = newly_completed_chunk
+                
+                flash(f"🎉 チャンク{newly_completed_chunk}のテストが完了しました！×の問題を練習しましょう。")
+                return redirect(url_for('study', source=source))
+            else:
+                # ×問題がない場合は次のチャンクへ
+                flash(f"🌟 チャンク{newly_completed_chunk}完了！全問正解です。次のチャンクに進みます。")
+        
+        # 全チャンク完了チェック
+        if chunk_progress.get('all_completed') and mode != 'chunk_practice':
+            flash("🏆 Stage 1の全チャンクが完了しました！")
+            return redirect(url_for('prepare', source=source))
+        
+        # チャンク練習モードの処理
+        if mode == 'chunk_practice':
+            current_chunk = session.get('practicing_chunk')
+            
+            # 練習問題を取得
+            cards_dict = get_chunk_practice_cards(user_id, source, stage, current_chunk, page_range, difficulty)
+            
+            if not cards_dict:
+                # 練習完了 → テストモードに戻る
+                flash(f"✅ チャンク{current_chunk}の復習完了！次のチャンクに進みます。")
+                session['mode'] = 'test'
+                session.pop('practicing_chunk', None)
+                return redirect(url_for('study', source=source))
+            
+            total_chunks = chunk_progress['total_chunks']
+            
         else:
-            # ×問題がない場合は次のチャンクへ
-            flash(f"🌟 チャンク{newly_completed_chunk}完了！全問正解です。次のチャンクに進みます。")
+            current_chunk = chunk_progress['current_chunk']
+            total_chunks = chunk_progress['total_chunks']
+            
+            # Stage 1のテスト問題を取得
+            cards_dict = get_study_cards_test_integrated(source, stage, mode, page_range, user_id, difficulty, current_chunk)
     
-    # 全チャンク完了チェック
-    if chunk_progress.get('all_completed') and mode != 'chunk_practice':
-        flash("🏆 このステージの全チャンクが完了しました！")
-        return redirect(url_for('prepare', source=source))
-    
-    # 🔥 チャンク練習モードの処理（新機能）
-    if mode == 'chunk_practice':
-        current_chunk = session.get('practicing_chunk')
-        
-        # 練習問題を取得
-        cards_dict = get_chunk_practice_cards(user_id, source, stage, current_chunk, page_range, difficulty)
-        
-        if not cards_dict:
-            # 練習完了 → テストモードに戻る
-            flash(f"✅ チャンク{current_chunk}の復習完了！次のチャンクに進みます。")
-            session['mode'] = 'test'
-            session.pop('practicing_chunk', None)
-            return redirect(url_for('study', source=source))
-        
-        total_chunks = chunk_progress['total_chunks']
-        
     else:
-        current_chunk = chunk_progress['current_chunk']
-        total_chunks = chunk_progress['total_chunks']
+        # 🔥 Stage 2・3は統合復習（チャンク機能なし）
+        current_chunk = None
+        total_chunks = 1
         
-        # 通常のテスト問題を取得
-        cards_dict = get_study_cards(source, stage, mode, page_range, user_id, difficulty, current_chunk)
+        app.logger.debug(f"[統合復習] Stage {stage}で統合復習開始")
+        
+        # 統合復習問題を取得
+        cards_dict = get_study_cards_test_integrated(source, stage, mode, page_range, user_id, difficulty)
+        
+        if cards_dict:
+            flash(f"📚 Stage {stage} 統合復習: {len(cards_dict)}問の×問題があります")
+        else:
+            app.logger.debug(f"[統合復習] Stage {stage}で問題が見つからない")
 
     if not cards_dict:
-        flash("該当するカードが見つかりませんでした。")
+        if stage in [2, 3]:
+            flash(f"Stage {stage}で学習する×問題がありません。前のStageで×問題を作ってください。")
+        else:
+            flash("該当するカードが見つかりませんでした。")
         return redirect(url_for('prepare', source=source))
 
-    # チャンク情報をテンプレートに渡す
-    return render_template('index.html', 
+    # テンプレートに渡す情報
+    app.logger.debug(f"[統合復習] 問題表示: stage={stage}, 問題数={len(cards_dict)}")
+
+    return render_template('index.html',
                          cards=cards_dict, 
                          mode=mode,
                          current_chunk=current_chunk,
