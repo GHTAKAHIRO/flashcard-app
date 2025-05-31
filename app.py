@@ -134,10 +134,8 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                 # モード・ステージ別の条件
                 if mode == 'test':
                     if stage == 1:
-                        # Stage 1 テスト: 全問題対象（ページ範囲内）
-                        pass  # 既にページ範囲で絞り込み済み
+                        pass
                     elif stage == 2:
-                        # Stage 2 テスト: Stage 1 テストで×だった問題のみ
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -151,7 +149,6 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                         '''
                         params.append(user_id)
                     elif stage == 3:
-                        # Stage 3 テスト: Stage 2 テストで×だった問題のみ
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -166,9 +163,7 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                         params.append(user_id)
                 
                 elif mode == 'practice':
-                    # 練習モード: 段階的絞り込み方式
                     if stage == 1:
-                        # Stage 1 練習: Stage 1 テストで×だった問題から、まだ○になっていない問題
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -191,7 +186,6 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                         '''
                         params.extend([user_id, user_id])
                     elif stage == 2:
-                        # Stage 2 練習: Stage 2 テストで×だった問題から、まだ○になっていない問題
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -214,7 +208,6 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
                         '''
                         params.extend([user_id, user_id])
                     elif stage == 3:
-                        # Stage 3 練習: Stage 3 テストで×だった問題から、まだ○になっていない問題
                         query += '''
                             AND id IN (
                                 SELECT card_id FROM (
@@ -253,9 +246,9 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
             chunks = create_chunks_for_cards(cards_dict, subject)
             
             if 1 <= chunk_number <= len(chunks):
-                return chunks[chunk_number - 1]  # 指定チャンクのみ返す
+                return chunks[chunk_number - 1]
             else:
-                return []  # 無効なチャンク番号
+                return []
         
         return cards_dict
     except Exception as e:
@@ -267,7 +260,6 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # まず既存の進捗をチェック
                 cur.execute('''
                     SELECT chunk_number, total_chunks, completed 
                     FROM chunk_progress 
@@ -277,12 +269,10 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                 existing_chunks = cur.fetchall()
                 
                 if existing_chunks:
-                    # 既存の進捗がある場合はそれを返す
                     total_chunks = existing_chunks[0][1]
                     completed_chunks = [chunk[0] for chunk in existing_chunks if chunk[2]]
                     
                     if len(completed_chunks) < total_chunks:
-                        # 未完了のチャンクがある
                         next_chunk = len(completed_chunks) + 1
                         return {
                             'current_chunk': next_chunk,
@@ -290,7 +280,6 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                             'completed_chunks': completed_chunks
                         }
                     else:
-                        # 全チャンク完了
                         return {
                             'current_chunk': None,
                             'total_chunks': total_chunks,
@@ -298,18 +287,15 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                             'all_completed': True
                         }
                 else:
-                    # 新規作成が必要
                     cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
                     
                     if not cards:
                         return None
                     
-                    # 科目を取得（最初のカードから）
                     subject = cards[0]['subject']
                     chunk_size = get_chunk_size_by_subject(subject)
                     total_chunks = math.ceil(len(cards) / chunk_size)
                     
-                    # chunk_progress レコードを作成
                     for chunk_num in range(1, total_chunks + 1):
                         cur.execute('''
                             INSERT INTO chunk_progress (user_id, source, stage, chunk_number, total_chunks, page_range, difficulty)
@@ -349,7 +335,6 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 対象となる全カードIDを取得（ページ範囲と難易度でフィルタ）
                 base_query = '''
                     SELECT id FROM image
                     WHERE source = %s
@@ -369,7 +354,6 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
                 cur.execute(base_query, base_params)
                 all_card_ids = [row[0] for row in cur.fetchall()]
 
-                # 各ステージの練習履歴をチェック
                 for stage in [1, 2, 3]:
                     cur.execute('''
                         SELECT COUNT(*) FROM study_log
@@ -379,15 +363,11 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
                     result['practice_history'][stage] = practice_count > 0
 
                 for stage in [1, 2, 3]:
-                    # 各ステージのテスト対象カードを決定
                     if stage == 1:
                         target_card_ids = all_card_ids
                     elif stage == 2:
-                        # Stage 1 テストが完了している場合のみチェック
                         if 1 not in result['test']:
                             continue
-                        
-                        # Stage 1 テストで×だった問題が対象
                         cur.execute('''
                             SELECT card_id FROM (
                                 SELECT card_id, result,
@@ -399,11 +379,8 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
                         ''', (user_id,))
                         target_card_ids = [r[0] for r in cur.fetchall()]
                     elif stage == 3:
-                        # Stage 2 テストが完了している場合のみチェック
                         if 2 not in result['test']:
                             continue
-                        
-                        # Stage 2 テストで×だった問題が対象
                         cur.execute('''
                             SELECT card_id FROM (
                                 SELECT card_id, result,
@@ -415,7 +392,6 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
                         ''', (user_id,))
                         target_card_ids = [r[0] for r in cur.fetchall()]
 
-                    # テストが完了しているかチェック
                     if target_card_ids:
                         cur.execute('''
                             SELECT COUNT(DISTINCT card_id)
@@ -427,7 +403,6 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
                         if tested_count == len(target_card_ids):
                             result['test'].add(stage)
                             
-                            # 満点判定（テスト完了後に全問正解かチェック）
                             cur.execute('''
                                 SELECT COUNT(DISTINCT card_id)
                                 FROM (
@@ -440,26 +415,19 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
                             ''', (user_id, stage, list(target_card_ids)))
                             perfect_count = cur.fetchone()[0]
                             
-                            # 満点の場合は全学習完了とみなす
                             if perfect_count == len(target_card_ids):
                                 result['perfect_completion'] = True
-                                
-                                # 満点達成ステージまでの全ての練習を完了扱いにする
                                 for completed_stage in range(1, stage + 1):
                                     result['practice'].add(completed_stage)
-                                
-                                break  # 満点なので以降のステージは不要
+                                break
 
                     elif stage > 1:
-                        # Stage 2, 3 で対象カードがない場合は前ステージで満点だった
                         result['test'].add(stage)
                         result['practice'].add(stage)
 
-                # 満点でない場合の通常の練習完了判定
                 if not result['perfect_completion']:
                     for stage in [1, 2, 3]:
-                        if stage in result['test']:  # テストが完了している場合のみ
-                            # 各ステージのテストで×だった問題を取得
+                        if stage in result['test']:
                             if stage == 1:
                                 cur.execute('''
                                     SELECT card_id FROM (
@@ -494,7 +462,6 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
                             practice_target_cards = [r[0] for r in cur.fetchall()]
                             
                             if practice_target_cards:
-                                # 練習で全問題が最終的に○になったかチェック
                                 cur.execute('''
                                     SELECT card_id FROM (
                                         SELECT card_id, result,
@@ -507,11 +474,9 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
                                 
                                 completed_practice_cards = [r[0] for r in cur.fetchall()]
                                 
-                                # 全ての対象カードが練習で○になった場合に完了
                                 if len(completed_practice_cards) == len(practice_target_cards):
                                     result['practice'].add(stage)
                             else:
-                                # テストで×の問題がない場合（満点）は練習完了
                                 result['practice'].add(stage)
 
     except Exception as e:
@@ -537,7 +502,6 @@ def dashboard():
                 rows = cur.fetchall()
                 sources = [{"source": r[0], "subject": r[1], "grade": r[2]} for r in rows]
                 
-                # 保存されたページ範囲と難易度を取得
                 user_id = str(current_user.id)
                 cur.execute('SELECT source, page_range, difficulty FROM user_settings WHERE user_id = %s', (user_id,))
                 settings = cur.fetchall()
@@ -561,7 +525,6 @@ def set_page_range_and_prepare(source):
     difficulty = ','.join(difficulty_list) if difficulty_list else ''
     user_id = str(current_user.id)
     
-    # ページ範囲と難易度を保存
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -608,14 +571,12 @@ def login():
 def prepare(source):
     user_id = str(current_user.id)
 
-    # --- POST時（学習設定の保存と遷移） ---
     if request.method == 'POST':
         page_range = request.form.get('page_range', '').strip()
         difficulty_list = request.form.getlist('difficulty')
         difficulty = ','.join(difficulty_list) if difficulty_list else ''
         stage_mode = request.form.get('stage')
 
-        # stage_mode の None チェック
         if not stage_mode or '-' not in stage_mode:
             flash("学習ステージを選択してください")
             return redirect(url_for('prepare', source=source))
@@ -626,7 +587,6 @@ def prepare(source):
         session['page_range'] = page_range
         session['difficulty'] = difficulty
 
-        # user_settings に保存
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
@@ -642,7 +602,6 @@ def prepare(source):
 
         return redirect(url_for('study', source=source))
 
-    # --- GET時 ---
     saved_page_range = ''
     saved_difficulty = ''
     try:
@@ -681,15 +640,6 @@ def prepare(source):
         saved_page_range=saved_page_range,
         saved_difficulty=saved_difficulty
     )
-
-@app.route('/study/<source>')
-@login_required
-def study(source):
-    mode = session.get('mode', 'test')
-    page_range = session.get('page_range', '').strip()
-    difficulty = session.get('difficulty', '').strip()
-    stage = session.get('stage', 1)
-    user_id = str(current_user.id)
 
 @app.route('/study/<source>')
 @login_required
@@ -763,7 +713,6 @@ def reset_history(source):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # study_log の履歴削除
                 cur.execute('''
                     DELETE FROM study_log
                     WHERE user_id = %s AND card_id IN (
@@ -771,7 +720,6 @@ def reset_history(source):
                     )
                 ''', (user_id, source))
                 
-                # chunk_progress の履歴削除
                 cur.execute('''
                     DELETE FROM chunk_progress
                     WHERE user_id = %s AND source = %s
@@ -788,4 +736,4 @@ def reset_history(source):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.
