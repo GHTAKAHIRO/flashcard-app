@@ -700,79 +700,106 @@ def login():
 
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
-def prepare(source):
+def prepare_with_debug(source):
     user_id = str(current_user.id)
+    
+    try:
+        app.logger.debug(f"[PREPARE] 開始: source={source}, user_id={user_id}")
+        
+        if request.method == 'POST':
+            app.logger.debug(f"[PREPARE] POST処理開始")
+            
+            page_range = request.form.get('page_range', '').strip()
+            difficulty_list = request.form.getlist('difficulty')
+            difficulty = ','.join(difficulty_list) if difficulty_list else ''
+            stage_mode = request.form.get('stage')
 
-    if request.method == 'POST':
-        page_range = request.form.get('page_range', '').strip()
-        difficulty_list = request.form.getlist('difficulty')
-        difficulty = ','.join(difficulty_list) if difficulty_list else ''
-        stage_mode = request.form.get('stage')
+            app.logger.debug(f"[PREPARE] フォームデータ: page_range={page_range}, difficulty={difficulty}, stage_mode={stage_mode}")
 
-        if not stage_mode or '-' not in stage_mode:
-            flash("学習ステージを選択してください")
-            return redirect(url_for('prepare', source=source))
+            if not stage_mode or '-' not in stage_mode:
+                flash("学習ステージを選択してください")
+                return redirect(url_for('prepare', source=source))
 
-        stage_str, mode = stage_mode.split('-')
-        session['stage'] = int(stage_str)
-        session['mode'] = mode
-        session['page_range'] = page_range
-        session['difficulty'] = difficulty
+            stage_str, mode = stage_mode.split('-')
+            session['stage'] = int(stage_str)
+            session['mode'] = mode
+            session['page_range'] = page_range
+            session['difficulty'] = difficulty
 
+            app.logger.debug(f"[PREPARE] セッション設定: stage={stage_str}, mode={mode}")
+
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute('''
+                            INSERT INTO user_settings (user_id, source, page_range, difficulty)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (user_id, source)
+                            DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
+                        ''', (user_id, source, page_range, difficulty))
+                        conn.commit()
+                        app.logger.debug(f"[PREPARE] user_settings保存成功")
+            except Exception as e:
+                app.logger.error(f"[PREPARE] user_settings保存エラー: {e}")
+
+            return redirect(url_for('study', source=source))
+
+        # GET処理
+        app.logger.debug(f"[PREPARE] GET処理開始")
+        
+        saved_page_range = ''
+        saved_difficulty = ''
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute('''
-                        INSERT INTO user_settings (user_id, source, page_range, difficulty)
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (user_id, source)
-                        DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
-                    ''', (user_id, source, page_range, difficulty))
-                    conn.commit()
+                        SELECT page_range, difficulty FROM user_settings
+                        WHERE user_id = %s AND source = %s
+                    ''', (user_id, source))
+                    result = cur.fetchone()
+                    if result:
+                        saved_page_range = result[0] or ''
+                        saved_difficulty = result[1] or ''
+                        session['page_range'] = saved_page_range
+                        session['difficulty'] = saved_difficulty
+                        app.logger.debug(f"[PREPARE] 保存済み設定取得: page_range={saved_page_range}, difficulty={saved_difficulty}")
         except Exception as e:
-            app.logger.error(f"user_settings保存エラー: {e}")
+            app.logger.error(f"[PREPARE] user_settings取得エラー: {e}")
 
-        return redirect(url_for('study', source=source))
+        # 🚨 この部分でエラーが起きている可能性が高い
+        try:
+            app.logger.debug(f"[PREPARE] completed_stages取得開始")
+            completed_raw = get_completed_stages(user_id, source, saved_page_range, saved_difficulty)
+            app.logger.debug(f"[PREPARE] completed_stages取得成功: {completed_raw}")
+            
+            completed = {
+                "test": set(completed_raw.get("test", [])),
+                "practice": set(completed_raw.get("practice", [])),
+                "perfect_completion": completed_raw.get("perfect_completion", False),
+                "practice_history": completed_raw.get("practice_history", {})
+            }
+            
+        except Exception as e:
+            app.logger.error(f"[PREPARE] completed_stages取得エラー: {e}")
+            app.logger.error(f"[PREPARE] エラー詳細: {str(e)}")
+            completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}
 
-    saved_page_range = ''
-    saved_difficulty = ''
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('''
-                    SELECT page_range, difficulty FROM user_settings
-                    WHERE user_id = %s AND source = %s
-                ''', (user_id, source))
-                result = cur.fetchone()
-                if result:
-                    saved_page_range = result[0] or ''
-                    saved_difficulty = result[1] or ''
-                    session['page_range'] = saved_page_range
-                    session['difficulty'] = saved_difficulty
-    except Exception as e:
-        app.logger.error(f"user_settings取得エラー: {e}")
-
-    try:
-        completed_raw = get_completed_stages(user_id, source, saved_page_range, saved_difficulty)
-        completed = {
-            "test": set(completed_raw.get("test", [])),
-            "practice": set(completed_raw.get("practice", [])),
-            "perfect_completion": completed_raw.get("perfect_completion", False),
-            "practice_history": completed_raw.get("practice_history", {})
-        }
+        app.logger.debug(f"[PREPARE] 処理完了、テンプレート表示")
+        
+        return render_template(
+            'prepare.html',
+            source=source,
+            completed=completed,
+            saved_page_range=saved_page_range,
+            saved_difficulty=saved_difficulty
+        )
         
     except Exception as e:
-        app.logger.error(f"完了ステージ取得エラー: {e}")
-        completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}
-
-    return render_template(
-        'prepare.html',
-        source=source,
-        completed=completed,
-        saved_page_range=saved_page_range,
-        saved_difficulty=saved_difficulty
-    )
-
+        app.logger.error(f"[PREPARE] 全体エラー: {e}")
+        app.logger.error(f"[PREPARE] エラー詳細: {str(e)}")
+        flash("準備画面でエラーが発生しました")
+        return redirect(url_for('dashboard'))
+    
 @app.route('/study/<source>')
 @login_required  
 def study_test_integrated(source):
