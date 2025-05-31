@@ -256,6 +256,8 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chu
         return None
 
 def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty):
+    app.logger.error(f"[DEBUG] チャンク進捗チェック開始: user_id={user_id}, source={source}")
+    
     """チャンク進捗を取得または作成"""
     try:
         with get_db_connection() as conn:
@@ -295,6 +297,8 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                     subject = cards[0]['subject']
                     chunk_size = get_chunk_size_by_subject(subject)
                     total_chunks = math.ceil(len(cards) / chunk_size)
+                    
+                    app.logger.error(f"[DEBUG] 科目={subject}, カード数={len(cards)}, チャンクサイズ={chunk_size}, 総チャンク数={total_chunks}")
                     
                     for chunk_num in range(1, total_chunks + 1):
                         cur.execute('''
