@@ -43,13 +43,13 @@ def get_db_connection():
 def get_chunk_size_by_subject(subject):
     """科目別チャンクサイズを返す"""
     chunk_sizes = {
-        '英語': 10,
-        '数学': 10,
-        '理科': 15,
-        '社会': 15,
-        '国語': 20
+        '英語': 2,  # テスト用に小さく
+        '数学': 2,  # テスト用に小さく
+        '理科': 3,  # テスト用に小さく
+        '社会': 3,  # テスト用に小さく
+        '国語': 3   # テスト用に小さく
     }
-    return chunk_sizes.get(subject, 15)
+    return chunk_sizes.get(subject, 2)
 
 def create_chunks_for_cards(cards, subject):
     """カードリストをチャンクに分割"""
