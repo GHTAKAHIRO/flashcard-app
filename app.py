@@ -700,7 +700,7 @@ def login():
 
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
-def prepare_with_debug(source):
+def prepare(source):  # 🔥 関数名はprepareのままにする
     user_id = str(current_user.id)
     
     try:
@@ -782,6 +782,7 @@ def prepare_with_debug(source):
         except Exception as e:
             app.logger.error(f"[PREPARE] completed_stages取得エラー: {e}")
             app.logger.error(f"[PREPARE] エラー詳細: {str(e)}")
+            # エラーでもページを表示できるようにデフォルト値を設定
             completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}
 
         app.logger.debug(f"[PREPARE] 処理完了、テンプレート表示")
@@ -796,7 +797,7 @@ def prepare_with_debug(source):
         
     except Exception as e:
         app.logger.error(f"[PREPARE] 全体エラー: {e}")
-        app.logger.error(f"[PREPARE] エラー詳細: {str(e)}")
+        app.logger.error(f"[PREPARE] エラートレースバック: ", exc_info=True)
         flash("準備画面でエラーが発生しました")
         return redirect(url_for('dashboard'))
     
