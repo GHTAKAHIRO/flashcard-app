@@ -1,15 +1,16 @@
+# ========== インポートエリア ==========
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-
 import os
 import logging
+import math
 import psycopg2
 from dotenv import load_dotenv
 
-# .envファイルの読み込み
+# ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
 
 app = Flask(__name__)
@@ -29,6 +30,7 @@ DB_NAME = os.getenv('DB_NAME')
 DB_USER = os.getenv('DB_USER')
 DB_PASSWORD = os.getenv('DB_PASSWORD')
 
+# ========== ユーティリティ関数エリア ==========
 def get_db_connection():
     return psycopg2.connect(
         host=DB_HOST,
@@ -38,26 +40,30 @@ def get_db_connection():
         password=DB_PASSWORD
     )
 
-# ユーザークラス
-class User(UserMixin):
-    def __init__(self, id, username):
-        self.id = id
-        self.username = username
+def get_chunk_size_by_subject(subject):
+    """科目別チャンクサイズを返す"""
+    chunk_sizes = {
+        '英語': 10,
+        '数学': 10,
+        '理科': 15,
+        '社会': 15,
+        '国語': 20
+    }
+    return chunk_sizes.get(subject, 15)
 
-# ログインマネージャのコールバック
-@login_manager.user_loader
-def load_user(user_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT id, username FROM users WHERE id = %s", (user_id,))
-    user = cur.fetchone()
-    cur.close()
-    conn.close()
-    if user:
-        return User(*user)
-    return None
+def create_chunks_for_cards(cards, subject):
+    """カードリストをチャンクに分割"""
+    chunk_size = get_chunk_size_by_subject(subject)
+    chunks = []
+    
+    for i in range(0, len(cards), chunk_size):
+        chunk = cards[i:i + chunk_size]
+        chunks.append(chunk)
+    
+    return chunks
 
 def parse_page_range(page_range_str):
+    """ページ範囲文字列を解析"""
     pages = set()
     for part in page_range_str.split(','):
         if '-' in part:
@@ -67,7 +73,26 @@ def parse_page_range(page_range_str):
             pages.add(part.strip())
     return list(pages)
 
-def get_study_cards(source, stage, mode, page_range, user_id, difficulty=''):
+# ========== データベース関数エリア ==========
+class User(UserMixin):
+    def __init__(self, id, username):
+        self.id = id
+        self.username = username
+
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, username FROM users WHERE id = %s", (user_id,))
+                user = cur.fetchone()
+                if user:
+                    return User(*user)
+    except Exception as e:
+        app.logger.error(f"ユーザー読み込みエラー: {e}")
+    return None
+
+def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chunk_number=None):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -99,7 +124,7 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty=''):
                 else:
                     query += ' AND false'
 
-                # 難易度フィルタの追加
+                # 難易度フィルタ
                 if difficulty:
                     difficulty_list = [d.strip() for d in difficulty.split(',')]
                     difficulty_placeholders = ','.join(['%s'] * len(difficulty_list))
@@ -222,11 +247,87 @@ def get_study_cards(source, stage, mode, page_range, user_id, difficulty=''):
             level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
         ) for r in records]
 
+        # チャンク分割処理
+        if chunk_number and cards_dict:
+            subject = cards_dict[0]['subject']
+            chunks = create_chunks_for_cards(cards_dict, subject)
+            
+            if 1 <= chunk_number <= len(chunks):
+                return chunks[chunk_number - 1]  # 指定チャンクのみ返す
+            else:
+                return []  # 無効なチャンク番号
+        
         return cards_dict
     except Exception as e:
         app.logger.error(f"教材取得エラー: {e}")
         return None
-    
+
+def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty):
+    """チャンク進捗を取得または作成"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # まず既存の進捗をチェック
+                cur.execute('''
+                    SELECT chunk_number, total_chunks, completed 
+                    FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s AND stage = %s
+                    ORDER BY chunk_number
+                ''', (user_id, source, stage))
+                existing_chunks = cur.fetchall()
+                
+                if existing_chunks:
+                    # 既存の進捗がある場合はそれを返す
+                    total_chunks = existing_chunks[0][1]
+                    completed_chunks = [chunk[0] for chunk in existing_chunks if chunk[2]]
+                    
+                    if len(completed_chunks) < total_chunks:
+                        # 未完了のチャンクがある
+                        next_chunk = len(completed_chunks) + 1
+                        return {
+                            'current_chunk': next_chunk,
+                            'total_chunks': total_chunks,
+                            'completed_chunks': completed_chunks
+                        }
+                    else:
+                        # 全チャンク完了
+                        return {
+                            'current_chunk': None,
+                            'total_chunks': total_chunks,
+                            'completed_chunks': completed_chunks,
+                            'all_completed': True
+                        }
+                else:
+                    # 新規作成が必要
+                    cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
+                    
+                    if not cards:
+                        return None
+                    
+                    # 科目を取得（最初のカードから）
+                    subject = cards[0]['subject']
+                    chunk_size = get_chunk_size_by_subject(subject)
+                    total_chunks = math.ceil(len(cards) / chunk_size)
+                    
+                    # chunk_progress レコードを作成
+                    for chunk_num in range(1, total_chunks + 1):
+                        cur.execute('''
+                            INSERT INTO chunk_progress (user_id, source, stage, chunk_number, total_chunks, page_range, difficulty)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (user_id, source, stage, chunk_number) DO NOTHING
+                        ''', (user_id, source, stage, chunk_num, total_chunks, page_range, difficulty))
+                    
+                    conn.commit()
+                    
+                    return {
+                        'current_chunk': 1,
+                        'total_chunks': total_chunks,
+                        'completed_chunks': []
+                    }
+                    
+    except Exception as e:
+        app.logger.error(f"チャンク進捗取得エラー: {e}")
+        return None
 
 def get_completed_stages(user_id, source, page_range, difficulty=''):
     result = {'test': set(), 'practice': set(), 'perfect_completion': False, 'practice_history': {}}
@@ -418,24 +519,7 @@ def get_completed_stages(user_id, source, page_range, difficulty=''):
 
     return result
 
-@app.route('/study/<source>')
-@login_required
-def study(source):
-    mode = session.get('mode', 'test')
-    page_range = session.get('page_range', '').strip()
-    difficulty = session.get('difficulty', '').strip()  # 追加
-    stage = session.get('stage', 1)
-    user_id = str(current_user.id)
-
-    cards_dict = get_study_cards(source, stage, mode, page_range, user_id, difficulty)  # difficulty追加
-
-    if not cards_dict:
-        flash("該当するカードが見つかりませんでした。")
-        return redirect(url_for('prepare', source=source))
-
-    return render_template('index.html', cards=cards_dict, mode=mode)
-
-# ホームリダイレクト
+# ========== ルート定義エリア ==========
 @app.route('/')
 def home():
     if current_user.is_authenticated:
@@ -443,8 +527,6 @@ def home():
     else:
         return redirect(url_for('login'))
 
-
-# ダッシュボード
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -471,12 +553,11 @@ def dashboard():
         flash("教材一覧の取得に失敗しました")
         return redirect(url_for('login'))
 
-
 @app.route('/set_page_range_and_prepare/<source>', methods=['POST'])
 @login_required
 def set_page_range_and_prepare(source):
     page_range = request.form.get('page_range', '').strip()
-    difficulty_list = request.form.getlist('difficulty')  # チェックボックスの値を取得
+    difficulty_list = request.form.getlist('difficulty')
     difficulty = ','.join(difficulty_list) if difficulty_list else ''
     user_id = str(current_user.id)
     
@@ -497,7 +578,6 @@ def set_page_range_and_prepare(source):
     
     return redirect(url_for('prepare', source=source))
 
-# ログイン処理
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -522,7 +602,6 @@ def login():
             flash("ログイン中にエラーが発生しました")
 
     return render_template('login.html')
-
 
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
@@ -603,6 +682,32 @@ def prepare(source):
         saved_difficulty=saved_difficulty
     )
 
+@app.route('/study/<source>')
+@login_required
+def study(source):
+    mode = session.get('mode', 'test')
+    page_range = session.get('page_range', '').strip()
+    difficulty = session.get('difficulty', '').strip()
+    stage = session.get('stage', 1)
+    user_id = str(current_user.id)
+
+@app.route('/study/<source>')
+@login_required
+def study(source):
+    mode = session.get('mode', 'test')
+    page_range = session.get('page_range', '').strip()
+    difficulty = session.get('difficulty', '').strip()
+    stage = session.get('stage', 1)
+    user_id = str(current_user.id)
+
+    cards_dict = get_study_cards(source, stage, mode, page_range, user_id, difficulty)
+
+    if not cards_dict:
+        flash("該当するカードが見つかりませんでした。")
+        return redirect(url_for('prepare', source=source))
+
+    return render_template('index.html', cards=cards_dict, mode=mode)
+
 @app.route('/log_result', methods=['POST'])
 @login_required
 def log_result():
@@ -612,8 +717,6 @@ def log_result():
     stage = data.get('stage')
     mode = data.get('mode')
     user_id = str(current_user.id)
-
-    print(f"[LOG] user_id={user_id} card_id={card_id} result={result} stage={stage} mode={mode}")
 
     try:
         with get_db_connection() as conn:
@@ -628,8 +731,6 @@ def log_result():
         app.logger.error(f"ログ書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-
-# 新規登録
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -648,14 +749,12 @@ def register():
 
     return render_template('register.html')
 
-# ログアウト処理
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# 履歴削除（教材単位）
 @app.route('/reset_history/<source>', methods=['POST'])
 @login_required
 def reset_history(source):
@@ -664,16 +763,7 @@ def reset_history(source):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 削除前の件数確認
-                cur.execute('''
-                    SELECT COUNT(*) FROM study_log
-                    WHERE user_id = %s AND card_id IN (
-                        SELECT id FROM image WHERE source = %s
-                    )
-                ''', (user_id, source))
-                before_count = cur.fetchone()[0]
-                
-                # 削除実行
+                # study_log の履歴削除
                 cur.execute('''
                     DELETE FROM study_log
                     WHERE user_id = %s AND card_id IN (
@@ -681,15 +771,17 @@ def reset_history(source):
                     )
                 ''', (user_id, source))
                 
-                deleted_count = cur.rowcount
-                conn.commit()
+                # chunk_progress の履歴削除
+                cur.execute('''
+                    DELETE FROM chunk_progress
+                    WHERE user_id = %s AND source = %s
+                ''', (user_id, source))
                 
+                conn.commit()
                 
         flash(f"{source} の学習履歴を削除しました。")
     except Exception as e:
         app.logger.error(f"履歴削除エラー: {e}")
-        import traceback
-        app.logger.error(f"[DEBUG] スタックトレース: {traceback.format_exc()}")
         flash("履歴の削除に失敗しました。")
 
     return redirect(url_for('dashboard'))
