@@ -153,7 +153,7 @@ def load_user(user_id):
         app.logger.error(f"ユーザー読み込みエラー: {e}")
     return None
 
-def get_study_cards_test_integrated(source, stage, mode, page_range, user_id, difficulty='', chunk_number=None):
+def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chunk_number=None):
     """統合復習対応版のget_study_cards（テスト環境用）"""
     try:
         with get_db_connection() as conn:
