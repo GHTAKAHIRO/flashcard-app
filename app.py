@@ -63,64 +63,83 @@ def create_chunks_for_cards(cards, subject):
     return chunks
 
 def get_chunk_practice_cards(user_id, source, stage, chunk_number, page_range, difficulty):
-    """指定チャンクの練習問題を取得（テストで×だった問題のみ）"""
+    """指定チャンクの練習問題を取得（修正版）"""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # まず、このチャンクの全カードを取得
+                # 🔥 修正: まず、このチャンクの全カードを取得
                 chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, chunk_number)
                 
                 if not chunk_cards:
+                    app.logger.warning(f"[練習カード] チャンク{chunk_number}のカードが取得できません")
                     return []
                 
                 chunk_card_ids = [card['id'] for card in chunk_cards]
+                app.logger.debug(f"[練習カード] チャンク{chunk_number}の全カードID: {chunk_card_ids}")
                 
-                # このチャンクでテスト時に×だった問題のうち、まだ練習で○になっていない問題
-                query = '''
+                # 🔥 修正: このチャンクでテスト時に×だった問題を取得
+                cur.execute('''
+                    SELECT card_id FROM (
+                        SELECT card_id, result,
+                               ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                        FROM study_log
+                        WHERE user_id = %s AND stage = %s AND mode = 'test'
+                        AND card_id = ANY(%s)
+                    ) AS test_ranked
+                    WHERE rn = 1 AND result = 'unknown'
+                ''', (user_id, stage, chunk_card_ids))
+                
+                wrong_card_ids = [row[0] for row in cur.fetchall()]
+                app.logger.debug(f"[練習カード] チャンク{chunk_number}のテスト×問題: {wrong_card_ids}")
+                
+                if not wrong_card_ids:
+                    app.logger.info(f"[練習カード] チャンク{chunk_number}に×問題がありません（全問正解）")
+                    return []
+                
+                # 🔥 修正: 練習で○になった問題を除外
+                cur.execute('''
+                    SELECT card_id FROM (
+                        SELECT card_id, result,
+                               ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                        FROM study_log
+                        WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                        AND card_id = ANY(%s)
+                    ) AS practice_ranked
+                    WHERE rn = 1 AND result = 'known'
+                ''', (user_id, stage, wrong_card_ids))
+                
+                practiced_correct_ids = [row[0] for row in cur.fetchall()]
+                app.logger.debug(f"[練習カード] チャンク{chunk_number}の練習○問題: {practiced_correct_ids}")
+                
+                # 練習が必要な問題 = テスト×問題 - 練習○問題
+                need_practice_ids = [cid for cid in wrong_card_ids if cid not in practiced_correct_ids]
+                app.logger.debug(f"[練習カード] チャンク{chunk_number}の練習対象: {need_practice_ids}")
+                
+                if not need_practice_ids:
+                    app.logger.info(f"[練習カード] チャンク{chunk_number}の練習完了")
+                    return []
+                
+                # 🔥 修正: 練習対象のカード詳細を取得
+                cur.execute('''
                     SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
                     FROM image
                     WHERE id = ANY(%s)
-                    AND id IN (
-                        -- このチャンクのテスト×問題
-                        SELECT card_id FROM (
-                            SELECT card_id, result,
-                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
-                            FROM study_log
-                            WHERE user_id = %s AND stage = %s AND mode = 'test'
-                            AND card_id = ANY(%s)
-                        ) AS test_ranked
-                        WHERE rn = 1 AND result = 'unknown'
-                    )
-                    AND id NOT IN (
-                        -- 練習で○になった問題
-                        SELECT card_id FROM (
-                            SELECT card_id, result,
-                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
-                            FROM study_log
-                            WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
-                            AND card_id = ANY(%s)
-                        ) AS practice_ranked
-                        WHERE rn = 1 AND result = 'known'
-                    )
                     ORDER BY id
-                '''
-                
-                cur.execute(query, (
-                    chunk_card_ids,  # 対象カードID
-                    user_id, stage, chunk_card_ids,  # テスト×問題
-                    user_id, stage, chunk_card_ids   # 練習○問題
-                ))
+                ''', (need_practice_ids,))
                 
                 records = cur.fetchall()
                 
-                return [dict(
+                practice_cards = [dict(
                     id=r[0], subject=r[1], grade=r[2], source=r[3],
                     page_number=r[4], problem_number=r[5], topic=r[6],
                     level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
                 ) for r in records]
                 
+                app.logger.info(f"[練習カード] チャンク{chunk_number}の練習カード数: {len(practice_cards)}")
+                return practice_cards
+                
     except Exception as e:
-        app.logger.error(f"チャンク練習問題取得エラー: {e}")
+        app.logger.error(f"チャンク{chunk_number}練習問題取得エラー: {e}")
         return []
        
 def parse_page_range(page_range_str):
@@ -447,15 +466,12 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
         app.logger.error(f"チャンク進捗取得エラー: {e}")
         return None    
 
-# 1. 汎用的なチャンク進捗管理関数
-def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, difficulty):
-    """全ステージ対応のチャンク進捗管理"""
+def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty):
+    """チャンク進捗を取得または作成"""
     try:
-        app.logger.debug(f"[チャンク進捗] 開始: user_id={user_id}, stage={stage}")
-        
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 既存の進捗をチェック
+                # まず既存の進捗をチェック
                 cur.execute('''
                     SELECT chunk_number, total_chunks, completed 
                     FROM chunk_progress 
@@ -468,30 +484,27 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
                     total_chunks = existing_chunks[0][1]
                     completed_chunks_before = [chunk[0] for chunk in existing_chunks if chunk[2]]
                     
-                    app.logger.debug(f"[チャンク進捗] 既存: stage={stage}, 完了={completed_chunks_before}/{total_chunks}")
-                    
-                    # 新しく完了するチャンクを検知
+                    # 🔥 ここが重要な修正点: リアルタイムでチャンク完了をチェック
                     newly_completed_chunks = []
                     
-                    # 各チャンクの完了状況をチェック
                     for chunk_num in range(1, total_chunks + 1):
                         was_completed_before = chunk_num in completed_chunks_before
                         
-                        # このチャンクの問題を取得（ステージ別）
-                        chunk_cards = get_stage_cards_by_chunk(source, stage, page_range, user_id, difficulty, chunk_num)
+                        # このチャンクの問題を取得
+                        chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, chunk_num)
                         
                         if chunk_cards:
                             chunk_card_ids = [card['id'] for card in chunk_cards]
                             
-                            # テスト完了数をチェック
+                            # 🔥 修正: 全問題がテスト完了しているかチェック
                             cur.execute('''
                                 SELECT COUNT(DISTINCT card_id)
                                 FROM study_log
-                                WHERE user_id = %s AND stage = %s AND mode = %s AND card_id = ANY(%s)
-                            ''', (user_id, stage, 'test', chunk_card_ids))
+                                WHERE user_id = %s AND stage = %s AND mode = 'test' AND card_id = ANY(%s)
+                            ''', (user_id, stage, chunk_card_ids))
                             completed_count = cur.fetchone()[0]
                             
-                            # 全問題完了かつ処理前未完了なら新規完了
+                            # 🔥 修正: 全問題完了 && 処理前未完了 → 新規完了
                             if completed_count == len(chunk_card_ids) and not was_completed_before:
                                 cur.execute('''
                                     UPDATE chunk_progress 
@@ -499,7 +512,7 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
                                     WHERE user_id = %s AND source = %s AND stage = %s AND chunk_number = %s AND completed = false
                                 ''', (user_id, source, stage, chunk_num))
                                 newly_completed_chunks.append(chunk_num)
-                                app.logger.debug(f"[チャンク進捗] 🚀 stage={stage}, chunk={chunk_num}が新規完了")
+                                app.logger.info(f"🎉 チャンク{chunk_num}が新規完了!")
                     
                     conn.commit()
                     
@@ -511,7 +524,7 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
                     ''', (user_id, source, stage))
                     completed_chunks_after = [row[0] for row in cur.fetchall()]
                     
-                    # 結果を返す
+                    # 🔥 修正: 結果の構築
                     if len(completed_chunks_after) < total_chunks:
                         next_chunk = len(completed_chunks_after) + 1
                         result = {
@@ -527,7 +540,7 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
                             'all_completed': True
                         }
                     
-                    # 即時練習フラグ設定
+                    # 🔥 修正: 新規完了チャンクがあれば即時練習フラグ
                     if newly_completed_chunks:
                         result['newly_completed_chunk'] = max(newly_completed_chunks)
                         result['needs_immediate_practice'] = True
@@ -537,21 +550,16 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
                     return result
                     
                 else:
-                    # 新規作成
-                    stage_cards = get_stage_cards_all(source, stage, page_range, user_id, difficulty)
+                    # 新規作成の場合（既存のロジックそのまま）
+                    cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
                     
-                    if not stage_cards:
-                        app.logger.debug(f"[チャンク進捗] stage={stage}で対象カードなし")
+                    if not cards:
                         return None
                     
-                    # チャンク分割
-                    subject = stage_cards[0]['subject'] if stage_cards else source
+                    subject = cards[0]['subject']
                     chunk_size = get_chunk_size_by_subject(subject)
-                    total_chunks = math.ceil(len(stage_cards) / chunk_size)
+                    total_chunks = math.ceil(len(cards) / chunk_size)
                     
-                    app.logger.debug(f"[チャンク進捗] stage={stage}新規作成: カード数={len(stage_cards)}, チャンク数={total_chunks}")
-                    
-                    # chunk_progressレコード作成
                     for chunk_num in range(1, total_chunks + 1):
                         cur.execute('''
                             INSERT INTO chunk_progress (user_id, source, stage, chunk_number, total_chunks, page_range, difficulty)
@@ -569,7 +577,7 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
                     }
                     
     except Exception as e:
-        app.logger.error(f"[チャンク進捗] エラー: {e}")
+        app.logger.error(f"チャンク進捗取得エラー: {e}")
         return None
 
 # 2. ステージ別カード取得関数
@@ -1725,6 +1733,128 @@ def reset_history(source):
         flash("履歴の削除に失敗しました。")
 
     return redirect(url_for('dashboard'))
+
+@app.route('/debug/chunk_status/<source>')
+@login_required
+def debug_chunk_status(source):
+    """チャンク状況の詳細デバッグ"""
+    user_id = str(current_user.id)
+    page_range = session.get('page_range', '').strip()
+    difficulty = session.get('difficulty', '').strip()
+    stage = session.get('stage', 1)
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # チャンク進捗状況
+                cur.execute('''
+                    SELECT chunk_number, total_chunks, completed, completed_at 
+                    FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s AND stage = %s
+                    ORDER BY chunk_number
+                ''', (user_id, source, stage))
+                chunk_progress = cur.fetchall()
+                
+                # 各チャンクのカード状況
+                debug_info = {
+                    'user_id': user_id,
+                    'source': source,
+                    'stage': stage,
+                    'page_range': page_range,
+                    'difficulty': difficulty,
+                    'chunk_progress': chunk_progress,
+                    'chunks_detail': []
+                }
+                
+                for chunk_num in range(1, 4):  # 最大3チャンクまでチェック
+                    chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, chunk_num)
+                    
+                    if chunk_cards:
+                        chunk_card_ids = [card['id'] for card in chunk_cards]
+                        
+                        # テスト状況
+                        cur.execute('''
+                            SELECT card_id, result FROM (
+                                SELECT card_id, result,
+                                       ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'test'
+                                AND card_id = ANY(%s)
+                            ) AS ranked
+                            WHERE rn = 1
+                        ''', (user_id, stage, chunk_card_ids))
+                        test_results = dict(cur.fetchall())
+                        
+                        # 練習状況
+                        cur.execute('''
+                            SELECT card_id, result FROM (
+                                SELECT card_id, result,
+                                       ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id = ANY(%s)
+                            ) AS ranked
+                            WHERE rn = 1
+                        ''', (user_id, stage, chunk_card_ids))
+                        practice_results = dict(cur.fetchall())
+                        
+                        debug_info['chunks_detail'].append({
+                            'chunk_number': chunk_num,
+                            'total_cards': len(chunk_card_ids),
+                            'card_ids': chunk_card_ids,
+                            'test_results': test_results,
+                            'practice_results': practice_results,
+                            'tested_count': len(test_results),
+                            'wrong_count': len([r for r in test_results.values() if r == 'unknown']),
+                            'practice_correct_count': len([r for r in practice_results.values() if r == 'known'])
+                        })
+                
+                import json
+                return f"<pre>{json.dumps(debug_info, indent=2, ensure_ascii=False, default=str)}</pre>"
+        
+    except Exception as e:
+        return f"<pre>デバッグエラー: {str(e)}</pre>"
+
+@app.route('/api/chunk_status/<source>')
+@login_required
+def api_chunk_status(source):
+    """チャンク状況をJSON形式で返す"""
+    user_id = str(current_user.id)
+    page_range = session.get('page_range', '').strip()
+    difficulty = session.get('difficulty', '').strip()
+    stage = session.get('stage', 1)
+    
+    try:
+        chunk_progress = get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
+        
+        if not chunk_progress:
+            return jsonify({'status': 'error', 'message': 'チャンク進捗が取得できません'})
+        
+        # 練習が必要なチャンクをチェック
+        needs_practice_chunks = []
+        if chunk_progress.get('needs_immediate_practice'):
+            chunk_num = chunk_progress.get('newly_completed_chunk')
+            if chunk_num:
+                practice_cards = get_chunk_practice_cards(user_id, source, stage, chunk_num, page_range, difficulty)
+                if practice_cards:
+                    needs_practice_chunks.append({
+                        'chunk_number': chunk_num,
+                        'practice_cards_count': len(practice_cards)
+                    })
+        
+        return jsonify({
+            'status': 'ok',
+            'current_chunk': chunk_progress.get('current_chunk'),
+            'total_chunks': chunk_progress.get('total_chunks'),
+            'completed_chunks': chunk_progress.get('completed_chunks', []),
+            'all_completed': chunk_progress.get('all_completed', False),
+            'needs_immediate_practice': chunk_progress.get('needs_immediate_practice', False),
+            'needs_practice_chunks': needs_practice_chunks
+        })
+        
+    except Exception as e:
+        app.logger.error(f"チャンク状況API エラー: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
 
 if __name__ == '__main__':
    port = int(os.environ.get('PORT', 10000))
