@@ -1178,21 +1178,10 @@ def prepare(source):
         app.logger.debug(f"[PREPARE] 開始: source={source}, user_id={user_id}")
         
         if request.method == 'POST':
-            # POST処理は既存のまま
+            # POST処理（ページ範囲・難易度設定）
             page_range = request.form.get('page_range', '').strip()
             difficulty_list = request.form.getlist('difficulty')
             difficulty = ','.join(difficulty_list) if difficulty_list else ''
-            stage_mode = request.form.get('stage')
-
-            if not stage_mode or '-' not in stage_mode:
-                flash("学習ステージを選択してください")
-                return redirect(url_for('prepare', source=source))
-
-            stage_str, mode = stage_mode.split('-')
-            session['stage'] = int(stage_str)
-            session['mode'] = mode
-            session['page_range'] = page_range
-            session['difficulty'] = difficulty
 
             try:
                 with get_db_connection() as conn:
@@ -1204,14 +1193,23 @@ def prepare(source):
                             DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
                         ''', (user_id, source, page_range, difficulty))
                         conn.commit()
+                        
+                # セッションに保存
+                session['page_range'] = page_range
+                session['difficulty'] = difficulty
+                
+                flash("設定を保存しました。")
+                
             except Exception as e:
                 app.logger.error(f"[PREPARE] user_settings保存エラー: {e}")
+                flash("設定の保存に失敗しました。")
 
-            return redirect(url_for('study', source=source))
+            return redirect(url_for('prepare', source=source))
 
         # GET処理
         saved_page_range = ''
         saved_difficulty = ''
+        
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
@@ -1228,36 +1226,274 @@ def prepare(source):
         except Exception as e:
             app.logger.error(f"[PREPARE] user_settings取得エラー: {e}")
 
-        # 🔥 修正版の完了ステージ取得を使用
-        try:
-            app.logger.debug(f"[PREPARE] completed_stages取得開始")
-            completed_raw = get_completed_stages_chunk_aware(user_id, source, saved_page_range, saved_difficulty)
-            app.logger.debug(f"[PREPARE] completed_stages取得成功: {completed_raw}")
-            
-            completed = {
-                "test": set(completed_raw.get("test", [])),
-                "practice": set(completed_raw.get("practice", [])),
-                "perfect_completion": completed_raw.get("perfect_completion", False),
-                "practice_history": completed_raw.get("practice_history", {})
-            }
-            
-        except Exception as e:
-            app.logger.error(f"[PREPARE] completed_stages取得エラー: {e}")
-            completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}
+        # 🔥 新機能：全ステージの詳細進捗を取得
+        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
+        
+        app.logger.debug(f"[PREPARE] stages_info取得成功: {len(stages_info)}ステージ")
 
         return render_template(
-            'prepare.html',
+            'prepare_new.html',
             source=source,
-            completed=completed,
             saved_page_range=saved_page_range,
-            saved_difficulty=saved_difficulty
+            saved_difficulty=saved_difficulty,
+            stages_info=stages_info
         )
         
     except Exception as e:
         app.logger.error(f"[PREPARE] 全体エラー: {e}")
         flash("準備画面でエラーが発生しました")
         return redirect(url_for('dashboard'))
-      
+    
+# ========== 新しい学習設定画面のルート ==========
+# 既存の /prepare/<source> ルートを以下に置き換え
+
+@app.route('/prepare/<source>', methods=['GET', 'POST'])
+@login_required
+def prepare(source):
+    user_id = str(current_user.id)
+    
+    try:
+        app.logger.debug(f"[PREPARE] 開始: source={source}, user_id={user_id}")
+        
+        if request.method == 'POST':
+            # POST処理（ページ範囲・難易度設定）
+            page_range = request.form.get('page_range', '').strip()
+            difficulty_list = request.form.getlist('difficulty')
+            difficulty = ','.join(difficulty_list) if difficulty_list else ''
+
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute('''
+                            INSERT INTO user_settings (user_id, source, page_range, difficulty)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (user_id, source)
+                            DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
+                        ''', (user_id, source, page_range, difficulty))
+                        conn.commit()
+                        
+                # セッションに保存
+                session['page_range'] = page_range
+                session['difficulty'] = difficulty
+                
+                flash("設定を保存しました。")
+                
+            except Exception as e:
+                app.logger.error(f"[PREPARE] user_settings保存エラー: {e}")
+                flash("設定の保存に失敗しました。")
+
+            return redirect(url_for('prepare', source=source))
+
+        # GET処理
+        saved_page_range = ''
+        saved_difficulty = ''
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        SELECT page_range, difficulty FROM user_settings
+                        WHERE user_id = %s AND source = %s
+                    ''', (user_id, source))
+                    result = cur.fetchone()
+                    if result:
+                        saved_page_range = result[0] or ''
+                        saved_difficulty = result[1] or ''
+                        session['page_range'] = saved_page_range
+                        session['difficulty'] = saved_difficulty
+        except Exception as e:
+            app.logger.error(f"[PREPARE] user_settings取得エラー: {e}")
+
+        # 🔥 新機能：全ステージの詳細進捗を取得
+        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
+        
+        app.logger.debug(f"[PREPARE] stages_info取得成功: {len(stages_info)}ステージ")
+
+        return render_template(
+            'prepare_new.html',
+            source=source,
+            saved_page_range=saved_page_range,
+            saved_difficulty=saved_difficulty,
+            stages_info=stages_info
+        )
+        
+    except Exception as e:
+        app.logger.error(f"[PREPARE] 全体エラー: {e}")
+        flash("準備画面でエラーが発生しました")
+        return redirect(url_for('dashboard'))
+
+# 🔥 新機能：全ステージの詳細進捗取得
+def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty):
+    """全ステージの詳細進捗情報を取得"""
+    stages_info = []
+    
+    try:
+        # ステージ1から順番にチェック
+        for stage in range(1, 5):  # ステージ1〜4
+            stage_info = get_stage_detailed_progress(user_id, source, stage, page_range, difficulty)
+            
+            if stage_info:
+                stages_info.append(stage_info)
+                
+                # このステージが未完了なら以降のステージは表示しない
+                if not stage_info.get('stage_completed', False):
+                    break
+            else:
+                # カードがない場合は終了
+                break
+                
+        app.logger.debug(f"[詳細進捗] 取得完了: {len(stages_info)}ステージ")
+        return stages_info
+        
+    except Exception as e:
+        app.logger.error(f"[詳細進捗] エラー: {e}")
+        return []
+
+def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
+    """指定ステージの詳細進捗を取得"""
+    try:
+        app.logger.debug(f"[ステージ進捗] Stage{stage}開始")
+        
+        # ステージ別の対象カードを取得
+        if stage == 1:
+            target_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
+        else:
+            # Stage 2以降は前ステージの×問題
+            if stage == 2:
+                target_cards = get_stage2_cards(source, page_range, user_id, difficulty)
+            elif stage == 3:
+                target_cards = get_stage3_cards(source, page_range, user_id, difficulty)
+            else:
+                target_cards = get_stage_unknown_cards(source, stage-1, page_range, user_id, difficulty)
+        
+        if not target_cards:
+            app.logger.debug(f"[ステージ進捗] Stage{stage}: 対象カードなし")
+            return None
+        
+        # チャンク情報を取得
+        subject = target_cards[0]['subject']
+        chunk_size = get_chunk_size_by_subject(subject)
+        chunks = create_chunks_for_cards(target_cards, subject)
+        total_chunks = len(chunks)
+        
+        app.logger.debug(f"[ステージ進捗] Stage{stage}: {len(target_cards)}問, {total_chunks}チャンク")
+        
+        # 各チャンクの進捗を取得
+        chunks_progress = []
+        stage_completed = True
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for chunk_num in range(1, total_chunks + 1):
+                    chunk_cards = chunks[chunk_num - 1]
+                    chunk_card_ids = [card['id'] for card in chunk_cards]
+                    
+                    # テスト進捗
+                    cur.execute('''
+                        SELECT card_id, result FROM (
+                            SELECT card_id, result,
+                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                            FROM study_log
+                            WHERE user_id = %s AND stage = %s AND mode = 'test'
+                            AND card_id = ANY(%s)
+                        ) AS ranked
+                        WHERE rn = 1
+                    ''', (user_id, stage, chunk_card_ids))
+                    test_results = dict(cur.fetchall())
+                    
+                    # 練習進捗
+                    cur.execute('''
+                        SELECT card_id, result FROM (
+                            SELECT card_id, result,
+                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                            FROM study_log
+                            WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                            AND card_id = ANY(%s)
+                        ) AS ranked
+                        WHERE rn = 1
+                    ''', (user_id, stage, chunk_card_ids))
+                    practice_results = dict(cur.fetchall())
+                    
+                    # チャンク状態を判定
+                    test_completed = len(test_results) == len(chunk_card_ids)
+                    test_wrong_cards = [cid for cid, result in test_results.items() if result == 'unknown']
+                    practice_completed = True
+                    
+                    if test_wrong_cards:
+                        # ×問題がある場合、練習で全て○になっているかチェック
+                        practice_correct_cards = [cid for cid, result in practice_results.items() if result == 'known']
+                        practice_completed = len(set(test_wrong_cards) & set(practice_correct_cards)) == len(test_wrong_cards)
+                    
+                    chunk_completed = test_completed and practice_completed
+                    
+                    if not chunk_completed:
+                        stage_completed = False
+                    
+                    chunk_progress = {
+                        'chunk_number': chunk_num,
+                        'total_cards': len(chunk_card_ids),
+                        'test_completed': test_completed,
+                        'test_correct': len([r for r in test_results.values() if r == 'known']),
+                        'test_wrong': len(test_wrong_cards),
+                        'practice_needed': len(test_wrong_cards) > 0,
+                        'practice_completed': practice_completed,
+                        'chunk_completed': chunk_completed,
+                        'can_start_test': chunk_num == 1 or chunks_progress[chunk_num-2]['chunk_completed'],
+                        'can_start_practice': test_completed and len(test_wrong_cards) > 0
+                    }
+                    
+                    chunks_progress.append(chunk_progress)
+        
+        stage_info = {
+            'stage': stage,
+            'stage_name': f'ステージ {stage}',
+            'total_cards': len(target_cards),
+            'total_chunks': total_chunks,
+            'chunks_progress': chunks_progress,
+            'stage_completed': stage_completed,
+            'can_start': stage == 1 or (stage > 1)  # Stage 1は常に開始可能、2以降は前ステージ完了で開始可能
+        }
+        
+        app.logger.debug(f"[ステージ進捗] Stage{stage}完了: stage_completed={stage_completed}")
+        return stage_info
+        
+    except Exception as e:
+        app.logger.error(f"[ステージ進捗] Stage{stage}エラー: {e}")
+        return None
+
+# 🔥 新機能：チャンク学習開始ルート
+@app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
+@login_required
+def start_chunk(source, stage, chunk_number, mode):
+    """指定チャンクの学習を開始"""
+    try:
+        user_id = str(current_user.id)
+        page_range = session.get('page_range', '').strip()
+        difficulty = session.get('difficulty', '').strip()
+        
+        app.logger.info(f"[START_CHUNK] Stage{stage} チャンク{chunk_number} {mode}モード開始")
+        
+        # セッションに学習情報を設定
+        session['stage'] = stage
+        session['current_source'] = source
+        session['page_range'] = page_range
+        session['difficulty'] = difficulty
+        
+        if mode == 'test':
+            session['mode'] = 'test'
+            session.pop('practicing_chunk', None)
+        elif mode == 'practice':
+            session['mode'] = 'chunk_practice'
+            session['practicing_chunk'] = chunk_number
+        
+        flash(f"ステージ{stage} チャンク{chunk_number}の{mode}を開始します！")
+        return redirect(url_for('study', source=source))
+        
+    except Exception as e:
+        app.logger.error(f"[START_CHUNK] エラー: {e}")
+        flash("学習開始に失敗しました")
+        return redirect(url_for('prepare', source=source))
+    
 @app.route('/study/<source>')
 @login_required  
 def study(source):
@@ -1479,8 +1715,10 @@ def debug_cards(source):
         
     except Exception as e:
         return f"<pre>エラー: {str(e)}</pre>"
-    
-# 🔥 Stage 2・3用の専用関数を追加
+
+# ========== Stage 2・3用の関数（再掲） ==========
+# 既存の関数群の後に追加
+
 def get_stage2_cards(source, page_range, user_id, difficulty):
     """Stage 2: Stage 1の×問題を全て取得"""
     try:
@@ -1616,7 +1854,7 @@ def get_stage3_cards(source, page_range, user_id, difficulty):
     except Exception as e:
         app.logger.error(f"Stage 3カード取得エラー: {e}")
         return []
-
+    
 @app.route('/complete_chunk', methods=['POST'])
 @login_required
 def complete_chunk():

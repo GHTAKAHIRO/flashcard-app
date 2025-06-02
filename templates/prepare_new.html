@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学習設定 - {{ source }}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .stage-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .stage-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            font-weight: bold;
+        }
+        .stage-completed .stage-header {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        .stage-locked .stage-header {
+            background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
+        }
+        .chunk-row {
+            border-bottom: 1px solid #f0f0f0;
+            padding: 15px 20px;
+            transition: background-color 0.2s;
+        }
+        .chunk-row:hover {
+            background-color: #f8f9fa;
+        }
+        .chunk-row:last-child {
+            border-bottom: none;
+        }
+        .chunk-number {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #495057;
+        }
+        .chunk-stats {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .btn-chunk {
+            min-width: 80px;
+            margin: 0 5px;
+        }
+        .progress-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .status-completed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-in-progress {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status-locked {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .settings-card {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- ヘッダー -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-1">📚 {{ source }} 学習設定</h1>
+                        <p class="text-muted mb-0">チャンク単位で学習を進めましょう</p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-home"></i> ダッシュボード
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 設定カード -->
+        <div class="settings-card">
+            <h5 class="mb-3"><i class="fas fa-cog"></i> 学習設定</h5>
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="page_range" class="form-label">ページ範囲</label>
+                        <input type="text" class="form-control" id="page_range" name="page_range" 
+                               value="{{ saved_page_range }}" placeholder="例: 1-10, 15, 20-25">
+                        <div class="form-text">カンマ区切りで複数範囲を指定できます</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">難易度</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for level in ['基本', '標準', '応用', '発展'] %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="difficulty" 
+                                       value="{{ level }}" id="diff_{{ level }}"
+                                       {% if level in saved_difficulty %}checked{% endif %}>
+                                <label class="form-check-label" for="diff_{{ level }}">{{ level }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 設定を保存
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ステージ一覧 -->
+        {% for stage_info in stages_info %}
+        <div class="stage-card {% if stage_info.stage_completed %}stage-completed{% elif not stage_info.can_start %}stage-locked{% endif %}">
+            <!-- ステージヘッダー -->
+            <div class="stage-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-1">
+                            {% if stage_info.stage_completed %}
+                                <i class="fas fa-check-circle"></i>
+                            {% elif not stage_info.can_start %}
+                                <i class="fas fa-lock"></i>
+                            {% else %}
+                                <i class="fas fa-play-circle"></i>
+                            {% endif %}
+                            {{ stage_info.stage_name }}
+                        </h5>
+                        <small>{{ stage_info.total_cards }}問 / {{ stage_info.total_chunks }}チャンク</small>
+                    </div>
+                    <div>
+                        {% if stage_info.stage_completed %}
+                            <span class="badge bg-light text-dark">完了</span>
+                        {% elif not stage_info.can_start %}
+                            <span class="badge bg-secondary">ロック中</span>
+                        {% else %}
+                            <span class="badge bg-warning">進行中</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- チャンク一覧 -->
+            {% if stage_info.can_start or stage_info.stage_completed %}
+            <div class="chunk-list">
+                {% for chunk in stage_info.chunks_progress %}
+                <div class="chunk-row">
+                    <div class="row align-items-center">
+                        <!-- チャンク情報 -->
+                        <div class="col-md-3">
+                            <div class="chunk-number">チャンク {{ chunk.chunk_number }}</div>
+                            <div class="chunk-stats">{{ chunk.total_cards }}問</div>
+                        </div>
+
+                        <!-- 進捗表示 -->
+                        <div class="col-md-4">
+                            <div class="progress-indicator">
+                                <!-- テスト状況 -->
+                                {% if chunk.test_completed %}
+                                    <span class="status-badge status-completed">
+                                        <i class="fas fa-check"></i> テスト完了
+                                    </span>
+                                {% elif chunk.can_start_test %}
+                                    <span class="status-badge status-in-progress">
+                                        <i class="fas fa-clock"></i> テスト可能
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge status-locked">
+                                        <i class="fas fa-lock"></i> テスト待機
+                                    </span>
+                                {% endif %}
+
+                                <!-- 練習状況 -->
+                                {% if chunk.practice_needed %}
+                                    {% if chunk.practice_completed %}
+                                        <span class="status-badge status-completed">
+                                            <i class="fas fa-check"></i> 練習完了
+                                        </span>
+                                    {% elif chunk.can_start_practice %}
+                                        <span class="status-badge status-in-progress">
+                                            <i class="fas fa-clock"></i> 練習可能
+                                        </span>
+                                    {% endif %}
+                                {% elif chunk.test_completed %}
+                                    <span class="status-badge status-completed">
+                                        <i class="fas fa-star"></i> 全問正解
+                                    </span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 詳細統計 -->
+                            {% if chunk.test_completed %}
+                            <div class="chunk-stats mt-1">
+                                正解: {{ chunk.test_correct }}問 / 
+                                {% if chunk.test_wrong > 0 %}
+                                    間違い: {{ chunk.test_wrong }}問
+                                {% else %}
+                                    <span class="text-success">全問正解！</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- アクションボタン -->
+                        <div class="col-md-5 text-end">
+                            <div class="btn-group" role="group">
+                                <!-- テストボタン -->
+                                {% if chunk.can_start_test and not chunk.test_completed %}
+                                    <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='test') }}" 
+                                       class="btn btn-primary btn-chunk">
+                                        <i class="fas fa-play"></i> テスト開始
+                                    </a>
+                                {% elif chunk.test_completed %}
+                                    <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='test') }}" 
+                                       class="btn btn-outline-primary btn-chunk">
+                                        <i class="fas fa-redo"></i> 再テスト
+                                    </a>
+                                {% else %}
+                                    <button class="btn btn-secondary btn-chunk" disabled>
+                                        <i class="fas fa-lock"></i> テスト
+                                    </button>
+                                {% endif %}
+
+                                <!-- 練習ボタン -->
+                                {% if chunk.can_start_practice %}
+                                    {% if chunk.practice_completed %}
+                                        <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
+                                           class="btn btn-outline-success btn-chunk">
+                                            <i class="fas fa-redo"></i> 再練習
+                                        </a>
+                                    {% else %}
+                                        <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
+                                           class="btn btn-success btn-chunk">
+                                            <i class="fas fa-dumbbell"></i> 練習開始
+                                        </a>
+                                    {% endif %}
+                                {% elif chunk.practice_needed %}
+                                    <button class="btn btn-secondary btn-chunk" disabled>
+                                        <i class="fas fa-lock"></i> 練習
+                                    </button>
+                                {% else %}
+                                    <span class="btn btn-outline-secondary btn-chunk" style="cursor: not-allowed;">
+                                        <i class="fas fa-star"></i> 不要
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <!-- ロック中の表示 -->
+            <div class="chunk-row text-center text-muted">
+                <i class="fas fa-lock fa-2x mb-2"></i>
+                <div>前のステージを完了すると利用できます</div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <!-- フッター -->
+        <div class="row mt-4">
+            <div class="col text-center">
+                <p class="text-muted">
+                    <i class="fas fa-lightbulb"></i> 
+                    各チャンクのテストを完了後、間違えた問題を練習してからステージ完了です
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
