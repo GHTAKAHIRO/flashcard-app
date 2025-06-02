@@ -324,3 +324,4 @@ function nextCard() {
 
     showingAnswer = false;
     renderCard();
+}
