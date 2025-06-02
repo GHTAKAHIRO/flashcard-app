@@ -11,74 +11,181 @@
     <style>
         .stage-card {
             border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            border-radius: 15px;
+            margin-bottom: 25px;
             overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
+        
+        .stage-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
         .stage-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 15px 20px;
+            padding: 20px 25px;
             font-weight: bold;
+            position: relative;
         }
+        
         .stage-completed .stage-header {
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         }
+        
         .stage-locked .stage-header {
             background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
         }
+        
+        .stage-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+        }
+        
         .chunk-row {
             border-bottom: 1px solid #f0f0f0;
-            padding: 15px 20px;
-            transition: background-color 0.2s;
+            padding: 20px 25px;
+            transition: background-color 0.2s ease;
         }
+        
         .chunk-row:hover {
             background-color: #f8f9fa;
         }
+        
         .chunk-row:last-child {
             border-bottom: none;
         }
+        
         .chunk-number {
-            font-size: 1.1em;
+            font-size: 1.2em;
             font-weight: bold;
             color: #495057;
-        }
-        .chunk-stats {
-            font-size: 0.9em;
-            color: #6c757d;
-        }
-        .btn-chunk {
-            min-width: 80px;
-            margin: 0 5px;
-        }
-        .progress-indicator {
             display: flex;
             align-items: center;
             gap: 10px;
         }
+        
+        .chunk-stats {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .btn-chunk {
+            min-width: 90px;
+            margin: 0 5px;
+            font-size: 0.9em;
+            padding: 8px 16px;
+        }
+        
+        .progress-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
         .status-badge {
-            padding: 4px 8px;
-            border-radius: 15px;
+            padding: 6px 12px;
+            border-radius: 20px;
             font-size: 0.8em;
             font-weight: bold;
+            white-space: nowrap;
         }
+        
         .status-completed {
             background-color: #d4edda;
             color: #155724;
+            border: 1px solid #c3e6cb;
         }
+        
         .status-in-progress {
             background-color: #fff3cd;
             color: #856404;
+            border: 1px solid #ffeaa7;
         }
+        
         .status-locked {
             background-color: #f8d7da;
             color: #721c24;
+            border: 1px solid #f5c6cb;
         }
+        
         .settings-card {
-            background-color: #f8f9fa;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .chunk-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            margin-right: 15px;
+        }
+        
+        .chunk-active .chunk-icon {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+        
+        .chunk-completed .chunk-icon {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+        }
+        
+        .chunk-locked .chunk-icon {
+            background: linear-gradient(135deg, #bdc3c7, #95a5a6);
+        }
+        
+        .stage-summary {
+            background: rgba(255,255,255,0.9);
+            padding: 15px;
             border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
+            margin-top: 15px;
+        }
+        
+        .progress-bar-custom {
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            background-color: #e9ecef;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+        }
+        
+        @media (max-width: 768px) {
+            .chunk-row {
+                padding: 15px;
+            }
+            
+            .btn-chunk {
+                min-width: 70px;
+                font-size: 0.8em;
+                margin: 2px;
+            }
+            
+            .progress-indicator {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
         }
     </style>
 </head>
@@ -89,8 +196,8 @@
             <div class="col">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h1 class="h3 mb-1">📚 {{ source }} 学習設定</h1>
-                        <p class="text-muted mb-0">チャンク単位で学習を進めましょう</p>
+                        <h1 class="h2 mb-2">📚 {{ source }} 学習設定</h1>
+                        <p class="text-muted mb-0">チャンク単位で効率よく学習を進めましょう</p>
                     </div>
                     <div>
                         <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
@@ -103,18 +210,20 @@
 
         <!-- 設定カード -->
         <div class="settings-card">
-            <h5 class="mb-3"><i class="fas fa-cog"></i> 学習設定</h5>
+            <h5 class="mb-3">
+                <i class="fas fa-cog text-primary"></i> 学習設定
+            </h5>
             <form method="POST">
                 <div class="row">
                     <div class="col-md-6">
-                        <label for="page_range" class="form-label">ページ範囲</label>
+                        <label for="page_range" class="form-label fw-bold">ページ範囲</label>
                         <input type="text" class="form-control" id="page_range" name="page_range" 
                                value="{{ saved_page_range }}" placeholder="例: 1-10, 15, 20-25">
                         <div class="form-text">カンマ区切りで複数範囲を指定できます</div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">難易度</label>
-                        <div class="d-flex flex-wrap gap-2">
+                        <label class="form-label fw-bold">難易度</label>
+                        <div class="d-flex flex-wrap gap-3">
                             {% for level in ['基本', '標準', '応用', '発展'] %}
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="difficulty" 
@@ -141,7 +250,7 @@
             <div class="stage-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="mb-1">
+                        <h4 class="mb-1">
                             {% if stage_info.stage_completed %}
                                 <i class="fas fa-check-circle"></i>
                             {% elif not stage_info.can_start %}
@@ -150,35 +259,64 @@
                                 <i class="fas fa-play-circle"></i>
                             {% endif %}
                             {{ stage_info.stage_name }}
-                        </h5>
-                        <small>{{ stage_info.total_cards }}問 / {{ stage_info.total_chunks }}チャンク</small>
+                        </h4>
+                        <small class="opacity-75">{{ stage_info.total_cards }}問 / {{ stage_info.total_chunks }}チャンク</small>
                     </div>
-                    <div>
+                    <div class="text-end">
                         {% if stage_info.stage_completed %}
-                            <span class="badge bg-light text-dark">完了</span>
+                            <span class="badge bg-light text-dark fs-6">✅ 完了</span>
                         {% elif not stage_info.can_start %}
-                            <span class="badge bg-secondary">ロック中</span>
+                            <span class="badge bg-secondary fs-6">🔒 ロック中</span>
                         {% else %}
-                            <span class="badge bg-warning">進行中</span>
+                            <span class="badge bg-warning text-dark fs-6">⏰ 進行中</span>
                         {% endif %}
                     </div>
                 </div>
+                
+                <!-- 進捗バー -->
+                {% if stage_info.can_start or stage_info.stage_completed %}
+                <div class="stage-summary">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="progress-bar-custom">
+                                {% set completed_chunks = stage_info.chunks_progress | selectattr('chunk_completed', 'equalto', true) | list | length %}
+                                {% set progress_percent = (completed_chunks / stage_info.total_chunks * 100) | round | int %}
+                                <div class="progress-fill" style="width: {{ progress_percent }}%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <small class="text-dark fw-bold">
+                                {{ completed_chunks }} / {{ stage_info.total_chunks }} チャンク完了
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             <!-- チャンク一覧 -->
             {% if stage_info.can_start or stage_info.stage_completed %}
             <div class="chunk-list">
                 {% for chunk in stage_info.chunks_progress %}
-                <div class="chunk-row">
+                <div class="chunk-row {% if chunk.chunk_completed %}chunk-completed{% elif chunk.can_start_test %}chunk-active{% else %}chunk-locked{% endif %}">
                     <div class="row align-items-center">
                         <!-- チャンク情報 -->
-                        <div class="col-md-3">
-                            <div class="chunk-number">チャンク {{ chunk.chunk_number }}</div>
-                            <div class="chunk-stats">{{ chunk.total_cards }}問</div>
+                        <div class="col-md-3 col-sm-4">
+                            <div class="d-flex align-items-center">
+                                <div class="chunk-icon">
+                                    {{ chunk.chunk_number }}
+                                </div>
+                                <div>
+                                    <div class="chunk-number">
+                                        チャンク {{ chunk.chunk_number }}
+                                    </div>
+                                    <div class="chunk-stats">{{ chunk.total_cards }}問</div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- 進捗表示 -->
-                        <div class="col-md-4">
+                        <div class="col-md-4 col-sm-8 mb-2 mb-md-0">
                             <div class="progress-indicator">
                                 <!-- テスト状況 -->
                                 {% if chunk.test_completed %}
@@ -203,7 +341,11 @@
                                         </span>
                                     {% elif chunk.can_start_practice %}
                                         <span class="status-badge status-in-progress">
-                                            <i class="fas fa-clock"></i> 練習可能
+                                            <i class="fas fa-dumbbell"></i> 練習可能
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-locked">
+                                            <i class="fas fa-lock"></i> 練習待機
                                         </span>
                                     {% endif %}
                                 {% elif chunk.test_completed %}
@@ -215,12 +357,13 @@
                             
                             <!-- 詳細統計 -->
                             {% if chunk.test_completed %}
-                            <div class="chunk-stats mt-1">
-                                正解: {{ chunk.test_correct }}問 / 
+                            <div class="chunk-stats mt-2">
+                                <i class="fas fa-chart-pie text-primary"></i>
+                                正解: <span class="text-success fw-bold">{{ chunk.test_correct }}問</span>
                                 {% if chunk.test_wrong > 0 %}
-                                    間違い: {{ chunk.test_wrong }}問
+                                    / 間違い: <span class="text-danger fw-bold">{{ chunk.test_wrong }}問</span>
                                 {% else %}
-                                    <span class="text-success">全問正解！</span>
+                                    / <span class="text-success fw-bold">全問正解！</span>
                                 {% endif %}
                             </div>
                             {% endif %}
@@ -228,7 +371,8 @@
 
                         <!-- アクションボタン -->
                         <div class="col-md-5 text-end">
-                            <div class="btn-group" role="group">
+                            <div class="btn-group-vertical btn-group-sm d-md-none mb-2"></div>
+                            <div class="d-flex flex-wrap justify-content-end gap-2">
                                 <!-- テストボタン -->
                                 {% if chunk.can_start_test and not chunk.test_completed %}
                                     <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='test') }}" 
@@ -276,26 +420,75 @@
             </div>
             {% else %}
             <!-- ロック中の表示 -->
-            <div class="chunk-row text-center text-muted">
-                <i class="fas fa-lock fa-2x mb-2"></i>
-                <div>前のステージを完了すると利用できます</div>
+            <div class="chunk-row text-center py-5">
+                <div class="text-muted">
+                    <i class="fas fa-lock fa-3x mb-3 opacity-50"></i>
+                    <h5>前のステージを完了すると利用できます</h5>
+                    <p class="mb-0">ステージは順番に進める必要があります</p>
+                </div>
             </div>
             {% endif %}
         </div>
         {% endfor %}
 
         <!-- フッター -->
-        <div class="row mt-4">
+        <div class="row mt-5">
             <div class="col text-center">
-                <p class="text-muted">
-                    <i class="fas fa-lightbulb"></i> 
-                    各チャンクのテストを完了後、間違えた問題を練習してからステージ完了です
-                </p>
+                <div class="p-4 bg-light rounded">
+                    <h6 class="text-primary mb-3">
+                        <i class="fas fa-lightbulb"></i> 学習のコツ
+                    </h6>
+                    <p class="mb-0 text-muted">
+                        各チャンクのテストを完了後、間違えた問題を練習してからステージ完了です。<br>
+                        チャンク単位で確実に理解を深めていきましょう！
+                    </p>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- カスタムJS -->
+    <script>
+        // ページ読み込み時のアニメーション
+        document.addEventListener('DOMContentLoaded', function() {
+            const stageCards = document.querySelectorAll('.stage-card');
+            stageCards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        });
+
+        // ボタンクリック時の確認
+        document.querySelectorAll('.btn-chunk').forEach(button => {
+            button.addEventListener('click', function(e) {
+                if (this.textContent.includes('テスト開始') || this.textContent.includes('練習開始')) {
+                    const confirmation = confirm('学習を開始しますか？');
+                    if (!confirmation) {
+                        e.preventDefault();
+                    }
+                }
+            });
+        });
+
+        // 進捗バーのアニメーション
+        setTimeout(() => {
+            document.querySelectorAll('.progress-fill').forEach(bar => {
+                const width = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = width;
+                }, 100);
+            });
+        }, 500);
+    </script>
 </body>
 </html>

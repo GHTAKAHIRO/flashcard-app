@@ -1088,6 +1088,7 @@ def get_completed_stages_chunk_aware(user_id, source, page_range, difficulty='')
     return result
 
 # ========== ルート定義エリア ==========
+
 @app.route('/')
 def home():
     if current_user.is_authenticated:
@@ -1175,9 +1176,10 @@ def prepare(source):
     user_id = str(current_user.id)
     
     try:
-        app.logger.debug(f"[PREPARE] 開始: source={source}, user_id={user_id}")
+        app.logger.debug(f"[NEW_PREPARE] 開始: source={source}, user_id={user_id}")
         
         if request.method == 'POST':
+            # POST処理（ページ範囲・難易度設定）
             page_range = request.form.get('page_range', '').strip()
             difficulty_list = request.form.getlist('difficulty')
             difficulty = ','.join(difficulty_list) if difficulty_list else ''
@@ -1198,12 +1200,12 @@ def prepare(source):
                 flash("設定を保存しました。")
                 
             except Exception as e:
-                app.logger.error(f"設定保存エラー: {e}")
+                app.logger.error(f"[NEW_PREPARE] 設定保存エラー: {e}")
                 flash("設定の保存に失敗しました。")
 
             return redirect(url_for('prepare', source=source))
 
-        # GET処理
+        # GET処理：設定取得
         saved_page_range = ''
         saved_difficulty = ''
         
@@ -1221,71 +1223,253 @@ def prepare(source):
                         session['page_range'] = saved_page_range
                         session['difficulty'] = saved_difficulty
         except Exception as e:
-            app.logger.error(f"設定取得エラー: {e}")
+            app.logger.error(f"[NEW_PREPARE] 設定取得エラー: {e}")
 
-        # セッション設定
-        session['stage'] = 1
-        session['current_source'] = source
-        session['mode'] = 'test'
+        # 🔥 新機能：詳細進捗情報を取得
+        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
+        
+        if not stages_info:
+            # フォールバック：最小限のStage 1情報
+            stages_info = create_fallback_stage_info(source, saved_page_range, saved_difficulty, user_id)
 
-        # 🔥 シンプルなHTMLを直接返す（テンプレートエラーを完全回避）
-        return f'''
-        <!DOCTYPE html>
-        <html lang="ja">
-        <head>
-            <meta charset="UTF-8">
-            <title>学習設定 - {source}</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        </head>
-        <body>
-            <div class="container mt-4">
-                <h1>📚 {source} 学習設定</h1>
-                
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5>📝 学習設定</h5>
-                        <form method="POST">
-                            <div class="mb-3">
-                                <label for="page_range" class="form-label">ページ範囲</label>
-                                <input type="text" class="form-control" name="page_range" 
-                                       value="{saved_page_range}" placeholder="例: 1-10, 15, 20-25">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">難易度</label><br>
-                                <input type="checkbox" name="difficulty" value="基本" {"checked" if "基本" in saved_difficulty else ""}> 基本
-                                <input type="checkbox" name="difficulty" value="標準" {"checked" if "標準" in saved_difficulty else ""}> 標準
-                                <input type="checkbox" name="difficulty" value="応用" {"checked" if "応用" in saved_difficulty else ""}> 応用
-                                <input type="checkbox" name="difficulty" value="発展" {"checked" if "発展" in saved_difficulty else ""}> 発展
-                            </div>
-                            <button type="submit" class="btn btn-primary">設定を保存</button>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-body">
-                        <h5>🚀 学習開始</h5>
-                        <p>ステージ1のチャンク1から開始します</p>
-                        <a href="/study/{source}?start_stage=1&start_chunk=1" class="btn btn-success btn-lg">
-                            <i class="fas fa-play"></i> テスト開始
-                        </a>
-                        <a href="/dashboard" class="btn btn-outline-secondary ms-2">
-                            <i class="fas fa-home"></i> ダッシュボード
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
-        '''
+        return render_template(
+            'prepare_new.html',
+            source=source,
+            stages_info=stages_info,
+            saved_page_range=saved_page_range,
+            saved_difficulty=saved_difficulty
+        )
         
     except Exception as e:
-        app.logger.error(f"準備画面エラー: {e}")
+        app.logger.error(f"[NEW_PREPARE] 全体エラー: {e}")
         flash("準備画面でエラーが発生しました")
         return redirect(url_for('dashboard'))
-    
-#@app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
 
+def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty):
+    """全ステージの詳細進捗情報を取得"""
+    stages_info = []
+    
+    try:
+        app.logger.debug(f"[詳細進捗] 開始: user_id={user_id}, source={source}")
+        
+        # ステージ1から順番にチェック
+        for stage in range(1, 4):  # ステージ1〜3
+            stage_info = get_stage_detailed_progress(user_id, source, stage, page_range, difficulty)
+            
+            if stage_info:
+                stages_info.append(stage_info)
+                app.logger.debug(f"[詳細進捗] Stage{stage}: 完了={stage_info.get('stage_completed', False)}")
+                
+                # このステージが未完了なら以降のステージは表示しない
+                if not stage_info.get('stage_completed', False):
+                    break
+            else:
+                # カードがない場合は終了
+                break
+                
+        app.logger.debug(f"[詳細進捗] 取得完了: {len(stages_info)}ステージ")
+        return stages_info
+        
+    except Exception as e:
+        app.logger.error(f"[詳細進捗] エラー: {e}")
+        return []
+
+def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
+    """指定ステージの詳細進捗を取得"""
+    try:
+        app.logger.debug(f"[ステージ進捗] Stage{stage}開始")
+        
+        # ステージ別の対象カードを取得
+        if stage == 1:
+            target_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
+        elif stage == 2:
+            target_cards = get_stage2_cards(source, page_range, user_id, difficulty)
+        elif stage == 3:
+            target_cards = get_stage3_cards(source, page_range, user_id, difficulty)
+        else:
+            target_cards = []
+        
+        if not target_cards:
+            app.logger.debug(f"[ステージ進捗] Stage{stage}: 対象カードなし")
+            return None
+        
+        # チャンク情報を取得
+        subject = target_cards[0]['subject']
+        chunk_size = get_chunk_size_by_subject(subject)
+        
+        if stage == 1:
+            # Stage 1はチャンク分割
+            chunks = create_chunks_for_cards(target_cards, subject)
+            total_chunks = len(chunks)
+        else:
+            # Stage 2・3は統合復習（1チャンク）
+            chunks = [target_cards]
+            total_chunks = 1
+        
+        app.logger.debug(f"[ステージ進捗] Stage{stage}: {len(target_cards)}問, {total_chunks}チャンク")
+        
+        # 各チャンクの進捗を取得
+        chunks_progress = []
+        stage_completed = True
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for chunk_num in range(1, total_chunks + 1):
+                    if stage == 1:
+                        chunk_cards = chunks[chunk_num - 1]
+                    else:
+                        chunk_cards = target_cards  # Stage 2・3は全問題
+                    
+                    chunk_card_ids = [card['id'] for card in chunk_cards]
+                    
+                    # テスト進捗
+                    cur.execute('''
+                        SELECT card_id, result FROM (
+                            SELECT card_id, result,
+                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                            FROM study_log
+                            WHERE user_id = %s AND stage = %s AND mode = 'test'
+                            AND card_id = ANY(%s)
+                        ) AS ranked
+                        WHERE rn = 1
+                    ''', (user_id, stage, chunk_card_ids))
+                    test_results = dict(cur.fetchall())
+                    
+                    # 練習進捗
+                    practice_mode = 'chunk_practice' if stage == 1 else 'practice'
+                    cur.execute('''
+                        SELECT card_id, result FROM (
+                            SELECT card_id, result,
+                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                            FROM study_log
+                            WHERE user_id = %s AND stage = %s AND mode = %s
+                            AND card_id = ANY(%s)
+                        ) AS ranked
+                        WHERE rn = 1
+                    ''', (user_id, stage, practice_mode, chunk_card_ids))
+                    practice_results = dict(cur.fetchall())
+                    
+                    # チャンク状態を判定
+                    test_completed = len(test_results) == len(chunk_card_ids)
+                    test_wrong_cards = [cid for cid, result in test_results.items() if result == 'unknown']
+                    practice_completed = True
+                    
+                    if test_wrong_cards:
+                        # ×問題がある場合、練習で全て○になっているかチェック
+                        practice_correct_cards = [cid for cid, result in practice_results.items() if result == 'known']
+                        practice_completed = len(set(test_wrong_cards) & set(practice_correct_cards)) == len(test_wrong_cards)
+                    
+                    chunk_completed = test_completed and practice_completed
+                    
+                    if not chunk_completed:
+                        stage_completed = False
+                    
+                    # チャンク開始可能判定
+                    if chunk_num == 1:
+                        can_start_test = True  # 最初のチャンクは常に開始可能
+                    else:
+                        # 前のチャンクが完了していれば開始可能
+                        can_start_test = chunks_progress[chunk_num-2]['chunk_completed']
+                    
+                    chunk_progress = {
+                        'chunk_number': chunk_num,
+                        'total_cards': len(chunk_card_ids),
+                        'test_completed': test_completed,
+                        'test_correct': len([r for r in test_results.values() if r == 'known']),
+                        'test_wrong': len(test_wrong_cards),
+                        'practice_needed': len(test_wrong_cards) > 0,
+                        'practice_completed': practice_completed,
+                        'chunk_completed': chunk_completed,
+                        'can_start_test': can_start_test,
+                        'can_start_practice': test_completed and len(test_wrong_cards) > 0
+                    }
+                    
+                    chunks_progress.append(chunk_progress)
+        
+        # ステージ開始可能判定
+        if stage == 1:
+            can_start = True  # Stage 1は常に開始可能
+        else:
+            # 前のステージが完了していれば開始可能
+            can_start = True  # この関数が呼ばれる時点で前ステージは完了済み
+        
+        stage_info = {
+            'stage': stage,
+            'stage_name': f'ステージ {stage}',
+            'total_cards': len(target_cards),
+            'total_chunks': total_chunks,
+            'chunks_progress': chunks_progress,
+            'stage_completed': stage_completed,
+            'can_start': can_start
+        }
+        
+        app.logger.debug(f"[ステージ進捗] Stage{stage}完了: stage_completed={stage_completed}")
+        return stage_info
+        
+    except Exception as e:
+        app.logger.error(f"[ステージ進捗] Stage{stage}エラー: {e}")
+        return None
+
+def create_fallback_stage_info(source, page_range, difficulty, user_id):
+    """エラー時のフォールバック：最小限のStage 1情報"""
+    try:
+        # 基本的なカード情報を取得
+        cards = get_study_cards(source, 1, 'test', page_range, user_id, difficulty)
+        
+        if cards:
+            subject = cards[0]['subject']
+            chunk_size = get_chunk_size_by_subject(subject)
+            total_chunks = math.ceil(len(cards) / chunk_size)
+        else:
+            total_chunks = 1
+        
+        return [{
+            'stage': 1,
+            'stage_name': 'ステージ 1',
+            'total_cards': len(cards) if cards else 0,
+            'total_chunks': total_chunks,
+            'chunks_progress': [{
+                'chunk_number': 1,
+                'total_cards': chunk_size if cards else 0,
+                'test_completed': False,
+                'test_correct': 0,
+                'test_wrong': 0,
+                'practice_needed': False,
+                'practice_completed': False,
+                'chunk_completed': False,
+                'can_start_test': True,
+                'can_start_practice': False
+            }],
+            'stage_completed': False,
+            'can_start': True
+        }]
+        
+    except Exception as e:
+        app.logger.error(f"[フォールバック] エラー: {e}")
+        return [{
+            'stage': 1,
+            'stage_name': 'ステージ 1',
+            'total_cards': 0,
+            'total_chunks': 1,
+            'chunks_progress': [{
+                'chunk_number': 1,
+                'total_cards': 0,
+                'test_completed': False,
+                'test_correct': 0,
+                'test_wrong': 0,
+                'practice_needed': False,
+                'practice_completed': False,
+                'chunk_completed': False,
+                'can_start_test': True,
+                'can_start_practice': False
+            }],
+            'stage_completed': False,
+            'can_start': True
+        }]
+
+# ========== 3. start_chunk ルートを追加（既存のstart_chunk_practiceの前） ==========
+
+@app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
 @login_required
 def start_chunk(source, stage, chunk_number, mode):
     """指定チャンクの学習を開始"""
@@ -1305,9 +1489,15 @@ def start_chunk(source, stage, chunk_number, mode):
         if mode == 'test':
             session['mode'] = 'test'
             session.pop('practicing_chunk', None)
+            # Stage 1のみチャンク番号を設定
+            if stage == 1:
+                session['current_chunk'] = chunk_number
         elif mode == 'practice':
-            session['mode'] = 'chunk_practice'
-            session['practicing_chunk'] = chunk_number
+            if stage == 1:
+                session['mode'] = 'chunk_practice'
+                session['practicing_chunk'] = chunk_number
+            else:
+                session['mode'] = 'practice'
         
         flash(f"ステージ{stage} チャンク{chunk_number}の{mode}を開始します！")
         return redirect(url_for('study', source=source))
@@ -1316,7 +1506,144 @@ def start_chunk(source, stage, chunk_number, mode):
         app.logger.error(f"[START_CHUNK] エラー: {e}")
         flash("学習開始に失敗しました")
         return redirect(url_for('prepare', source=source))
-    
+
+# ========== 4. Stage2・3用関数を追加（関数群の最後に） ==========
+def get_stage2_cards(source, page_range, user_id, difficulty):
+    """Stage 2: Stage 1の×問題を全て取得"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                query = '''
+                    SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
+                    FROM image
+                    WHERE source = %s
+                '''
+                params = [source]
+
+                # ページ範囲の処理
+                page_conditions = []
+                if page_range:
+                    for part in page_range.split(','):
+                        part = part.strip()
+                        if '-' in part:
+                            try:
+                                start, end = map(int, part.split('-'))
+                                page_conditions.extend([str(i) for i in range(start, end + 1)])
+                            except ValueError:
+                                pass
+                        else:
+                            page_conditions.append(part)
+
+                if page_conditions:
+                    placeholders = ','.join(['%s'] * len(page_conditions))
+                    query += f' AND page_number IN ({placeholders})'
+                    params.extend(page_conditions)
+                else:
+                    query += ' AND false'
+
+                # 難易度フィルタ
+                if difficulty:
+                    difficulty_list = [d.strip() for d in difficulty.split(',')]
+                    difficulty_placeholders = ','.join(['%s'] * len(difficulty_list))
+                    query += f' AND level IN ({difficulty_placeholders})'
+                    params.extend(difficulty_list)
+
+                # Stage 1の×問題のみ
+                query += '''
+                    AND id IN (
+                        SELECT card_id FROM (
+                            SELECT card_id, result,
+                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                            FROM study_log
+                            WHERE user_id = %s AND stage = 1 AND mode = 'test'
+                        ) AS ranked
+                        WHERE rn = 1 AND result = 'unknown'
+                    )
+                '''
+                params.append(user_id)
+
+                query += ' ORDER BY id'
+                cur.execute(query, params)
+                records = cur.fetchall()
+
+                return [dict(
+                    id=r[0], subject=r[1], grade=r[2], source=r[3],
+                    page_number=r[4], problem_number=r[5], topic=r[6],
+                    level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
+                ) for r in records]
+                
+    except Exception as e:
+        app.logger.error(f"Stage 2カード取得エラー: {e}")
+        return []
+
+def get_stage3_cards(source, page_range, user_id, difficulty):
+    """Stage 3: Stage 2の×問題を全て取得"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                query = '''
+                    SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
+                    FROM image
+                    WHERE source = %s
+                '''
+                params = [source]
+
+                # ページ範囲の処理（Stage 2と同じ）
+                page_conditions = []
+                if page_range:
+                    for part in page_range.split(','):
+                        part = part.strip()
+                        if '-' in part:
+                            try:
+                                start, end = map(int, part.split('-'))
+                                page_conditions.extend([str(i) for i in range(start, end + 1)])
+                            except ValueError:
+                                pass
+                        else:
+                            page_conditions.append(part)
+
+                if page_conditions:
+                    placeholders = ','.join(['%s'] * len(page_conditions))
+                    query += f' AND page_number IN ({placeholders})'
+                    params.extend(page_conditions)
+                else:
+                    query += ' AND false'
+
+                # 難易度フィルタ
+                if difficulty:
+                    difficulty_list = [d.strip() for d in difficulty.split(',')]
+                    difficulty_placeholders = ','.join(['%s'] * len(difficulty_list))
+                    query += f' AND level IN ({difficulty_placeholders})'
+                    params.extend(difficulty_list)
+
+                # Stage 2の×問題のみ
+                query += '''
+                    AND id IN (
+                        SELECT card_id FROM (
+                            SELECT card_id, result,
+                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                            FROM study_log
+                            WHERE user_id = %s AND stage = 2 AND mode = 'test'
+                        ) AS ranked
+                        WHERE rn = 1 AND result = 'unknown'
+                    )
+                '''
+                params.append(user_id)
+
+                query += ' ORDER BY id'
+                cur.execute(query, params)
+                records = cur.fetchall()
+
+                return [dict(
+                    id=r[0], subject=r[1], grade=r[2], source=r[3],
+                    page_number=r[4], problem_number=r[5], topic=r[6],
+                    level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
+                ) for r in records]
+                
+    except Exception as e:
+        app.logger.error(f"Stage 3カード取得エラー: {e}")
+        return []
+   
 @app.route('/study/<source>')
 @login_required  
 def study(source):
@@ -1538,146 +1865,7 @@ def debug_cards(source):
         
     except Exception as e:
         return f"<pre>エラー: {str(e)}</pre>"
-
-# ========== Stage 2・3用の関数（再掲） ==========
-# 既存の関数群の後に追加
-
-def get_stage2_cards(source, page_range, user_id, difficulty):
-    """Stage 2: Stage 1の×問題を全て取得"""
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                query = '''
-                    SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
-                    FROM image
-                    WHERE source = %s
-                '''
-                params = [source]
-
-                # ページ範囲の処理
-                page_conditions = []
-                if page_range:
-                    for part in page_range.split(','):
-                        part = part.strip()
-                        if '-' in part:
-                            try:
-                                start, end = map(int, part.split('-'))
-                                page_conditions.extend([str(i) for i in range(start, end + 1)])
-                            except ValueError:
-                                pass
-                        else:
-                            page_conditions.append(part)
-
-                if page_conditions:
-                    placeholders = ','.join(['%s'] * len(page_conditions))
-                    query += f' AND page_number IN ({placeholders})'
-                    params.extend(page_conditions)
-                else:
-                    query += ' AND false'
-
-                # 難易度フィルタ
-                if difficulty:
-                    difficulty_list = [d.strip() for d in difficulty.split(',')]
-                    difficulty_placeholders = ','.join(['%s'] * len(difficulty_list))
-                    query += f' AND level IN ({difficulty_placeholders})'
-                    params.extend(difficulty_list)
-
-                # Stage 1の×問題のみ
-                query += '''
-                    AND id IN (
-                        SELECT card_id FROM (
-                            SELECT card_id, result,
-                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
-                            FROM study_log
-                            WHERE user_id = %s AND stage = 1 AND mode = 'test'
-                        ) AS ranked
-                        WHERE rn = 1 AND result = 'unknown'
-                    )
-                '''
-                params.append(user_id)
-
-                query += ' ORDER BY id'
-                cur.execute(query, params)
-                records = cur.fetchall()
-
-                return [dict(
-                    id=r[0], subject=r[1], grade=r[2], source=r[3],
-                    page_number=r[4], problem_number=r[5], topic=r[6],
-                    level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
-                ) for r in records]
-                
-    except Exception as e:
-        app.logger.error(f"Stage 2カード取得エラー: {e}")
-        return []
-
-def get_stage3_cards(source, page_range, user_id, difficulty):
-    """Stage 3: Stage 2の×問題を全て取得"""
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                query = '''
-                    SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
-                    FROM image
-                    WHERE source = %s
-                '''
-                params = [source]
-
-                # ページ範囲の処理
-                page_conditions = []
-                if page_range:
-                    for part in page_range.split(','):
-                        part = part.strip()
-                        if '-' in part:
-                            try:
-                                start, end = map(int, part.split('-'))
-                                page_conditions.extend([str(i) for i in range(start, end + 1)])
-                            except ValueError:
-                                pass
-                        else:
-                            page_conditions.append(part)
-
-                if page_conditions:
-                    placeholders = ','.join(['%s'] * len(page_conditions))
-                    query += f' AND page_number IN ({placeholders})'
-                    params.extend(page_conditions)
-                else:
-                    query += ' AND false'
-
-                # 難易度フィルタ
-                if difficulty:
-                    difficulty_list = [d.strip() for d in difficulty.split(',')]
-                    difficulty_placeholders = ','.join(['%s'] * len(difficulty_list))
-                    query += f' AND level IN ({difficulty_placeholders})'
-                    params.extend(difficulty_list)
-
-                # Stage 2の×問題のみ
-                query += '''
-                    AND id IN (
-                        SELECT card_id FROM (
-                            SELECT card_id, result,
-                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
-                            FROM study_log
-                            WHERE user_id = %s AND stage = 2 AND mode = 'test'
-                        ) AS ranked
-                        WHERE rn = 1 AND result = 'unknown'
-                    )
-                '''
-                params.append(user_id)
-
-                query += ' ORDER BY id'
-                cur.execute(query, params)
-                records = cur.fetchall()
-
-                return [dict(
-                    id=r[0], subject=r[1], grade=r[2], source=r[3],
-                    page_number=r[4], problem_number=r[5], topic=r[6],
-                    level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
-                ) for r in records]
-                
-    except Exception as e:
-        app.logger.error(f"Stage 3カード取得エラー: {e}")
-        return []
-    
+   
 @app.route('/complete_chunk', methods=['POST'])
 @login_required
 def complete_chunk():
@@ -1832,8 +2020,6 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# ========== 既存のコード（920行目付近） ==========
-
 @app.route('/reset_history/<source>', methods=['POST'])
 @login_required
 def reset_history(source):
@@ -1862,9 +2048,6 @@ def reset_history(source):
         flash("履歴の削除に失敗しました。")
 
     return redirect(url_for('dashboard'))
-
-# 🔥 ここに新しいルートを追加 🔥
-# ========== チャンク練習関連ルート ==========
 
 @app.route('/start_chunk_practice/<source>/<int:chunk_number>')
 @login_required
@@ -1947,9 +2130,6 @@ def complete_chunk_practice(source):
         app.logger.error(f"[COMPLETE_PRACTICE] 完了処理エラー: {e}")
         flash("完了処理に失敗しました")
         return redirect(url_for('study', source=source))
-
-# 🔥 ここにデバッグ用ルートを追加 🔥
-# ========== デバッグ・開発用ルート ==========
 
 @app.route('/debug/chunk_status/<source>')
 @login_required
