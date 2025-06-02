@@ -954,6 +954,31 @@ def dashboard():
         flash("教材一覧の取得に失敗しました")
         return redirect(url_for('login'))
 
+@app.route('/set_page_range_and_prepare/<source>', methods=['POST'])
+@login_required
+def set_page_range_and_prepare(source):
+    """ダッシュボードからの設定保存＆準備画面遷移"""
+    page_range = request.form.get('page_range', '').strip()
+    difficulty_list = request.form.getlist('difficulty')
+    difficulty = ','.join(difficulty_list) if difficulty_list else ''
+    user_id = str(current_user.id)
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    INSERT INTO user_settings (user_id, source, page_range, difficulty)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (user_id, source)
+                    DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
+                ''', (user_id, source, page_range, difficulty))
+                conn.commit()
+    except Exception as e:
+        app.logger.error(f"user_settings保存エラー: {e}")
+        flash("設定の保存に失敗しました")
+    
+    return redirect(url_for('prepare', source=source))
+
 @app.route('/prepare/<source>', methods=['GET', 'POST'])
 @login_required
 def prepare(source):
