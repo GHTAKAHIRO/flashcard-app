@@ -1223,182 +1223,67 @@ def prepare(source):
         except Exception as e:
             app.logger.error(f"設定取得エラー: {e}")
 
-        # 🔥 最小限のstages_info
-        stages_info = [{
-            'stage': 1,
-            'stage_name': 'ステージ 1',
-            'total_cards': 10,
-            'total_chunks': 3,
-            'chunks_progress': [
-                {
-                    'chunk_number': 1,
-                    'total_cards': 3,
-                    'test_completed': False,
-                    'test_correct': 0,
-                    'test_wrong': 0,
-                    'practice_needed': False,
-                    'practice_completed': False,
-                    'chunk_completed': False,
-                    'can_start_test': True,
-                    'can_start_practice': False
-                }
-            ],
-            'stage_completed': False,
-            'can_start': True
-        }]
+        # セッション設定
+        session['stage'] = 1
+        session['current_source'] = source
+        session['mode'] = 'test'
 
-        return render_template(
-            'prepare_new.html',
-            source=source,
-            stages_info=stages_info,
-            saved_page_range=saved_page_range,
-            saved_difficulty=saved_difficulty
-        )
+        # 🔥 シンプルなHTMLを直接返す（テンプレートエラーを完全回避）
+        return f'''
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+            <meta charset="UTF-8">
+            <title>学習設定 - {source}</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        </head>
+        <body>
+            <div class="container mt-4">
+                <h1>📚 {source} 学習設定</h1>
+                
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5>📝 学習設定</h5>
+                        <form method="POST">
+                            <div class="mb-3">
+                                <label for="page_range" class="form-label">ページ範囲</label>
+                                <input type="text" class="form-control" name="page_range" 
+                                       value="{saved_page_range}" placeholder="例: 1-10, 15, 20-25">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">難易度</label><br>
+                                <input type="checkbox" name="difficulty" value="基本" {"checked" if "基本" in saved_difficulty else ""}> 基本
+                                <input type="checkbox" name="difficulty" value="標準" {"checked" if "標準" in saved_difficulty else ""}> 標準
+                                <input type="checkbox" name="difficulty" value="応用" {"checked" if "応用" in saved_difficulty else ""}> 応用
+                                <input type="checkbox" name="difficulty" value="発展" {"checked" if "発展" in saved_difficulty else ""}> 発展
+                            </div>
+                            <button type="submit" class="btn btn-primary">設定を保存</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5>🚀 学習開始</h5>
+                        <p>ステージ1のチャンク1から開始します</p>
+                        <a href="/study/{source}?start_stage=1&start_chunk=1" class="btn btn-success btn-lg">
+                            <i class="fas fa-play"></i> テスト開始
+                        </a>
+                        <a href="/dashboard" class="btn btn-outline-secondary ms-2">
+                            <i class="fas fa-home"></i> ダッシュボード
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        '''
         
     except Exception as e:
         app.logger.error(f"準備画面エラー: {e}")
         flash("準備画面でエラーが発生しました")
         return redirect(url_for('dashboard'))
-
-# 🔥 新機能：全ステージの詳細進捗取得
-#def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty):
-    """全ステージの詳細進捗情報を取得"""
-    stages_info = []
     
-    try:
-        # ステージ1から順番にチェック
-        for stage in range(1, 5):  # ステージ1〜4
-            stage_info = get_stage_detailed_progress(user_id, source, stage, page_range, difficulty)
-            
-            if stage_info:
-                stages_info.append(stage_info)
-                
-                # このステージが未完了なら以降のステージは表示しない
-                if not stage_info.get('stage_completed', False):
-                    break
-            else:
-                # カードがない場合は終了
-                break
-                
-        app.logger.debug(f"[詳細進捗] 取得完了: {len(stages_info)}ステージ")
-        return stages_info
-        
-    except Exception as e:
-        app.logger.error(f"[詳細進捗] エラー: {e}")
-        return []
-
-#def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
-    """指定ステージの詳細進捗を取得"""
-    try:
-        app.logger.debug(f"[ステージ進捗] Stage{stage}開始")
-        
-        # ステージ別の対象カードを取得
-        if stage == 1:
-            target_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
-        else:
-            # Stage 2以降は前ステージの×問題
-            if stage == 2:
-                target_cards = get_stage2_cards(source, page_range, user_id, difficulty)
-            elif stage == 3:
-                target_cards = get_stage3_cards(source, page_range, user_id, difficulty)
-            else:
-                target_cards = get_stage_unknown_cards(source, stage-1, page_range, user_id, difficulty)
-        
-        if not target_cards:
-            app.logger.debug(f"[ステージ進捗] Stage{stage}: 対象カードなし")
-            return None
-        
-        # チャンク情報を取得
-        subject = target_cards[0]['subject']
-        chunk_size = get_chunk_size_by_subject(subject)
-        chunks = create_chunks_for_cards(target_cards, subject)
-        total_chunks = len(chunks)
-        
-        app.logger.debug(f"[ステージ進捗] Stage{stage}: {len(target_cards)}問, {total_chunks}チャンク")
-        
-        # 各チャンクの進捗を取得
-        chunks_progress = []
-        stage_completed = True
-        
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                for chunk_num in range(1, total_chunks + 1):
-                    chunk_cards = chunks[chunk_num - 1]
-                    chunk_card_ids = [card['id'] for card in chunk_cards]
-                    
-                    # テスト進捗
-                    cur.execute('''
-                        SELECT card_id, result FROM (
-                            SELECT card_id, result,
-                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
-                            FROM study_log
-                            WHERE user_id = %s AND stage = %s AND mode = 'test'
-                            AND card_id = ANY(%s)
-                        ) AS ranked
-                        WHERE rn = 1
-                    ''', (user_id, stage, chunk_card_ids))
-                    test_results = dict(cur.fetchall())
-                    
-                    # 練習進捗
-                    cur.execute('''
-                        SELECT card_id, result FROM (
-                            SELECT card_id, result,
-                                   ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
-                            FROM study_log
-                            WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
-                            AND card_id = ANY(%s)
-                        ) AS ranked
-                        WHERE rn = 1
-                    ''', (user_id, stage, chunk_card_ids))
-                    practice_results = dict(cur.fetchall())
-                    
-                    # チャンク状態を判定
-                    test_completed = len(test_results) == len(chunk_card_ids)
-                    test_wrong_cards = [cid for cid, result in test_results.items() if result == 'unknown']
-                    practice_completed = True
-                    
-                    if test_wrong_cards:
-                        # ×問題がある場合、練習で全て○になっているかチェック
-                        practice_correct_cards = [cid for cid, result in practice_results.items() if result == 'known']
-                        practice_completed = len(set(test_wrong_cards) & set(practice_correct_cards)) == len(test_wrong_cards)
-                    
-                    chunk_completed = test_completed and practice_completed
-                    
-                    if not chunk_completed:
-                        stage_completed = False
-                    
-                    chunk_progress = {
-                        'chunk_number': chunk_num,
-                        'total_cards': len(chunk_card_ids),
-                        'test_completed': test_completed,
-                        'test_correct': len([r for r in test_results.values() if r == 'known']),
-                        'test_wrong': len(test_wrong_cards),
-                        'practice_needed': len(test_wrong_cards) > 0,
-                        'practice_completed': practice_completed,
-                        'chunk_completed': chunk_completed,
-                        'can_start_test': chunk_num == 1 or chunks_progress[chunk_num-2]['chunk_completed'],
-                        'can_start_practice': test_completed and len(test_wrong_cards) > 0
-                    }
-                    
-                    chunks_progress.append(chunk_progress)
-        
-        stage_info = {
-            'stage': stage,
-            'stage_name': f'ステージ {stage}',
-            'total_cards': len(target_cards),
-            'total_chunks': total_chunks,
-            'chunks_progress': chunks_progress,
-            'stage_completed': stage_completed,
-            'can_start': stage == 1 or (stage > 1)  # Stage 1は常に開始可能、2以降は前ステージ完了で開始可能
-        }
-        
-        app.logger.debug(f"[ステージ進捗] Stage{stage}完了: stage_completed={stage_completed}")
-        return stage_info
-        
-    except Exception as e:
-        app.logger.error(f"[ステージ進捗] Stage{stage}エラー: {e}")
-        return None
-
 #@app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
 
 @login_required
