@@ -1175,10 +1175,8 @@ def prepare(source):
     user_id = str(current_user.id)
     
     try:
-        app.logger.debug(f"[PREPARE] 開始: source={source}, user_id={user_id}")
-        
         if request.method == 'POST':
-            # POST処理（ページ範囲・難易度設定）
+            # POST処理（設定保存）
             page_range = request.form.get('page_range', '').strip()
             difficulty_list = request.form.getlist('difficulty')
             difficulty = ','.join(difficulty_list) if difficulty_list else ''
@@ -1194,14 +1192,12 @@ def prepare(source):
                         ''', (user_id, source, page_range, difficulty))
                         conn.commit()
                         
-                # セッションに保存
                 session['page_range'] = page_range
                 session['difficulty'] = difficulty
-                
                 flash("設定を保存しました。")
                 
             except Exception as e:
-                app.logger.error(f"[PREPARE] user_settings保存エラー: {e}")
+                app.logger.error(f"設定保存エラー: {e}")
                 flash("設定の保存に失敗しました。")
 
             return redirect(url_for('prepare', source=source))
@@ -1224,34 +1220,21 @@ def prepare(source):
                         session['page_range'] = saved_page_range
                         session['difficulty'] = saved_difficulty
         except Exception as e:
-            app.logger.error(f"[PREPARE] user_settings取得エラー: {e}")
+            app.logger.error(f"設定取得エラー: {e}")
 
-        # 🔥 簡易版：従来の機能を維持
-        try:
-            completed_raw = get_completed_stages_chunk_aware(user_id, source, saved_page_range, saved_difficulty)
-            app.logger.debug(f"[PREPARE] completed_stages取得成功: {completed_raw}")
-            
-            completed = {
-                "test": set(completed_raw.get("test", [])),
-                "practice": set(completed_raw.get("practice", [])),
-                "perfect_completion": completed_raw.get("perfect_completion", False),
-                "practice_history": completed_raw.get("practice_history", {})
-            }
-            
-        except Exception as e:
-            app.logger.error(f"[PREPARE] completed_stages取得エラー: {e}")
-            completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}
+        # ✅ 新システム対応: 詳細進捗情報を取得
+        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
 
         return render_template(
-            'prepare.new.html',  # 🔥 既存のテンプレートを使用
+            'prepare_new.html',  # ✅ 正しいテンプレート名
             source=source,
-            completed=completed,
+            stages_info=stages_info,  # ✅ 新テンプレート用のデータ
             saved_page_range=saved_page_range,
             saved_difficulty=saved_difficulty
         )
         
     except Exception as e:
-        app.logger.error(f"[PREPARE] 全体エラー: {e}")
+        app.logger.error(f"準備画面エラー: {e}")
         flash("準備画面でエラーが発生しました")
         return redirect(url_for('dashboard'))
 
