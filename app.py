@@ -1226,95 +1226,28 @@ def prepare(source):
         except Exception as e:
             app.logger.error(f"[PREPARE] user_settings取得エラー: {e}")
 
-        # 🔥 新機能：全ステージの詳細進捗を取得
-        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
-        
-        app.logger.debug(f"[PREPARE] stages_info取得成功: {len(stages_info)}ステージ")
-
-        return render_template(
-            'prepare_new.html',
-            source=source,
-            saved_page_range=saved_page_range,
-            saved_difficulty=saved_difficulty,
-            stages_info=stages_info
-        )
-        
-    except Exception as e:
-        app.logger.error(f"[PREPARE] 全体エラー: {e}")
-        flash("準備画面でエラーが発生しました")
-        return redirect(url_for('dashboard'))
-    
-# ========== 新しい学習設定画面のルート ==========
-# 既存の /prepare/<source> ルートを以下に置き換え
-
-@app.route('/prepare/<source>', methods=['GET', 'POST'])
-@login_required
-def prepare(source):
-    user_id = str(current_user.id)
-    
-    try:
-        app.logger.debug(f"[PREPARE] 開始: source={source}, user_id={user_id}")
-        
-        if request.method == 'POST':
-            # POST処理（ページ範囲・難易度設定）
-            page_range = request.form.get('page_range', '').strip()
-            difficulty_list = request.form.getlist('difficulty')
-            difficulty = ','.join(difficulty_list) if difficulty_list else ''
-
-            try:
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute('''
-                            INSERT INTO user_settings (user_id, source, page_range, difficulty)
-                            VALUES (%s, %s, %s, %s)
-                            ON CONFLICT (user_id, source)
-                            DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
-                        ''', (user_id, source, page_range, difficulty))
-                        conn.commit()
-                        
-                # セッションに保存
-                session['page_range'] = page_range
-                session['difficulty'] = difficulty
-                
-                flash("設定を保存しました。")
-                
-            except Exception as e:
-                app.logger.error(f"[PREPARE] user_settings保存エラー: {e}")
-                flash("設定の保存に失敗しました。")
-
-            return redirect(url_for('prepare', source=source))
-
-        # GET処理
-        saved_page_range = ''
-        saved_difficulty = ''
-        
+        # 🔥 簡易版：従来の機能を維持
         try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute('''
-                        SELECT page_range, difficulty FROM user_settings
-                        WHERE user_id = %s AND source = %s
-                    ''', (user_id, source))
-                    result = cur.fetchone()
-                    if result:
-                        saved_page_range = result[0] or ''
-                        saved_difficulty = result[1] or ''
-                        session['page_range'] = saved_page_range
-                        session['difficulty'] = saved_difficulty
+            completed_raw = get_completed_stages_chunk_aware(user_id, source, saved_page_range, saved_difficulty)
+            app.logger.debug(f"[PREPARE] completed_stages取得成功: {completed_raw}")
+            
+            completed = {
+                "test": set(completed_raw.get("test", [])),
+                "practice": set(completed_raw.get("practice", [])),
+                "perfect_completion": completed_raw.get("perfect_completion", False),
+                "practice_history": completed_raw.get("practice_history", {})
+            }
+            
         except Exception as e:
-            app.logger.error(f"[PREPARE] user_settings取得エラー: {e}")
-
-        # 🔥 新機能：全ステージの詳細進捗を取得
-        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
-        
-        app.logger.debug(f"[PREPARE] stages_info取得成功: {len(stages_info)}ステージ")
+            app.logger.error(f"[PREPARE] completed_stages取得エラー: {e}")
+            completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}
 
         return render_template(
-            'prepare_new.html',
+            'prepare.html',  # 🔥 既存のテンプレートを使用
             source=source,
+            completed=completed,
             saved_page_range=saved_page_range,
-            saved_difficulty=saved_difficulty,
-            stages_info=stages_info
+            saved_difficulty=saved_difficulty
         )
         
     except Exception as e:
@@ -1323,7 +1256,7 @@ def prepare(source):
         return redirect(url_for('dashboard'))
 
 # 🔥 新機能：全ステージの詳細進捗取得
-def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty):
+#def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty):
     """全ステージの詳細進捗情報を取得"""
     stages_info = []
     
@@ -1349,7 +1282,7 @@ def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty
         app.logger.error(f"[詳細進捗] エラー: {e}")
         return []
 
-def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
+#def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
     """指定ステージの詳細進捗を取得"""
     try:
         app.logger.debug(f"[ステージ進捗] Stage{stage}開始")
@@ -1461,8 +1394,8 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
         app.logger.error(f"[ステージ進捗] Stage{stage}エラー: {e}")
         return None
 
-# 🔥 新機能：チャンク学習開始ルート
-@app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
+#@app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
+
 @login_required
 def start_chunk(source, stage, chunk_number, mode):
     """指定チャンクの学習を開始"""
