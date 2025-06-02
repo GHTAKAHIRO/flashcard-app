@@ -1243,7 +1243,7 @@ def prepare(source):
             completed = {"test": set(), "practice": set(), "perfect_completion": False, "practice_history": {}}
 
         return render_template(
-            'prepare.html',  # 🔥 既存のテンプレートを使用
+            'prepare.new.html',  # 🔥 既存のテンプレートを使用
             source=source,
             completed=completed,
             saved_page_range=saved_page_range,
