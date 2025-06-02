@@ -1175,8 +1175,9 @@ def prepare(source):
     user_id = str(current_user.id)
     
     try:
+        app.logger.debug(f"[PREPARE] 開始: source={source}, user_id={user_id}")
+        
         if request.method == 'POST':
-            # POST処理（設定保存）
             page_range = request.form.get('page_range', '').strip()
             difficulty_list = request.form.getlist('difficulty')
             difficulty = ','.join(difficulty_list) if difficulty_list else ''
@@ -1222,13 +1223,34 @@ def prepare(source):
         except Exception as e:
             app.logger.error(f"設定取得エラー: {e}")
 
-        # ✅ 新システム対応: 詳細進捗情報を取得
-        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
+        # 🔥 最小限のstages_info
+        stages_info = [{
+            'stage': 1,
+            'stage_name': 'ステージ 1',
+            'total_cards': 10,
+            'total_chunks': 3,
+            'chunks_progress': [
+                {
+                    'chunk_number': 1,
+                    'total_cards': 3,
+                    'test_completed': False,
+                    'test_correct': 0,
+                    'test_wrong': 0,
+                    'practice_needed': False,
+                    'practice_completed': False,
+                    'chunk_completed': False,
+                    'can_start_test': True,
+                    'can_start_practice': False
+                }
+            ],
+            'stage_completed': False,
+            'can_start': True
+        }]
 
         return render_template(
-            'prepare_new.html',  # ✅ 正しいテンプレート名
+            'prepare_new.html',
             source=source,
-            stages_info=stages_info,  # ✅ 新テンプレート用のデータ
+            stages_info=stages_info,
             saved_page_range=saved_page_range,
             saved_difficulty=saved_difficulty
         )
