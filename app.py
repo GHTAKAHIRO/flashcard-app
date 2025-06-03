@@ -1027,7 +1027,7 @@ def prepare(source):
             stages_info = create_fallback_stage_info(source, saved_page_range, saved_difficulty, user_id)
 
         return render_template(
-            'prepare_new.html',
+            'prepare.html',
             source=source,
             stages_info=stages_info,
             saved_page_range=saved_page_range,
