@@ -1038,7 +1038,7 @@ def prepare(source):
         app.logger.error(f"準備画面エラー: {e}")
         flash("準備画面でエラーが発生しました")
         return redirect(url_for('dashboard'))
-
+    
 @app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
 @login_required
 def start_chunk(source, stage, chunk_number, mode):
