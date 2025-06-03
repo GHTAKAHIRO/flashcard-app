@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('knownBtn').addEventListener('click', markKnown);
     document.getElementById('unknownBtn').addEventListener('click', markUnknown);
 
-    isPracticeMode = typeof mode !== 'undefined' && mode === 'practice';
+    isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
     initCards(rawCards);
 });
 
@@ -45,6 +45,8 @@ function renderCard() {
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
         questionDiv.appendChild(img);
     }
     if (card.problem_number && card.topic) {
@@ -59,6 +61,8 @@ function renderCard() {
         const answerDiv = document.createElement('div');
         const img = document.createElement('img');
         img.src = card.image_answer;
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
         answerDiv.appendChild(img);
         cardDiv.appendChild(answerDiv);
     }
@@ -81,10 +85,10 @@ function markUnknown() {
     sendResult(id, 'unknown');
 }
 
-// 🔥 修正：sendResult関数を拡張
+// 🔥 修正：新しいバックエンド仕様に対応したsendResult関数
 async function sendResult(cardId, result) {
     try {
-        console.log('[SUBMIT] 回答送信開始:', cardId, result);
+        console.log('[SUBMIT] 回答送信開始:', cardId, result, 'mode:', mode);
         
         const response = await fetch('/log_result', {
             method: 'POST',
@@ -101,29 +105,49 @@ async function sendResult(cardId, result) {
         console.log('[SUBMIT] レスポンス受信:', data);
 
         if (data.status === 'ok') {
-            // 🔥 即時練習判定の処理
-            if (data.needs_immediate_practice) {
-                console.log('[SUBMIT] 即時練習が必要:', data.completed_chunk);
-                // チャンク完了 + 練習が必要
-                showChunkCompletionModal(data.completed_chunk, data.message, true);
-                return; // ここで処理終了
-            } 
-            
-            if (data.chunk_perfect) {
-                console.log('[SUBMIT] チャンク完了（全問正解）:', data.completed_chunk);
-                // チャンク完了 + 全問正解
-                showChunkCompletionModal(data.completed_chunk, data.message, false);
-                return; // ここで処理終了
+            // 🔥 テストモード完了判定
+            if (data.chunk_test_completed || data.stage_test_completed) {
+                console.log('[SUBMIT] テスト完了:', data);
+                
+                if (data.redirect_to_prepare) {
+                    console.log('[SUBMIT] prepare画面に戻ります');
+                    showMessage(data.message);
+                    setTimeout(() => {
+                        const currentSource = getCurrentSource();
+                        window.location.href = `/prepare/${currentSource}`;
+                    }, 2000);
+                    return;
+                }
             }
             
-            if (data.practice_complete) {
-                console.log('[SUBMIT] 練習完了:', data.completed_chunk);
-                // 練習完了
-                showPracticeCompleteModal(data.completed_chunk, data.message);
-                return; // ここで処理終了
+            // 🔥 練習モード完了判定
+            if (data.practice_completed) {
+                console.log('[SUBMIT] 練習完了:', data);
+                
+                if (data.redirect_to_prepare) {
+                    console.log('[SUBMIT] prepare画面に戻ります');
+                    showMessage(data.message);
+                    setTimeout(() => {
+                        const currentSource = getCurrentSource();
+                        window.location.href = `/prepare/${currentSource}`;
+                    }, 2000);
+                    return;
+                }
             }
             
-            // 通常の次の問題へ
+            // 🔥 練習モード継続判定
+            if (data.practice_continuing) {
+                console.log('[SUBMIT] 練習継続:', data.remaining_count, '問残り');
+                showMessage(data.message);
+                
+                // 🔥 重要：prepare画面に戻らず、次の問題へ
+                setTimeout(() => {
+                    nextCard();
+                }, 1000);
+                return;
+            }
+            
+            // 🔥 通常の次の問題へ（テストモード）
             console.log('[SUBMIT] 通常の次問題へ');
             nextCard();
             
@@ -133,163 +157,47 @@ async function sendResult(cardId, result) {
 
     } catch (error) {
         console.error('[SUBMIT] エラー:', error);
-        console.error("❌ サーバーへの記録に失敗しました");
+        showMessage("❌ サーバーへの記録に失敗しました", "error");
         nextCard(); // エラーでも次に進む
     }
 }
 
-// 🔥 チャンク完了モーダル表示
-function showChunkCompletionModal(chunkNumber, message, needsPractice) {
-    console.log('[MODAL] チャンク完了モーダル表示:', chunkNumber, needsPractice);
+// 🔥 メッセージ表示関数
+function showMessage(message, type = "info") {
+    console.log('[MESSAGE]', type, ':', message);
     
-    // 既存のモーダルがあれば削除
-    const existingModal = document.getElementById('chunkCompletionModal');
-    if (existingModal) {
-        existingModal.remove();
+    // 既存のメッセージを削除
+    const existingMessage = document.getElementById('messageAlert');
+    if (existingMessage) {
+        existingMessage.remove();
     }
     
-    const modal = document.createElement('div');
-    modal.className = 'modal fade';
-    modal.id = 'chunkCompletionModal';
-    modal.setAttribute('data-bs-backdrop', 'static'); // 背景クリックで閉じない
-    modal.innerHTML = `
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">🎉 チャンク${chunkNumber}完了！</h5>
-                </div>
-                <div class="modal-body text-center">
-                    <p class="mb-3">${message}</p>
-                    ${needsPractice ? 
-                        '<p class="text-info"><strong>×だった問題を練習してから次のチャンクに進みましょう。</strong></p>' : 
-                        '<p class="text-success"><strong>全問正解でした！次のチャンクに進みます。</strong></p>'
-                    }
-                </div>
-                <div class="modal-footer justify-content-center">
-                    ${needsPractice ? 
-                        `<button type="button" class="btn btn-primary btn-lg me-2" onclick="startChunkPractice(${chunkNumber})">
-                            <i class="fas fa-play"></i> 練習開始
-                         </button>
-                         <button type="button" class="btn btn-outline-secondary" onclick="skipPractice()">
-                            <i class="fas fa-forward"></i> スキップ
-                         </button>` :
-                        `<button type="button" class="btn btn-success btn-lg" onclick="continueToNextChunk()">
-                            <i class="fas fa-arrow-right"></i> 次のチャンクへ
-                         </button>`
-                    }
-                </div>
-            </div>
-        </div>
+    // メッセージ要素を作成
+    const messageDiv = document.createElement('div');
+    messageDiv.id = 'messageAlert';
+    messageDiv.className = `alert alert-${type === 'error' ? 'danger' : 'info'} alert-dismissible fade show position-fixed`;
+    messageDiv.style.cssText = `
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        min-width: 300px;
+        text-align: center;
     `;
     
-    document.body.appendChild(modal);
+    messageDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
     
-    // Bootstrap modalとして表示
-    if (typeof bootstrap !== 'undefined') {
-        const bootstrapModal = new bootstrap.Modal(modal);
-        bootstrapModal.show();
-        
-        // モーダルが閉じられたら削除
-        modal.addEventListener('hidden.bs.modal', () => {
-            modal.remove();
-        });
-    } else {
-        // Bootstrap がない場合はalertで代替
-        if (needsPractice) {
-            if (confirm(`${message}\n練習を開始しますか？`)) {
-                startChunkPractice(chunkNumber);
-            } else {
-                skipPractice();
-            }
-        } else {
-            alert(message);
-            continueToNextChunk();
+    document.body.appendChild(messageDiv);
+    
+    // 5秒後に自動削除
+    setTimeout(() => {
+        if (messageDiv && messageDiv.parentNode) {
+            messageDiv.remove();
         }
-    }
-}
-
-// 🔥 練習完了モーダル表示
-function showPracticeCompleteModal(chunkNumber, message) {
-    console.log('[MODAL] 練習完了モーダル表示:', chunkNumber);
-    
-    if (typeof bootstrap !== 'undefined') {
-        const modal = document.createElement('div');
-        modal.className = 'modal fade';
-        modal.id = 'practiceCompleteModal';
-        modal.innerHTML = `
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header bg-info text-white">
-                        <h5 class="modal-title">✅ 練習完了！</h5>
-                    </div>
-                    <div class="modal-body text-center">
-                        <p class="mb-3">${message}</p>
-                        <p class="text-success">次のチャンクに進みます。</p>
-                    </div>
-                    <div class="modal-footer justify-content-center">
-                        <button type="button" class="btn btn-success btn-lg" onclick="continueToNextChunk()">
-                            <i class="fas fa-arrow-right"></i> 次のチャンクへ
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        const bootstrapModal = new bootstrap.Modal(modal);
-        bootstrapModal.show();
-        
-        modal.addEventListener('hidden.bs.modal', () => {
-            modal.remove();
-        });
-    } else {
-        alert(message);
-        continueToNextChunk();
-    }
-}
-
-// 🔥 練習開始
-function startChunkPractice(chunkNumber) {
-    console.log('[PRACTICE] 練習開始:', chunkNumber);
-    
-    const modal = document.getElementById('chunkCompletionModal');
-    if (modal) {
-        modal.remove();
-    }
-    
-    // 練習開始のURLにリダイレクト
-    const currentSource = getCurrentSource();
-    console.log('[PRACTICE] リダイレクト先:', `/start_chunk_practice/${currentSource}/${chunkNumber}`);
-    window.location.href = `/start_chunk_practice/${currentSource}/${chunkNumber}`;
-}
-
-// 🔥 練習スキップ
-function skipPractice() {
-    console.log('[PRACTICE] 練習スキップ');
-    
-    const modal = document.getElementById('chunkCompletionModal');
-    if (modal) {
-        modal.remove();
-    }
-    
-    const currentSource = getCurrentSource();
-    window.location.href = `/skip_chunk_practice/${currentSource}`;
-}
-
-// 🔥 次のチャンクへ
-function continueToNextChunk() {
-    console.log('[CHUNK] 次のチャンクへ');
-    
-    // モーダルを閉じる
-    const completionModal = document.getElementById('chunkCompletionModal');
-    const practiceModal = document.getElementById('practiceCompleteModal');
-    
-    if (completionModal) completionModal.remove();
-    if (practiceModal) practiceModal.remove();
-    
-    // ページをリロードして次のチャンクへ
-    window.location.reload();
+    }, 5000);
 }
 
 // 🔥 現在のソース名を取得
@@ -301,23 +209,33 @@ function getCurrentSource() {
     return source;
 }
 
-// 🔥 既存のnextCard関数はそのまま維持
+// 🔥 修正版nextCard関数
 function nextCard() {
     currentIndex++;
 
+    // 🔥 練習モードでは、カードがなくなってもprepare画面に戻らない
+    // バックエンドが適切に新しいカードを提供するまで待機
     if (currentIndex >= cards.length) {
+        console.log('[NEXTCARD] カード終了:', currentIndex, '/', cards.length);
+        
         if (isPracticeMode) {
-            const wrongCards = cards.filter(card => cardStatus[card.id] === 'unknown');
-            if (wrongCards.length > 0) {
-                alert("✏️ 間違えたカードがあります。設定画面から再度練習してください。");
-            } else {
-                alert("✅ 練習完了！すべて正解です！");
-            }
-            window.location.href = `/prepare/${cards[0].source}`;
+            // 🔥 練習モードでカードが終了した場合
+            console.log('[NEXTCARD] 練習モード - サーバーから新しいカードを待機');
+            showMessage("問題を読み込んでいます...");
+            
+            // 🔥 ページをリロードして新しいカードを取得
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
             return;
         } else {
-            alert("✅ テスト完了！");
-            window.location.href = `/prepare/${cards[0].source}`;
+            // 🔥 テストモードでカードが終了した場合
+            console.log('[NEXTCARD] テストモード完了 - prepare画面に戻る');
+            showMessage("✅ テスト完了！");
+            setTimeout(() => {
+                const currentSource = getCurrentSource();
+                window.location.href = `/prepare/${currentSource}`;
+            }, 2000);
             return;
         }
     }
