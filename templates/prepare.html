@@ -445,7 +445,7 @@
                 <div class="col-lg-4">
                     <div class="current-settings">
                         <div class="text-center mb-2">
-                            <span><i class="fas fa-info-circle"></i> 学習設定</span>
+                            <span><i class="fas fa-lock"></i> 学習設定（固定）</span>
                         </div>
                         <div class="small text-center">
                             <div><strong>ページ範囲:</strong> {{ saved_page_range or '未設定' }}</div>
@@ -457,6 +457,12 @@
                                 <i class="fas fa-exclamation-triangle"></i> 設定が必要です
                             </a>
                         </div>
+                        {% else %}
+                        <div class="text-center mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> 学習開始後は変更不可
+                            </small>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -466,11 +472,6 @@
                     <a href="{{ url_for('dashboard') }}" class="btn btn-outline-light">
                         <i class="fas fa-arrow-left"></i> ダッシュボードに戻る
                     </a>
-                    {% if saved_page_range %}
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-light ms-2">
-                        <i class="fas fa-edit"></i> 設定を変更
-                    </a>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -564,7 +565,7 @@
                             </span>
                         {% endif %}
 
-                        <!-- 練習状況 -->
+                        <!-- 練習状況（×問題がある場合のみ表示） -->
                         {% if chunk.practice_needed %}
                             {% if chunk.practice_completed %}
                                 <span class="status-badge status-completed">
@@ -579,10 +580,6 @@
                                     <i class="fas fa-lock"></i> 練習待機
                                 </span>
                             {% endif %}
-                        {% elif chunk.test_completed %}
-                            <span class="status-badge status-completed">
-                                <i class="fas fa-star"></i> 全問正解
-                            </span>
                         {% endif %}
                     </div>
                     
@@ -608,37 +605,34 @@
                                 <i class="fas fa-play"></i> テスト開始
                             </a>
                         {% elif chunk.test_completed %}
-                            <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='test') }}" 
-                               class="btn btn-outline-modern btn-modern">
-                                <i class="fas fa-redo"></i> 再テスト
-                            </a>
+                            <button class="btn btn-disabled-modern btn-modern" disabled>
+                                <i class="fas fa-check"></i> テスト完了
+                            </button>
                         {% else %}
                             <button class="btn btn-disabled-modern btn-modern" disabled>
                                 <i class="fas fa-lock"></i> テスト
                             </button>
                         {% endif %}
 
-                        <!-- 練習ボタン -->
-                        {% if chunk.can_start_practice %}
-                            {% if chunk.practice_completed %}
-                                <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
-                                   class="btn btn-outline-modern btn-modern">
-                                    <i class="fas fa-redo"></i> 再練習
-                                </a>
+                        <!-- 練習ボタン（×問題がある場合のみ表示） -->
+                        {% if chunk.practice_needed %}
+                            {% if chunk.can_start_practice %}
+                                {% if chunk.practice_completed %}
+                                    <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
+                                       class="btn btn-outline-modern btn-modern">
+                                        <i class="fas fa-redo"></i> 再練習
+                                    </a>
+                                {% else %}
+                                    <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
+                                       class="btn btn-success-modern btn-modern">
+                                        <i class="fas fa-dumbbell"></i> 練習開始
+                                    </a>
+                                {% endif %}
                             {% else %}
-                                <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
-                                   class="btn btn-success-modern btn-modern">
-                                    <i class="fas fa-dumbbell"></i> 練習開始
-                                </a>
+                                <button class="btn btn-disabled-modern btn-modern" disabled>
+                                    <i class="fas fa-lock"></i> 練習
+                                </button>
                             {% endif %}
-                        {% elif chunk.practice_needed %}
-                            <button class="btn btn-disabled-modern btn-modern" disabled>
-                                <i class="fas fa-lock"></i> 練習
-                            </button>
-                        {% else %}
-                            <span class="btn btn-outline-modern btn-modern" style="cursor: not-allowed; opacity: 0.5;">
-                                <i class="fas fa-star"></i> 不要
-                            </span>
                         {% endif %}
                     </div>
                 </div>
