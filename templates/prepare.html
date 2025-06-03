@@ -53,11 +53,11 @@
 
         .stage-card {
             border: none;
-            border-radius: 20px;
-            margin-bottom: 2rem;
+            border-radius: 15px;  /* 🔥 20px → 15px に変更 */
+            margin-bottom: 1rem;  /* 🔥 2rem → 1rem に変更 */
             overflow: hidden;
             transition: all 0.4s ease;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);  /* 🔥 影を小さく */
             background: white;
         }
         
@@ -69,7 +69,7 @@
         .stage-header {
             background: var(--primary-gradient);
             color: white;
-            padding: 2rem 2.5rem;
+            padding: 1.2rem 1.5rem;  /* 🔥 2rem 2.5rem → 1.2rem 1.5rem に変更 */
             position: relative;
             overflow: hidden;
         }
@@ -100,30 +100,30 @@
         }
         
         .stage-title {
-            font-size: 1.8rem;
+            font-size: 1.4rem;  /* 🔥 1.8rem → 1.4rem に変更 */
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;  /* 🔥 0.5rem → 0.3rem に変更 */
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;  /* 🔥 1rem → 0.75rem に変更 */
         }
 
         .stage-stats {
-            font-size: 1rem;
+            font-size: 0.85rem;  /* 🔥 1rem → 0.85rem に変更 */
             opacity: 0.9;
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.75rem;  /* 🔥 1.5rem → 0.75rem に変更 */
         }
 
         .stage-progress-summary {
             background: rgba(255,255,255,0.15);
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
+            padding: 0.6rem 1rem;  /* 🔥 1rem 1.5rem → 0.6rem 1rem に変更 */
+            border-radius: 8px;    /* 🔥 12px → 8px に変更 */
             backdrop-filter: blur(10px);
         }
 
         .progress-bar-modern {
-            height: 12px;
-            border-radius: 6px;
+            height: 8px;     /* 🔥 12px → 8px に変更 */
+            border-radius: 4px;
             overflow: hidden;
             background-color: rgba(255,255,255,0.3);
             position: relative;
@@ -133,7 +133,7 @@
             height: 100%;
             background: linear-gradient(90deg, #fff, rgba(255,255,255,0.8));
             transition: width 0.8s ease;
-            border-radius: 6px;
+            border-radius: 4px;  /* 🔥 6px → 4px に変更 */
             position: relative;
             overflow: hidden;
         }
@@ -155,9 +155,9 @@
         }
         
         .chunk-grid {
-            padding: 2rem;
+            padding: 1rem;      /* 🔥 2rem → 1rem に変更 */
             display: grid;
-            gap: 1.5rem;
+            gap: 0.75rem;       /* 🔥 1.5rem → 0.75rem に変更 */
         }
 
         .chunk-card {
@@ -243,8 +243,8 @@
 
         .chunk-stats {
             color: #6c757d;
-            font-size: 0.9rem;
-            margin-top: 0.25rem;
+            font-size: 0.8rem;     /* 🔥 0.9rem → 0.8rem に変更 */
+            margin-top: 0.2rem;    /* 🔥 0.25rem → 0.2rem に変更 */
         }
 
         .status-badges {

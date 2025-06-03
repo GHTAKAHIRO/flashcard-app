@@ -438,7 +438,7 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
         return None
 
 def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, difficulty):
-    """Stage 2・3用のチャンク進捗管理（統合復習対応）"""
+    """Stage 2・3用のチャンク進捗管理（エラーハンドリング強化版）"""
     try:
         app.logger.debug(f"[Universal進捗] Stage{stage}開始: user_id={user_id}")
         
@@ -450,9 +450,23 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
         else:
             return get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
         
+        # 🔥 Stage 3の前提条件チェック
+        if stage == 3:
+            # Stage 2が完了しているかチェック
+            stage2_completed = check_stage_completion(user_id, source, 2, page_range, difficulty)
+            if not stage2_completed:
+                app.logger.warning(f"[Universal進捗] Stage2未完了のためStage3はアクセス不可")
+                return None
+        
         if not target_cards:
             app.logger.debug(f"[Universal進捗] Stage{stage}: 対象カードなし")
-            return None
+            return {
+                'current_chunk': None,
+                'total_chunks': 1,
+                'completed_chunks': [1],
+                'all_completed': True,
+                'no_target_cards': True  # 🔥 対象カードなしフラグ
+            }
         
         total_chunks = 1
         chunk_number = 1
@@ -523,7 +537,7 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
                         UPDATE chunk_progress 
                         SET completed = true, completed_at = CURRENT_TIMESTAMP
                         WHERE user_id = %s AND source = %s AND stage = %s AND chunk_number = %s AND completed = false
-                    ''', (user_id, stage, chunk_number))
+                    ''', (user_id, source, stage, chunk_number))
                     conn.commit()
                 
                 result = {
@@ -534,10 +548,13 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
                     'needs_immediate_practice': False
                 }
                 
+                app.logger.debug(f"[Universal進捗] Stage{stage}完了: {result}")
                 return result
                 
     except Exception as e:
         app.logger.error(f"[Universal進捗] Stage{stage}エラー: {e}")
+        import traceback
+        app.logger.error(f"[Universal進捗] トレースバック: {traceback.format_exc()}")
         return None
 
 # ========== 5. 練習問題取得関数群 ==========
@@ -697,12 +714,24 @@ def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty
         return []
 
 def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
-    """指定ステージの詳細進捗を取得"""
+    """指定ステージの詳細進捗を取得（エラーハンドリング強化版）"""
     try:
+        # Stage 3の前提条件チェック
+        if stage == 3:
+            stage2_completed = check_stage_completion(user_id, source, 2, page_range, difficulty)
+            if not stage2_completed:
+                app.logger.warning(f"[STAGE_PROGRESS] Stage2未完了のためStage3は表示しない")
+                return None
+        
         # ステージ別の対象カードを取得
         if stage == 1:
             target_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
         elif stage == 2:
+            # Stage 1完了チェック
+            stage1_completed = check_stage_completion(user_id, source, 1, page_range, difficulty)
+            if not stage1_completed:
+                app.logger.warning(f"[STAGE_PROGRESS] Stage1未完了のためStage2は表示しない")
+                return None
             target_cards = get_stage2_cards(source, page_range, user_id, difficulty)
         elif stage == 3:
             target_cards = get_stage3_cards(source, page_range, user_id, difficulty)
@@ -710,9 +739,10 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
             target_cards = []
         
         if not target_cards:
+            app.logger.debug(f"[STAGE_PROGRESS] Stage{stage}: 対象カードなし")
             return None
         
-        # チャンク情報を取得
+        # 以下は既存のロジックと同じ...
         subject = target_cards[0]['subject']
         
         if stage == 1:
@@ -798,6 +828,13 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
                     
                     chunks_progress.append(chunk_progress)
         
+        # 🔥 Stage 3では前のステージ完了が必要
+        can_start = True
+        if stage == 2:
+            can_start = check_stage_completion(user_id, source, 1, page_range, difficulty)
+        elif stage == 3:
+            can_start = check_stage_completion(user_id, source, 2, page_range, difficulty)
+        
         stage_info = {
             'stage': stage,
             'stage_name': f'ステージ {stage}',
@@ -805,14 +842,38 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
             'total_chunks': total_chunks,
             'chunks_progress': chunks_progress,
             'stage_completed': stage_completed,
-            'can_start': True
+            'can_start': can_start
         }
         
         return stage_info
         
     except Exception as e:
-        app.logger.error(f"ステージ進捗エラー: {e}")
+        app.logger.error(f"[STAGE_PROGRESS] Stage{stage}進捗エラー: {e}")
+        import traceback
+        app.logger.error(f"[STAGE_PROGRESS] トレースバック: {traceback.format_exc()}")
         return None
+
+def check_stage_completion(user_id, source, stage, page_range, difficulty):
+    """指定ステージが完了しているかチェック"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    SELECT completed FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s AND stage = %s AND completed = true
+                ''', (user_id, source, stage))
+                completed_chunks = cur.fetchall()
+                
+                if completed_chunks:
+                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}完了済み")
+                    return True
+                else:
+                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}未完了")
+                    return False
+                    
+    except Exception as e:
+        app.logger.error(f"[STAGE_CHECK] Stage{stage}チェックエラー: {e}")
+        return False
 
 def create_fallback_stage_info(source, page_range, difficulty, user_id):
     """エラー時のフォールバック：最小限のStage 1情報"""
