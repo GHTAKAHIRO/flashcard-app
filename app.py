@@ -987,39 +987,14 @@ def set_page_range_and_prepare(source):
     
     return redirect(url_for('prepare', source=source))
 
-@app.route('/prepare/<source>', methods=['GET', 'POST'])
+@app.route('/prepare/<source>')
 @login_required
 def prepare(source):
+    """学習進捗確認画面（設定変更機能は削除）"""
     user_id = str(current_user.id)
     
     try:
-        if request.method == 'POST':
-            page_range = request.form.get('page_range', '').strip()
-            difficulty_list = request.form.getlist('difficulty')
-            difficulty = ','.join(difficulty_list) if difficulty_list else ''
-
-            try:
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute('''
-                            INSERT INTO user_settings (user_id, source, page_range, difficulty)
-                            VALUES (%s, %s, %s, %s)
-                            ON CONFLICT (user_id, source)
-                            DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
-                        ''', (user_id, source, page_range, difficulty))
-                        conn.commit()
-                        
-                session['page_range'] = page_range
-                session['difficulty'] = difficulty
-                flash("設定を保存しました。")
-                
-            except Exception as e:
-                app.logger.error(f"設定保存エラー: {e}")
-                flash("設定の保存に失敗しました。")
-
-            return redirect(url_for('prepare', source=source))
-
-        # GET処理
+        # 保存済み設定を取得
         saved_page_range = ''
         saved_difficulty = ''
         
@@ -1034,10 +1009,16 @@ def prepare(source):
                     if result:
                         saved_page_range = result[0] or ''
                         saved_difficulty = result[1] or ''
+                        # セッションにも保存（学習時に使用）
                         session['page_range'] = saved_page_range
                         session['difficulty'] = saved_difficulty
         except Exception as e:
             app.logger.error(f"設定取得エラー: {e}")
+
+        # 設定が未完了の場合はダッシュボードにリダイレクト
+        if not saved_page_range:
+            flash("学習設定が必要です。ページ範囲と難易度を設定してください。")
+            return redirect(url_for('dashboard'))
 
         # 詳細進捗情報を取得
         stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
