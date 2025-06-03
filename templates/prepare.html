@@ -477,7 +477,7 @@
     </div>
 
     <div class="container">
-        <!-- ステージ一覧 -->
+        <!-- ステージ一覧（設定セクションは完全に削除済み） -->
         {% for stage_info in stages_info %}
         <div class="stage-card {% if stage_info.stage_completed %}stage-completed{% elif not stage_info.can_start %}stage-locked{% endif %}">
             <!-- ステージヘッダー -->
