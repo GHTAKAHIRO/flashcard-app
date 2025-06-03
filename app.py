@@ -881,6 +881,7 @@ def get_completed_stages_chunk_aware(user_id, source, page_range, difficulty='')
     return result
 
 # ========== 8. ルート定義エリア ==========
+
 @app.route('/')
 def home():
     if current_user.is_authenticated:
@@ -1078,11 +1079,13 @@ def start_chunk(source, stage, chunk_number, mode):
             if stage == 1:
                 session['current_chunk'] = chunk_number
         elif mode == 'practice':
+            # 🔥 修正: ステージ2・3でも練習モードに対応
             if stage == 1:
                 session['mode'] = 'chunk_practice'
                 session['practicing_chunk'] = chunk_number
             else:
                 session['mode'] = 'practice'
+                session['practicing_chunk'] = chunk_number  # ステージ2・3でも chunk_number を保存
         
         flash(f"ステージ{stage} チャンク{chunk_number}の{mode}を開始します！")
         return redirect(url_for('study', source=source))
@@ -1091,7 +1094,7 @@ def start_chunk(source, stage, chunk_number, mode):
         app.logger.error(f"学習開始エラー: {e}")
         flash("学習開始に失敗しました")
         return redirect(url_for('prepare', source=source))
-
+    
 @app.route('/study/<source>')
 @login_required  
 def study(source):
@@ -1104,7 +1107,7 @@ def study(source):
         stage = session.get('stage', 1)
         user_id = str(current_user.id)
 
-        # Stage別処理
+        # Stage 1の処理（既存のまま）
         if stage == 1:
             try:
                 chunk_progress = get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
@@ -1117,7 +1120,6 @@ def study(source):
                 flash("該当するカードが見つかりませんでした。")
                 return redirect(url_for('prepare', source=source))
             
-            # 🔥 修正：全チャンク完了時は設定画面に戻る
             if chunk_progress.get('all_completed') and mode != 'chunk_practice':
                 flash("🏆 Stage 1の全チャンクが完了しました！")
                 return redirect(url_for('prepare', source=source))
@@ -1127,7 +1129,6 @@ def study(source):
                 cards_dict = get_chunk_practice_cards(user_id, source, stage, current_chunk, page_range, difficulty)
                 
                 if not cards_dict:
-                    # 🔥 修正：練習完了時は設定画面に戻る
                     flash(f"✅ チャンク{current_chunk}の練習完了！")
                     session['mode'] = 'test'
                     session.pop('practicing_chunk', None)
@@ -1142,10 +1143,10 @@ def study(source):
                     flash("🏆 Stage 1の全チャンクが完了しました！")
                     return redirect(url_for('prepare', source=source))
                 
-                # 🔥 セッションに現在のチャンク番号を保存
                 session['current_chunk'] = current_chunk
                 cards_dict = get_study_cards(source, stage, mode, page_range, user_id, difficulty, current_chunk)
         
+        # ステージ2・3の処理
         elif stage in [2, 3]:
             try:
                 chunk_progress = get_or_create_chunk_progress_universal(user_id, source, stage, page_range, difficulty)
@@ -1161,18 +1162,22 @@ def study(source):
                 flash(f"🏆 Stage {stage}の全チャンクが完了しました！")
                 return redirect(url_for('prepare', source=source))
             
-            if mode == 'chunk_practice':
-                current_chunk = session.get('practicing_chunk')
+            # 🔥 修正: ステージ2・3の練習モード処理
+            if mode == 'practice':
+                current_chunk = session.get('practicing_chunk', 1)  # デフォルト1
                 cards_dict = get_chunk_practice_cards_universal(user_id, source, stage, current_chunk, page_range, difficulty)
                 
                 if not cards_dict:
-                    flash(f"✅ Stage {stage} チャンク{current_chunk}の練習完了！")
+                    # 🔥 練習対象がない場合：設定画面に戻る
+                    flash(f"✅ Stage {stage}の練習完了！すべての×問題を克服しました。")
                     session['mode'] = 'test'
                     session.pop('practicing_chunk', None)
                     return redirect(url_for('prepare', source=source))
                 
                 total_chunks = chunk_progress['total_chunks']
+                app.logger.info(f"[STAGE{stage}_PRACTICE] 練習カード{len(cards_dict)}問を表示")
             else:
+                # テストモード
                 current_chunk = chunk_progress['current_chunk']
                 total_chunks = chunk_progress['total_chunks']
                 
@@ -1211,6 +1216,7 @@ def study(source):
         return redirect(url_for('prepare', source=source))
 
 # ========== 1. log_result ルートを修正 ==========
+
 @app.route('/log_result', methods=['POST'])
 @login_required
 def log_result():
@@ -1235,7 +1241,7 @@ def log_result():
         
         response_data = {'status': 'ok'}
         
-        # 🔥 修正：チャンクテスト完了時の処理を変更
+        # ステージ1のチャンクテスト完了時の処理（既存）
         if stage == 1 and session_mode == 'test':
             source = session.get('current_source')
             page_range = session.get('page_range', '').strip()
@@ -1244,13 +1250,11 @@ def log_result():
             
             if source:
                 try:
-                    # 現在のチャンクの問題をすべて解いたかチェック
                     chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, current_chunk)
                     
                     if chunk_cards:
                         chunk_card_ids = [card['id'] for card in chunk_cards]
                         
-                        # このチャンクのテスト完了をチェック
                         with get_db_connection() as conn:
                             with conn.cursor() as cur:
                                 cur.execute('''
@@ -1260,13 +1264,10 @@ def log_result():
                                 ''', (user_id, stage, chunk_card_ids))
                                 tested_count = cur.fetchone()[0]
                         
-                        # 🔥 全問題テスト完了時：設定画面に戻る指示
                         if tested_count == len(chunk_card_ids):
-                            # ×問題があるかチェック
                             practice_cards = get_chunk_practice_cards(user_id, source, stage, current_chunk, page_range, difficulty)
                             
                             if practice_cards:
-                                # ×問題がある場合：練習必須
                                 response_data.update({
                                     'chunk_test_completed': True,
                                     'has_wrong_answers': True,
@@ -1275,7 +1276,6 @@ def log_result():
                                     'message': f"🎉 チャンク{current_chunk}テスト完了！×の問題を練習してください。"
                                 })
                             else:
-                                # 全問正解の場合：設定画面に戻る
                                 response_data.update({
                                     'chunk_test_completed': True,
                                     'has_wrong_answers': False,
@@ -1287,7 +1287,7 @@ def log_result():
                 except Exception as e:
                     app.logger.error(f"チャンク完了チェックエラー: {e}")
         
-        # 🔥 修正：チャンク練習完了時の処理を変更
+        # ステージ1の練習完了時の処理（既存）
         elif stage == 1 and session_mode == 'chunk_practice':
             source = session.get('current_source')
             page_range = session.get('page_range', '').strip()
@@ -1296,11 +1296,9 @@ def log_result():
             
             if source and practicing_chunk:
                 try:
-                    # 残りの練習カードをチェック
                     remaining_practice_cards = get_chunk_practice_cards(user_id, source, stage, practicing_chunk, page_range, difficulty)
                     
                     if not remaining_practice_cards:
-                        # 🔥 練習完了時：設定画面に戻る指示
                         response_data.update({
                             'practice_completed': True,
                             'completed_chunk': practicing_chunk,
@@ -1311,12 +1309,35 @@ def log_result():
                 except Exception as e:
                     app.logger.error(f"練習完了チェックエラー: {e}")
         
+        # 🔥 新規追加: ステージ2・3の練習完了チェック
+        elif stage in [2, 3] and session_mode == 'practice':
+            source = session.get('current_source')
+            page_range = session.get('page_range', '').strip()
+            difficulty = session.get('difficulty', '').strip()
+            
+            if source:
+                try:
+                    # 残りの練習カードをチェック
+                    remaining_practice_cards = get_chunk_practice_cards_universal(user_id, source, stage, 1, page_range, difficulty)
+                    
+                    if not remaining_practice_cards:
+                        # ステージ2・3の練習完了時：設定画面に戻る指示
+                        response_data.update({
+                            'practice_completed': True,
+                            'completed_stage': stage,
+                            'message': f"✅ ステージ{stage}の練習完了！すべての×問題を克服しました。",
+                            'redirect_to_prepare': True
+                        })
+                        
+                except Exception as e:
+                    app.logger.error(f"ステージ{stage}練習完了チェックエラー: {e}")
+        
         return jsonify(response_data)
         
     except Exception as e:
         app.logger.error(f"ログ書き込みエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
+    
 @app.route('/start_chunk_practice/<source>/<int:chunk_number>')
 @login_required
 def start_chunk_practice(source, chunk_number):
