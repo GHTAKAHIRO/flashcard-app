@@ -1090,6 +1090,25 @@ def prepare(source):
     user_id = str(current_user.id)
     
     try:
+        # 🔥 教材の詳細情報を取得（追加）
+        full_material_name = source  # デフォルト値
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        SELECT DISTINCT subject, grade 
+                        FROM image 
+                        WHERE source = %s 
+                        LIMIT 1
+                    ''', (source,))
+                    material_info = cur.fetchone()
+                    
+                    if material_info:
+                        subject, grade = material_info
+                        full_material_name = f"{source}（{subject}{grade}）"
+        except Exception as e:
+            app.logger.error(f"教材情報取得エラー: {e}")
+        
         # 保存済み設定を取得
         saved_page_range = ''
         saved_difficulty = ''
@@ -1125,6 +1144,7 @@ def prepare(source):
         return render_template(
             'prepare.html',
             source=source,
+            full_material_name=full_material_name,  # 🔥 追加
             stages_info=stages_info,
             saved_page_range=saved_page_range,
             saved_difficulty=saved_difficulty
