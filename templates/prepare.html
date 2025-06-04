@@ -69,7 +69,7 @@
         .stage-header {
             background: var(--primary-gradient);
             color: white;
-            padding: 1rem 1.5rem;
+            padding: 0.8rem 1.2rem;  /* 🔥 1rem 1.5rem → 0.8rem 1.2rem に変更 */
             position: relative;
             overflow: hidden;
         }
@@ -100,18 +100,18 @@
         }
         
         .stage-title {
-            font-size: 1.3rem;
+            font-size: 1.2rem;      /* 🔥 1.3rem → 1.2rem に変更 */
             font-weight: 700;
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.2rem;   /* 🔥 0.3rem → 0.2rem に変更 */
             display: flex;
             align-items: center;
-            gap: 0.7rem;
+            gap: 0.6rem;            /* 🔥 0.7rem → 0.6rem に変更 */
         }
 
         .stage-stats {
-            font-size: 0.8rem;
+            font-size: 0.75rem;     /* 🔥 0.8rem → 0.75rem に変更 */
             opacity: 0.9;
-            margin-bottom: 0.8rem;
+            margin-bottom: 0.5rem;   /* 🔥 0.8rem → 0.5rem に変更 */
         }
 
         .stage-progress-summary {
@@ -461,14 +461,14 @@
                 <div class="col-lg-8">
                     <h1 class="hero-title">
                         <i class="fas fa-graduation-cap"></i>
-                        {{ source }} 学習進捗
+                        {{ source }}
                     </h1>
                     <p class="hero-subtitle">チャンク単位で効率よく学習を進めましょう</p>
                 </div>
                 <div class="col-lg-4">
                     <div class="current-settings">
                         <div class="text-center mb-2">
-                            <span><i class="fas fa-lock"></i> 学習設定（固定）</span>
+                            <span><i class="fas fa-cog"></i> 学習設定</span>
                         </div>
                         <div class="small text-center">
                             <div><strong>ページ範囲:</strong> {{ saved_page_range or '未設定' }}</div>
@@ -480,19 +480,13 @@
                                 <i class="fas fa-exclamation-triangle"></i> 設定が必要です
                             </a>
                         </div>
-                        {% else %}
-                        <div class="text-center mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle"></i> 学習開始後は変更不可
-                            </small>
-                        </div>
                         {% endif %}
                     </div>
                 </div>
             </div>
             <div class="row mt-3">
                 <div class="col">
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-light">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-light btn-lg">
                         <i class="fas fa-arrow-left"></i> ダッシュボードに戻る
                     </a>
                 </div>
@@ -506,39 +500,41 @@
         <div class="stage-card {% if stage_info.stage_completed %}stage-completed{% elif not stage_info.can_start %}stage-locked{% endif %}">
             <!-- ステージヘッダー -->
             <div class="stage-header">
-                <div class="stage-title">
-                    {% if stage_info.stage_completed %}
-                        <i class="fas fa-check-circle fa-lg"></i>
-                    {% elif not stage_info.can_start %}
-                        <i class="fas fa-lock fa-lg"></i>
-                    {% else %}
-                        <i class="fas fa-play-circle fa-lg"></i>
-                    {% endif %}
-                    <div>
-                        {{ stage_info.stage_name }}
-                        <div class="stage-stats">{{ stage_info.total_cards }}問 / {{ stage_info.total_chunks }}チャンク</div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="stage-title">
+                        {% if stage_info.stage_completed %}
+                            <i class="fas fa-check-circle fa-lg"></i>
+                        {% elif not stage_info.can_start %}
+                            <i class="fas fa-lock fa-lg"></i>
+                        {% else %}
+                            <i class="fas fa-play-circle fa-lg"></i>
+                        {% endif %}
+                        <div>
+                            {{ stage_info.stage_name }}
+                            <div class="stage-stats">{{ stage_info.total_cards }}問 / {{ stage_info.total_chunks }}チャンク</div>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="text-end">
-                    {% if stage_info.stage_completed %}
-                        <span class="badge bg-light text-success fs-6 px-2 py-1">
-                            <i class="fas fa-trophy"></i> 完了
-                        </span>
-                    {% elif not stage_info.can_start %}
-                        <span class="badge bg-secondary fs-6 px-2 py-1">
-                            <i class="fas fa-lock"></i> ロック中
-                        </span>
-                    {% else %}
-                        <span class="badge bg-warning text-dark fs-6 px-2 py-1">
-                            <i class="fas fa-clock"></i> 進行中
-                        </span>
-                    {% endif %}
+                    
+                    <div class="text-end">
+                        {% if stage_info.stage_completed %}
+                            <span class="badge bg-light text-success fs-6 px-2 py-1">
+                                <i class="fas fa-trophy"></i> 完了
+                            </span>
+                        {% elif not stage_info.can_start %}
+                            <span class="badge bg-secondary fs-6 px-2 py-1">
+                                <i class="fas fa-lock"></i> ロック中
+                            </span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark fs-6 px-2 py-1">
+                                <i class="fas fa-clock"></i> 進行中
+                            </span>
+                        {% endif %}
+                    </div>
                 </div>
                 
                 <!-- 進捗バー -->
                 {% if stage_info.can_start or stage_info.stage_completed %}
-                <div class="stage-progress-summary mt-2">
+                <div class="stage-progress-summary">
                     <div class="row align-items-center">
                         <div class="col-md-8">
                             <div class="progress-bar-modern">
