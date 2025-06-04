@@ -155,9 +155,9 @@
         }
         
         .chunk-grid {
-            padding: 0.8rem;
+            padding: 1rem;           /* 🔥 0.8rem → 1rem に変更 */
             display: grid;
-            gap: 0.6rem;
+            gap: 0.8rem;             /* 🔥 0.6rem → 0.8rem に変更 */
         }
 
         .chunk-card {
@@ -561,67 +561,35 @@
                 {% for chunk in stage_info.chunks_progress %}
                 <div class="chunk-card {% if chunk.chunk_completed %}chunk-completed{% elif chunk.can_start_test %}chunk-active{% else %}chunk-locked{% endif %}">
                     
-                    <!-- すべて1行で表示 -->
-                    <div class="d-flex align-items-center justify-content-between">
-                        <!-- 左側：チャンク番号＋名前 -->
-                        <div class="d-flex align-items-center">
-                            <div class="chunk-icon">
-                                {{ chunk.chunk_number }}
+                    <!-- 2行レイアウトに変更 -->
+                    <div>
+                        <!-- 1行目：チャンク情報 -->
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <!-- 左側：チャンク番号＋名前 -->
+                            <div class="d-flex align-items-center">
+                                <div class="chunk-icon">
+                                    {{ chunk.chunk_number }}
+                                </div>
+                                <div class="chunk-info-inline">
+                                    <span class="chunk-title">チャンク {{ chunk.chunk_number }}</span>
+                                    <span class="chunk-count">{{ chunk.total_cards }}問</span>
+                                </div>
                             </div>
-                            <div class="chunk-info-inline">
-                                <span class="chunk-title">チャンク {{ chunk.chunk_number }}</span>
-                                <span class="chunk-count">{{ chunk.total_cards }}問</span>
-                            </div>
-                        </div>
 
-                        <!-- 中央：ステータスバッジ -->
-                        <div class="d-flex align-items-center gap-1">
-                            <!-- テスト状況 -->
+                            <!-- 右側：テスト完了時の統計のみ -->
                             {% if chunk.test_completed %}
-                                <span class="status-badge-mini status-completed">
-                                    <i class="fas fa-check"></i> 完了
-                                </span>
-                            {% elif chunk.can_start_test %}
-                                <span class="status-badge-mini status-in-progress">
-                                    <i class="fas fa-clock"></i> 可能
-                                </span>
-                            {% else %}
-                                <span class="status-badge-mini status-locked">
-                                    <i class="fas fa-lock"></i> 待機
-                                </span>
-                            {% endif %}
-
-                            <!-- 練習状況（×問題がある場合のみ表示） -->
-                            {% if chunk.practice_needed %}
-                                {% if chunk.practice_completed %}
-                                    <span class="status-badge-mini status-completed">
-                                        <i class="fas fa-dumbbell"></i> 練習完了
-                                    </span>
-                                {% elif chunk.can_start_practice %}
-                                    <span class="status-badge-mini status-in-progress">
-                                        <i class="fas fa-dumbbell"></i> 練習可能
-                                    </span>
-                                {% else %}
-                                    <span class="status-badge-mini status-locked">
-                                        <i class="fas fa-lock"></i> 練習待機
-                                    </span>
-                                {% endif %}
-                            {% endif %}
-
-                            <!-- テスト完了時の統計（インライン表示） -->
-                            {% if chunk.test_completed %}
-                                <span class="stats-inline">
+                                <div class="stats-inline">
                                     <i class="fas fa-chart-pie text-primary"></i>
                                     <span class="text-success fw-bold">{{ chunk.test_correct }}</span>
                                     {% if chunk.test_wrong > 0 %}
                                         /<span class="text-danger fw-bold">{{ chunk.test_wrong }}</span>
                                     {% endif %}
-                                </span>
+                                </div>
                             {% endif %}
                         </div>
                         
-                        <!-- 右側：アクションボタン -->
-                        <div class="d-flex gap-1">
+                        <!-- 2行目：アクションボタン -->
+                        <div class="d-flex gap-2 justify-content-end">
                             <!-- テストボタン -->
                             {% if chunk.can_start_test and not chunk.test_completed %}
                                 <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='test') }}" 
@@ -630,11 +598,11 @@
                                 </a>
                             {% elif chunk.test_completed %}
                                 <button class="btn btn-disabled-mini" disabled>
-                                    <i class="fas fa-check"></i> 完了
+                                    <i class="fas fa-check"></i> テスト完了
                                 </button>
                             {% else %}
                                 <button class="btn btn-disabled-mini" disabled>
-                                    <i class="fas fa-lock"></i> テスト
+                                    <i class="fas fa-lock"></i> テスト待機
                                 </button>
                             {% endif %}
 
@@ -654,7 +622,7 @@
                                     {% endif %}
                                 {% else %}
                                     <button class="btn btn-disabled-mini" disabled>
-                                        <i class="fas fa-lock"></i> 練習
+                                        <i class="fas fa-lock"></i> 練習待機
                                     </button>
                                 {% endif %}
                             {% endif %}
