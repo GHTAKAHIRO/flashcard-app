@@ -1,4 +1,4 @@
-console.log("🔍 デバッグ強化版 瞬間応答 main.js が読み込まれました");
+console.log("🔧 最終修正版 瞬間応答 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
@@ -119,33 +119,31 @@ function updateProgressInstantly() {
     }
 }
 
-// ========== 瞬間回答処理（デバッグ強化版） ==========
+// ========== 瞬間回答処理（最終修正版） ==========
 function handleAnswerInstantly(result) {
     console.log("⚡ 瞬間回答: " + result + " (カード" + (currentIndex + 1) + "/" + cards.length + ")");
     
     // 現在のカードIDを保存
     const currentCardId = cards[currentIndex].id;
-    console.log("📋 現在のカードID:", currentCardId);
     
-    // 1. 瞬間カウンター更新（1ms）
+    // 1. 瞬間カウンター更新
     updateCountersInstantly(result);
     
-    // 2. 瞬間ボタンフィードバック（1ms）
+    // 2. 瞬間ボタンフィードバック
     triggerButtonFeedback(result);
     
-    // 3. 瞬間次カード表示（2ms）
+    // 3. 瞬間次カード表示 or 完了
     const success = switchToCardInstantly(currentIndex + 1);
     
     if (!success) {
-        console.log("🏁 全カード完了 - 同期ログ送信開始");
-        // カード終了 - ログ送信してから完了処理
-        sendResultSyncAndComplete(currentCardId, result);
+        console.log("🏁 全カード完了");
+        // 🔧 修正：完了時は必ずサーバーレスポンスを待つ
+        handleCardCompletionSync(currentCardId, result);
         return;
     }
     
-    // 4. 通常カード - 非同期ログ送信
-    console.log("➡️ 次カード表示完了 - 非同期ログ送信");
-    sendResultImmediate(currentCardId, result);
+    // 4. 通常カード - 非同期ログ送信（レスポンス無視）
+    sendResultBackground(currentCardId, result);
 }
 
 function updateCountersInstantly(result) {
@@ -155,11 +153,9 @@ function updateCountersInstantly(result) {
     if (result === 'known' && correctSpan) {
         const current = parseInt(correctSpan.textContent) || 0;
         correctSpan.textContent = current + 1;
-        console.log("✅ 正解カウンター更新:", current + 1);
     } else if (result === 'unknown' && incorrectSpan) {
         const current = parseInt(incorrectSpan.textContent) || 0;
         incorrectSpan.textContent = current + 1;
-        console.log("❌ 不正解カウンター更新:", current + 1);
     }
 }
 
@@ -172,7 +168,6 @@ function triggerButtonFeedback(result) {
         button.style.transform = 'scale(0.95)';
         button.style.backgroundColor = result === 'known' ? '#45a049' : '#da190b';
         
-        // 次フレームで復元
         requestAnimationFrame(function() {
             button.style.transform = 'scale(1)';
             setTimeout(function() {
@@ -195,19 +190,34 @@ function toggleAnswerInstantly() {
         if (showingAnswer) {
             problemDiv.style.display = 'none';
             answerDiv.style.display = 'block';
-            console.log("👁️ 解答表示");
         } else {
             problemDiv.style.display = 'block';
             answerDiv.style.display = 'none';
-            console.log("❓ 問題表示");
         }
     }
 }
 
-// ========== デバッグ強化版ログ処理 ==========
-function sendResultImmediate(cardId, result) {
-    console.log("📤 非同期ログ送信:", cardId, result);
+// ========== 最終修正版ログ処理 ==========
+function sendResultBackground(cardId, result) {
+    // 🔧 非同期ログ送信（レスポンス処理なし）
+    fetch('/log_result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            card_id: cardId,
+            result: result,
+            stage: stage,
+            mode: mode
+        })
+    }).catch(function(error) {
+        console.error('非同期ログエラー:', error);
+    });
+}
+
+function handleCardCompletionSync(cardId, result) {
+    console.log("🔧 カード完了時同期処理:", cardId, result);
     
+    // 🔧 修正：完了時は必ずサーバーレスポンスを待ってから処理
     fetch('/log_result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -218,118 +228,42 @@ function sendResultImmediate(cardId, result) {
             mode: mode
         })
     }).then(function(response) {
-        console.log("📡 非同期レスポンス受信:", response.status);
         return response.json();
     }).then(function(data) {
-        console.log("✅ 非同期ログ完了:", data);
-        // 通常は特別な処理なし
+        console.log("✅ 完了時サーバーレスポンス:", data);
+        
+        // 🔧 修正：サーバーからの指示に従う
+        if (data.redirect_to_prepare === true) {
+            console.log("🎯 サーバー指示：prepare画面へリダイレクト");
+            if (data.message) {
+                showInstantMessage(data.message);
+            }
+            setTimeout(function() {
+                window.location.href = '/prepare/' + getCurrentSource();
+            }, 2000);
+        } else {
+            console.log("🔧 サーバー指示なし：デフォルト処理");
+            handleDefaultCompletion();
+        }
     }).catch(function(error) {
-        console.error('❌ 非同期ログエラー:', error);
+        console.error('❌ 完了時ログエラー:', error);
+        handleDefaultCompletion();
     });
 }
 
-function sendResultSyncAndComplete(cardId, result) {
-    console.log("📤 同期ログ送信（完了時）:", cardId, result);
-    console.log("📋 送信データ:", {
-        card_id: cardId,
-        result: result,
-        stage: stage,
-        mode: mode
-    });
-    
-    fetch('/log_result', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            card_id: cardId,
-            result: result,
-            stage: stage,
-            mode: mode
-        })
-    }).then(function(response) {
-        console.log("📡 同期レスポンス受信:", response.status, response.statusText);
-        return response.json();
-    }).then(function(data) {
-        console.log("✅ 同期ログ完了:", data);
-        console.log("🔍 レスポンス詳細:", JSON.stringify(data, null, 2));
-        handleServerResponse(data);
-    }).catch(function(error) {
-        console.error('❌ 同期ログエラー:', error);
-        console.log("🔧 エラー時はフォールバック完了処理");
-        handleCompletionInstantly();
-    });
-}
-
-// 🔍 デバッグ強化版サーバーレスポンス処理
-function handleServerResponse(data) {
-    console.log("🔄 サーバーレスポンス処理開始");
-    console.log("📋 受信データ:", data);
-    
-    // 各フラグをチェック
-    console.log("🔍 フラグチェック:");
-    console.log("  - redirect_to_prepare:", data.redirect_to_prepare);
-    console.log("  - chunk_test_completed:", data.chunk_test_completed);
-    console.log("  - stage_test_completed:", data.stage_test_completed);
-    console.log("  - practice_completed:", data.practice_completed);
-    console.log("  - practice_continuing:", data.practice_continuing);
-    console.log("  - has_wrong_answers:", data.has_wrong_answers);
-    console.log("  - message:", data.message);
-    
-    if (data.redirect_to_prepare) {
-        console.log("🎯 prepare画面にリダイレクト");
-        showInstantMessage(data.message || "完了しました");
-        setTimeout(function() {
-            const prepareUrl = '/prepare/' + getCurrentSource();
-            console.log("🔗 リダイレクト先:", prepareUrl);
-            window.location.href = prepareUrl;
-        }, 2000); // 少し長めに設定
-    } else if (data.chunk_test_completed || data.stage_test_completed) {
-        console.log("🎉 テスト完了:", data);
-        showInstantMessage(data.message || "テスト完了！");
-        setTimeout(function() {
-            const prepareUrl = '/prepare/' + getCurrentSource();
-            console.log("🔗 テスト完了後リダイレクト:", prepareUrl);
-            window.location.href = prepareUrl;
-        }, 2000);
-    } else if (data.practice_completed) {
-        console.log("🎉 練習完了:", data);
-        showInstantMessage(data.message || "練習完了！");
-        setTimeout(function() {
-            const prepareUrl = '/prepare/' + getCurrentSource();
-            console.log("🔗 練習完了後リダイレクト:", prepareUrl);
-            window.location.href = prepareUrl;
-        }, 2000);
-    } else if (data.practice_continuing) {
-        console.log("🔄 練習継続:", data);
-        showInstantMessage(data.message || "練習を続けます");
-        setTimeout(function() {
-            console.log("🔄 練習継続のためリロード");
-            window.location.reload();
-        }, 1500);
-    } else {
-        console.log("🔧 その他の完了パターン - デフォルト処理");
-        handleCompletionInstantly();
-    }
-}
-
-function handleCompletionInstantly() {
-    console.log("🏁 デフォルト完了処理");
-    console.log("📚 練習モード:", isPracticeMode);
+function handleDefaultCompletion() {
+    console.log("🔧 デフォルト完了処理");
     
     if (isPracticeMode) {
-        console.log("🔄 練習モード完了 - リロード");
         showInstantMessage("問題を読み込んでいます...");
         setTimeout(function() {
             window.location.reload();
         }, 1000);
     } else {
-        console.log("🎯 テストモード完了 - prepare画面へ");
         showInstantMessage("✅ テスト完了！");
         setTimeout(function() {
-            const prepareUrl = '/prepare/' + getCurrentSource();
-            console.log("🔗 デフォルト完了後リダイレクト:", prepareUrl);
-            window.location.href = prepareUrl;
-        }, 1500);
+            window.location.href = '/prepare/' + getCurrentSource();
+        }, 2000);
     }
 }
 
@@ -356,7 +290,7 @@ function showInstantMessage(message) {
 
 // ========== 初期化 ==========
 document.addEventListener('DOMContentLoaded', function () {
-    console.log("🔍 デバッグ強化版初期化開始");
+    console.log("🔧 最終修正版初期化開始");
     
     if (typeof rawCards === "undefined") {
         console.error("❌ rawCards が定義されていません");
@@ -370,8 +304,6 @@ document.addEventListener('DOMContentLoaded', function () {
     
     console.log("📊 カードデータ: " + cards.length + "枚");
     console.log("📚 練習モード: " + isPracticeMode);
-    console.log("🎬 現在のステージ:", typeof stage !== 'undefined' ? stage : 'undefined');
-    console.log("🎮 現在のモード:", typeof mode !== 'undefined' ? mode : 'undefined');
     
     // 事前レンダリング
     prerenderAllCards();
@@ -380,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function () {
     setupInstantEvents();
     setupInstantKeyboard();
     
-    console.log("🔍 デバッグ強化版初期化完了");
+    console.log("🔧 最終修正版初期化完了");
 });
 
 function setupInstantEvents() {
@@ -393,7 +325,6 @@ function setupInstantEvents() {
         knownBtn.addEventListener('click', function() {
             handleAnswerInstantly('known');
         });
-        console.log("✅ 〇ボタンイベント設定完了");
     }
     
     if (unknownBtn) {
@@ -401,7 +332,6 @@ function setupInstantEvents() {
         unknownBtn.addEventListener('click', function() {
             handleAnswerInstantly('unknown');
         });
-        console.log("✅ ×ボタンイベント設定完了");
     }
     
     if (flashcard) {
@@ -409,7 +339,6 @@ function setupInstantEvents() {
         flashcard.addEventListener('click', function() {
             toggleAnswerInstantly();
         });
-        console.log("✅ フラッシュカードイベント設定完了");
     }
 }
 
@@ -419,23 +348,19 @@ function setupInstantKeyboard() {
             case 'j':
             case 'arrowleft':
                 e.preventDefault();
-                console.log("⌨️ J/左矢印 → 〇");
                 handleAnswerInstantly('known');
                 break;
             case 'f':
             case 'arrowright':
                 e.preventDefault();
-                console.log("⌨️ F/右矢印 → ×");
                 handleAnswerInstantly('unknown');
                 break;
             case ' ':
                 e.preventDefault();
-                console.log("⌨️ Space → 解答切り替え");
                 toggleAnswerInstantly();
                 break;
         }
     });
-    console.log("✅ キーボードイベント設定完了");
 }
 
 // ========== ユーティリティ ==========
@@ -449,9 +374,7 @@ function shuffle(array) {
 
 function getCurrentSource() {
     const pathParts = window.location.pathname.split('/');
-    const source = pathParts[pathParts.length - 1];
-    console.log("🔗 現在のソース:", source);
-    return source;
+    return pathParts[pathParts.length - 1];
 }
 
 // ========== グローバル関数（互換性） ==========
@@ -467,4 +390,4 @@ window.markUnknown = function() {
     handleAnswerInstantly('unknown');
 };
 
-console.log("🔍 デバッグ強化版 瞬間応答システム読み込み完了");
+console.log("🔧 最終修正版 瞬間応答システム読み込み完了");
