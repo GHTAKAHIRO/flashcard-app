@@ -1,4 +1,4 @@
-console.log("⚡ 真・瞬間応答 main.js が読み込まれました");
+console.log("⚡ 不具合修正版 瞬間応答 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
@@ -119,9 +119,12 @@ function updateProgressInstantly() {
     }
 }
 
-// ========== 瞬間回答処理 ==========
+// ========== 瞬間回答処理（修正版） ==========
 function handleAnswerInstantly(result) {
     console.log("⚡ 瞬間回答: " + result);
+    
+    // 現在のカードIDを保存
+    const currentCardId = cards[currentIndex].id;
     
     // 1. 瞬間カウンター更新（1ms）
     updateCountersInstantly(result);
@@ -133,15 +136,13 @@ function handleAnswerInstantly(result) {
     const success = switchToCardInstantly(currentIndex + 1);
     
     if (!success) {
-        handleCompletionInstantly();
+        // カード終了 - ログ送信してから完了処理
+        sendResultSyncAndComplete(currentCardId, result);
         return;
     }
     
-    // 4. バックグラウンドでログ送信（非同期）
-    setTimeout(function() {
-        const cardId = cards[currentIndex - 1].id; // 一つ前のカード
-        sendResultBackground(cardId, result);
-    }, 10);
+    // 4. 🔧 修正：ログを即座に送信
+    sendResultImmediate(currentCardId, result);
 }
 
 function updateCountersInstantly(result) {
@@ -196,49 +197,85 @@ function toggleAnswerInstantly() {
     }
 }
 
-// ========== バックグラウンド処理 ==========
-let logQueue = [];
-function sendResultBackground(cardId, result) {
-    logQueue.push({
-        card_id: cardId,
-        result: result,
-        stage: stage,
-        mode: mode
-    });
+// ========== 修正版ログ処理 ==========
+function sendResultImmediate(cardId, result) {
+    console.log("📤 即座ログ送信:", cardId, result);
     
-    // デバウンス処理で送信
-    setTimeout(processBatchLogs, 100);
-}
-
-let batchProcessing = false;
-function processBatchLogs() {
-    if (batchProcessing || logQueue.length === 0) return;
-    
-    batchProcessing = true;
-    const batch = logQueue.slice();
-    logQueue = [];
-    
-    // 最新のログのみ送信
-    const latestLog = batch[batch.length - 1];
-    
+    // 🔧 修正：瞬間表示後に即座にサーバー送信
     fetch('/log_result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(latestLog)
+        body: JSON.stringify({
+            card_id: cardId,
+            result: result,
+            stage: stage,
+            mode: mode
+        })
     }).then(function(response) {
         return response.json();
     }).then(function(data) {
-        if (data.redirect_to_prepare) {
-            showInstantMessage(data.message);
-            setTimeout(function() {
-                window.location.href = '/prepare/' + getCurrentSource();
-            }, 1000);
-        }
+        console.log("✅ ログ送信完了:", data);
+        // 🔧 特別な処理は必要なし（既に次のカードに進んでいる）
     }).catch(function(error) {
-        console.error('バックグラウンドログエラー:', error);
-    }).finally(function() {
-        batchProcessing = false;
+        console.error('❌ ログ送信エラー:', error);
     });
+}
+
+function sendResultSyncAndComplete(cardId, result) {
+    console.log("📤 同期ログ送信（完了時）:", cardId, result);
+    
+    // 🔧 修正：完了時は同期的に送信してレスポンスを待つ
+    fetch('/log_result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            card_id: cardId,
+            result: result,
+            stage: stage,
+            mode: mode
+        })
+    }).then(function(response) {
+        return response.json();
+    }).then(function(data) {
+        console.log("✅ 完了時ログ送信完了:", data);
+        handleServerResponse(data);
+    }).catch(function(error) {
+        console.error('❌ 完了時ログ送信エラー:', error);
+        handleCompletionInstantly();
+    });
+}
+
+// 🔧 修正：サーバーレスポンス処理
+function handleServerResponse(data) {
+    console.log("🔄 サーバーレスポンス処理:", data);
+    
+    if (data.redirect_to_prepare) {
+        showInstantMessage(data.message);
+        setTimeout(function() {
+            window.location.href = '/prepare/' + getCurrentSource();
+        }, 1500);
+    } else if (data.chunk_test_completed || data.stage_test_completed) {
+        console.log("🎉 テスト完了:", data);
+        showInstantMessage(data.message);
+        setTimeout(function() {
+            window.location.href = '/prepare/' + getCurrentSource();
+        }, 1500);
+    } else if (data.practice_completed) {
+        console.log("🎉 練習完了:", data);
+        showInstantMessage(data.message);
+        setTimeout(function() {
+            window.location.href = '/prepare/' + getCurrentSource();
+        }, 1500);
+    } else if (data.practice_continuing) {
+        console.log("🔄 練習継続:", data);
+        showInstantMessage(data.message);
+        setTimeout(function() {
+            window.location.reload();
+        }, 1000);
+    } else {
+        // 通常の完了
+        handleCompletionInstantly();
+    }
 }
 
 function handleCompletionInstantly() {
@@ -256,6 +293,8 @@ function handleCompletionInstantly() {
 }
 
 function showInstantMessage(message) {
+    console.log("💬 メッセージ表示:", message);
+    
     const toast = document.createElement('div');
     toast.textContent = message;
     toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 12px 20px; border-radius: 6px; font-weight: bold; z-index: 1000; transform: translateX(100%); transition: transform 0.3s ease;';
@@ -289,6 +328,7 @@ document.addEventListener('DOMContentLoaded', function () {
     isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
     
     console.log("📊 カードデータ: " + cards.length + "枚");
+    console.log("📚 練習モード: " + isPracticeMode);
     
     // 事前レンダリング
     prerenderAllCards();
@@ -375,4 +415,4 @@ window.markUnknown = function() {
     handleAnswerInstantly('unknown');
 };
 
-console.log("⚡ 真・瞬間応答システム読み込み完了");
+console.log("⚡ 不具合修正版 瞬間応答システム読み込み完了");
