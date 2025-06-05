@@ -15,6 +15,10 @@ import json
 import hashlib
 import threading
 import time
+import threading
+import queue
+import time
+from contextlib import contextmanager
 
 # ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
@@ -24,10 +28,60 @@ CORS(app)
 app.secret_key = 'your_secret_key'
 logging.basicConfig(level=logging.DEBUG)
 
+app.config.update(
+    # JSON処理高速化
+    JSON_SORT_KEYS=False,
+    JSONIFY_PRETTYPRINT_REGULAR=False,
+    
+    # セッション最適化
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=2),
+    
+    # 静的ファイルキャッシュ
+    SEND_FILE_MAX_AGE_DEFAULT=31536000  # 1年
+)
+
+print("🚀 バックエンド高速化システム初期化完了")
+
 # Flask-Login 初期化
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+# 🚀 非同期ログ処理システム
+log_queue = queue.Queue(maxsize=1000)
+log_worker_active = True
+
+def log_worker():
+    """バックグラウンドでログを処理するワーカー"""
+    while log_worker_active:
+        try:
+            log_data = log_queue.get(timeout=1)
+            if log_data is None:  # 終了シグナル
+                break
+            
+            user_id, card_id, result, stage, mode = log_data
+            
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute('''
+                            INSERT INTO study_log (user_id, card_id, result, stage, mode)
+                            VALUES (%s, %s, %s, %s, %s)
+                        ''', (user_id, card_id, result, stage, mode))
+                        conn.commit()
+                app.logger.info(f"非同期ログ記録完了: user={user_id}, card={card_id}")
+            except Exception as e:
+                app.logger.error(f"非同期ログ書き込みエラー: {e}")
+            finally:
+                log_queue.task_done()
+                
+        except queue.Empty:
+            continue
+        except Exception as e:
+            app.logger.error(f"ログワーカーエラー: {e}")
+
+# ワーカースレッド開始
+log_thread = threading.Thread(target=log_worker, daemon=True)
+log_thread.start()
 
 # DB接続情報
 DB_HOST = os.getenv('DB_HOST')
@@ -1484,7 +1538,7 @@ def study(source):
 @app.route('/log_result', methods=['POST'])
 @login_required
 def log_result():
-    """学習結果記録ルート（最適化版）"""
+    """高速化されたログ記録（非同期処理）"""
     data = request.get_json()
     card_id = data.get('card_id')
     result = data.get('result')
@@ -1495,25 +1549,27 @@ def log_result():
     session_mode = session.get('mode', mode)
     log_mode = 'chunk_practice' if session_mode == 'chunk_practice' else mode
 
+    # 即座にレスポンスを返す準備
+    response_data = {'status': 'ok'}
+    
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('''
-                    INSERT INTO study_log (user_id, card_id, result, stage, mode)
-                    VALUES (%s, %s, %s, %s, %s)
-                ''', (user_id, card_id, result, stage, log_mode))
-                conn.commit()
+        # ログを非同期キューに追加（ノンブロッキング）
+        log_queue.put((user_id, card_id, result, stage, log_mode), block=False)
         
-        response_data = {'status': 'ok'}
+        # キャッシュクリアも非同期で実行
+        threading.Thread(
+            target=clear_user_cache, 
+            args=(user_id, session.get('current_source')), 
+            daemon=True
+        ).start()
         
-        # キャッシュクリア（結果記録時）
-        clear_user_cache(user_id, session.get('current_source'))
+        # 完了チェックロジック（既存のものを維持）
+        source = session.get('current_source')
+        page_range = session.get('page_range', '').strip()
+        difficulty = session.get('difficulty', '').strip()
         
-        # ステージ1のチャンクテスト完了時（即座にprepare画面に戻る）
+        # ステージ1のチャンクテスト完了時
         if stage == 1 and session_mode == 'test':
-            source = session.get('current_source')
-            page_range = session.get('page_range', '').strip()
-            difficulty = session.get('difficulty', '').strip()
             current_chunk = session.get('current_chunk', 1)
             
             if source:
@@ -1533,7 +1589,7 @@ def log_result():
                                 tested_count = cur.fetchone()[0]
                     
                         # テスト完了時は常にprepare画面に戻る
-                        if tested_count == len(chunk_card_ids):
+                        if tested_count >= len(chunk_card_ids):  # >= を使用（ログが重複する可能性を考慮）
                             practice_cards = get_chunk_practice_cards(user_id, source, stage, current_chunk, page_range, difficulty)
                             
                             if practice_cards:
@@ -1557,23 +1613,15 @@ def log_result():
                 except Exception as e:
                     app.logger.error(f"チャンク完了チェックエラー: {e}")
         
-        # ステージ1の練習モード（継続学習）
+        # ステージ1の練習モード完了チェック
         elif stage == 1 and session_mode == 'chunk_practice':
-            source = session.get('current_source')
-            page_range = session.get('page_range', '').strip()
-            difficulty = session.get('difficulty', '').strip()
             practicing_chunk = session.get('practicing_chunk')
             
             if source and practicing_chunk:
                 try:
-                    # 残りの練習カードをチェック
                     remaining_practice_cards = get_chunk_practice_cards(user_id, source, stage, practicing_chunk, page_range, difficulty)
                     
-                    app.logger.info(f"[PRACTICE_LOG] チャンク{practicing_chunk}: 残り練習カード{len(remaining_practice_cards)}問")
-                    
                     if not remaining_practice_cards:
-                        # すべての練習完了時のみprepare画面に戻る
-                        app.logger.info(f"[PRACTICE_LOG] チャンク{practicing_chunk}: 練習完了 - prepare画面に戻る")
                         response_data.update({
                             'practice_completed': True,
                             'completed_chunk': practicing_chunk,
@@ -1581,8 +1629,6 @@ def log_result():
                             'redirect_to_prepare': True
                         })
                     else:
-                        # まだ練習問題が残っている場合は継続（prepare画面に戻らない）
-                        app.logger.info(f"[PRACTICE_LOG] チャンク{practicing_chunk}: 練習継続 - 残り{len(remaining_practice_cards)}問")
                         response_data.update({
                             'practice_continuing': True,
                             'remaining_count': len(remaining_practice_cards),
@@ -1593,15 +1639,10 @@ def log_result():
                 except Exception as e:
                     app.logger.error(f"練習完了チェックエラー: {e}")
         
-        # ステージ2・3のテストモード（即座にprepare画面に戻る）
+        # ステージ2・3のテストモード完了チェック
         elif stage in [2, 3] and session_mode == 'test':
-            source = session.get('current_source')
-            page_range = session.get('page_range', '').strip()
-            difficulty = session.get('difficulty', '').strip()
-            
             if source:
                 try:
-                    # 対象カードを取得
                     if stage == 2:
                         target_cards = get_stage2_cards(source, page_range, user_id, difficulty)
                     else:
@@ -1619,8 +1660,7 @@ def log_result():
                                 ''', (user_id, stage, target_card_ids))
                                 tested_count = cur.fetchone()[0]
                     
-                        # ステージ2・3のテスト完了時は即座にprepare画面に戻る
-                        if tested_count == len(target_card_ids):
+                        if tested_count >= len(target_card_ids):
                             practice_cards = get_chunk_practice_cards_universal(user_id, source, stage, 1, page_range, difficulty)
                             
                             if practice_cards:
@@ -1644,22 +1684,13 @@ def log_result():
                 except Exception as e:
                     app.logger.error(f"ステージ{stage}テスト完了チェックエラー: {e}")
         
-        # ステージ2・3の練習モード（継続学習）
+        # ステージ2・3の練習モード完了チェック
         elif stage in [2, 3] and session_mode == 'practice':
-            source = session.get('current_source')
-            page_range = session.get('page_range', '').strip()
-            difficulty = session.get('difficulty', '').strip()
-            
             if source:
                 try:
-                    # 残りの練習カードをチェック
                     remaining_practice_cards = get_chunk_practice_cards_universal(user_id, source, stage, 1, page_range, difficulty)
                     
-                    app.logger.info(f"[STAGE{stage}_PRACTICE_LOG] 残り練習カード{len(remaining_practice_cards)}問")
-                    
                     if not remaining_practice_cards:
-                        # すべての練習完了時のみprepare画面に戻る
-                        app.logger.info(f"[STAGE{stage}_PRACTICE_LOG] 練習完了 - prepare画面に戻る")
                         response_data.update({
                             'practice_completed': True,
                             'completed_stage': stage,
@@ -1667,8 +1698,6 @@ def log_result():
                             'redirect_to_prepare': True
                         })
                     else:
-                        # まだ練習問題が残っている場合は継続（prepare画面に戻らない）
-                        app.logger.info(f"[STAGE{stage}_PRACTICE_LOG] 練習継続 - 残り{len(remaining_practice_cards)}問")
                         response_data.update({
                             'practice_continuing': True,
                             'remaining_count': len(remaining_practice_cards),
@@ -1681,8 +1710,11 @@ def log_result():
         
         return jsonify(response_data)
         
+    except queue.Full:
+        app.logger.error("ログキューが満杯です")
+        return jsonify({'status': 'error', 'message': 'システムが混雑しています'}), 503
     except Exception as e:
-        app.logger.error(f"ログ書き込みエラー: {e}")
+        app.logger.error(f"高速ログエラー: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/debug_cards/<source>')
@@ -1756,7 +1788,24 @@ def reset_history(source):
 
     return redirect(url_for('dashboard'))
 
+
 # ========== アプリケーション起動 ==========
+
+import atexit
+
+def cleanup_workers():
+    """アプリ終了時のワーカークリーンアップ"""
+    global log_worker_active
+    log_worker_active = False
+    try:
+        log_queue.put(None, timeout=1)  # 終了シグナル
+        if log_thread.is_alive():
+            log_thread.join(timeout=2)
+        app.logger.info("🧹 ワーカークリーンアップ完了")
+    except Exception as e:
+        app.logger.error(f"クリーンアップエラー: {e}")
+
+atexit.register(cleanup_workers)
 
 if __name__ == '__main__':
     # データベース最適化を実行
@@ -1767,3 +1816,41 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
+@app.route('/images_batch/<source>')
+@login_required
+def get_images_batch(source):
+    """複数画像を一括取得（プリロード用）"""
+    try:
+        user_id = str(current_user.id)
+        page_range = session.get('page_range', '').strip()
+        difficulty = session.get('difficulty', '').strip()
+        stage = session.get('stage', 1)
+        mode = session.get('mode', 'test')
+        
+        # 現在のチャンクの次の5枚を取得
+        if stage == 1:
+            chunk_number = session.get('current_chunk', 1)
+            cards = get_study_cards(source, stage, mode, page_range, user_id, difficulty, chunk_number)
+        else:
+            if stage == 2:
+                cards = get_stage2_cards(source, page_range, user_id, difficulty)
+            else:
+                cards = get_stage3_cards(source, page_range, user_id, difficulty)
+        
+        # 最大5枚まで返す
+        batch_data = []
+        for card in cards[:5]:
+            batch_data.append({
+                'id': card['id'],
+                'image_problem': card['image_problem'],
+                'image_answer': card['image_answer'],
+                'page_number': card['page_number'],
+                'problem_number': card['problem_number'],
+                'level': card['level']
+            })
+        
+        return jsonify({'cards': batch_data})
+        
+    except Exception as e:
+        app.logger.error(f"バッチ画像取得エラー: {e}")
+        return jsonify({'error': 'Batch fetch error'}), 500

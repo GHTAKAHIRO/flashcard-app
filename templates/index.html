@@ -1,55 +1,275 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>フラッシュカード</title>
-  
-  <!-- 🔥 Bootstrap CSS 追加 -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  
-  <!-- 🔥 Font Awesome 追加 -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  
-  <!-- 既存のスタイル -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高速暗記アプリ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* 🚀 高速化のためのCSS最適化 */
+        body {
+            background: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            /* GPU加速を有効化 */
+            transform: translateZ(0);
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header-info {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .stage-info {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .counters {
+            display: flex;
+            gap: 15px;
+            font-weight: bold;
+        }
+        
+        .counters span {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        
+        #flashcard {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 25px;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            /* 画像表示高速化 */
+            image-rendering: auto;
+            image-rendering: crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            /* トランジション最適化 */
+            transition: opacity 0.1s ease;
+        }
+        
+        #flashcard:hover {
+            box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .button-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .btn-custom {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            /* ボタン応答性向上 */
+            transition: all 0.1s ease;
+            transform: translateZ(0);
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        
+        .btn-custom:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-answer {
+            background: #17a2b8;
+            color: white;
+            font-size: 16px;
+        }
+        
+        .btn-answer:hover {
+            background: #138496;
+        }
+        
+        #knownBtn {
+            background: #28a745;
+            color: white;
+            font-size: 24px;
+        }
+        
+        #knownBtn:hover {
+            background: #218838;
+        }
+        
+        #unknownBtn {
+            background: #dc3545;
+            color: white;
+            font-size: 24px;
+        }
+        
+        #unknownBtn:hover {
+            background: #c82333;
+        }
+        
+        .shortcuts-info {
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .progress-info {
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        /* プリロード用の非表示画像 */
+        #preload-container {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* トースト表示用アニメーション */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        
+        /* モバイル対応 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            #flashcard {
+                padding: 20px;
+                min-height: 300px;
+            }
+            
+            .btn-custom {
+                padding: 12px;
+                font-size: 16px;
+            }
+            
+            #knownBtn, #unknownBtn {
+                font-size: 20px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="header">
-    ようこそ、{{ current_user.username }} さん |
-    <a href="{{ url_for('logout') }}">ログアウト</a>
-  </div>
 
-  <!-- チャンク情報表示 -->
-  {% if current_chunk and total_chunks %}
-  <div style="text-align: center; margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #e3f2fd, #f8f9fa); border-radius: 10px; border: 1px solid #007bff;">
-    <h3 style="margin: 0; color: #007bff;">📊 チャンク {{ current_chunk }} / {{ total_chunks }}</h3>
-    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">現在のチャンクの問題数: {{ cards|length }}問</p>
-  </div>
-  {% endif %}
+<div class="container">
+    <!-- ヘッダー情報 -->
+    <div class="header-info">
+        <div class="stage-info">
+            <strong>ステージ{{ stage }}</strong>
+            {% if current_chunk %}
+                - チャンク{{ current_chunk }}/{{ total_chunks }}
+            {% endif %}
+            <span>({{ mode }}モード)</span>
+        </div>
+        <div class="counters">
+            <span>〇 <span id="correct-count">0</span></span>
+            <span>× <span id="incorrect-count">0</span></span>
+        </div>
+    </div>
+    
+    <!-- 進捗表示 -->
+    <div class="progress-info" id="progress-info">
+        1 / {{ cards|length }}
+    </div>
+    
+    <!-- カード表示エリア -->
+    <div id="flashcard">
+        <!-- JavaScript でカードが表示される -->
+    </div>
+    
+    <!-- コントロール -->
+    <div class="controls">
+        <!-- 解答表示ボタン -->
+        <div class="button-row">
+            <button class="btn-custom btn-answer" onclick="toggleAnswer()">
+                解答を見る (Space)
+            </button>
+        </div>
+        
+        <!-- 〇×ボタン -->
+        <div class="button-row">
+            <button id="knownBtn" class="btn-custom">
+                〇 (J)
+            </button>
+            <button id="unknownBtn" class="btn-custom">
+                × (F)
+            </button>
+        </div>
+        
+        <!-- ショートカット説明 -->
+        <div class="shortcuts-info">
+            <strong>キーボード操作：</strong> J=〇, F=×, Space=解答表示
+        </div>
+    </div>
+</div>
 
-  <h2>📘 学習モード: {{ mode }}（{{ cards|length }}件）</h2>
+<!-- プリロード用コンテナ -->
+<div id="preload-container"></div>
 
-  <div id="flashcard" class="card"></div>
-
-  <div class="footer">
-    <button id="knownBtn">〇</button>
-    <button id="unknownBtn">✕</button>
-  </div>
-
-  <!-- ✅ ここに追加：Flaskから渡されたデータをJSに渡す -->
-  <script>
-    const rawCards = {{ cards | tojson }};
+<!-- JavaScript データ渡し -->
+<script>
+    // 🚀 既存のデータ形式を維持
+    const rawCards = {{ cards|tojson }};
+    const stage = {{ stage }};
     const mode = "{{ mode }}";
-    const stage = {{ session['stage'] | default(1) }};
-    const currentChunk = {{ current_chunk | default('null') }};
-    const totalChunks = {{ total_chunks | default('null') }};
-  </script>
+    
+    // 🚀 追加のグローバル変数
+    window.currentStage = {{ stage }};
+    window.currentMode = "{{ mode }}";
+    window.currentSource = "{{ source }}";
+    
+    console.log('📊 カードデータ読み込み:', rawCards.length, '問');
+</script>
 
-  <!-- 🔥 Bootstrap JS 追加（main.js より前に読み込み） -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- main.js の読み込みはこの後 -->
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<!-- メインスクリプト -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
 </body>
 </html>
