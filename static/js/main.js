@@ -1,8 +1,6 @@
-console.log("🔧 エラー修正版 main.js が読み込まれました");
+console.log("🔧 構文エラー修正版 main.js が読み込まれました");
 
-// ========== グローバル関数定義（HTMLから呼び出される） ==========
-// HTMLテンプレートで onclick="toggleAnswer()" が使われている可能性があるため
-
+// ========== グローバル関数定義 ==========
 window.toggleAnswer = function() {
     console.log("🔄 解答切り替え (グローバル)");
     toggleAnswerFunction();
@@ -29,7 +27,7 @@ let isPracticeMode = false;
 function safeGetElement(id) {
     const element = document.getElementById(id);
     if (!element) {
-        console.warn(`⚠️ 要素が見つかりません: ${id}`);
+        console.warn("⚠️ 要素が見つかりません: " + id);
     }
     return element;
 }
@@ -50,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    console.log(`📊 カードデータ: ${rawCards.length}枚`);
+    console.log("📊 カードデータ: " + rawCards.length + "枚");
 
     isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
     console.log("📚 練習モード:", isPracticeMode);
@@ -66,7 +64,6 @@ document.addEventListener('DOMContentLoaded', function () {
 function setupClickEvents() {
     console.log("🖱️ クリックイベント設定");
     
-    // 既存のonclick属性を削除して新しいイベントリスナーを追加
     const flashcard = safeGetElement('flashcard');
     const knownBtn = safeGetElement('knownBtn');
     const unknownBtn = safeGetElement('unknownBtn');
@@ -113,14 +110,14 @@ function initCards(data) {
     showingAnswer = false;
     cardStatus = {};
     
-    console.log(`📝 シャッフル完了: ${cards.length}枚`);
+    console.log("📝 シャッフル完了: " + cards.length + "枚");
     
     renderCard();
 }
 
 // ========== カードレンダリング ==========
 function renderCard() {
-    console.log(`🎴 カードレンダリング: ${currentIndex + 1}/${cards.length}`);
+    console.log("🎴 カードレンダリング: " + (currentIndex + 1) + "/" + cards.length);
     
     const card = cards[currentIndex];
     const cardDiv = safeGetElement('flashcard');
@@ -151,15 +148,19 @@ function renderCard() {
         img.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px;';
         img.alt = '問題画像';
         
-        img.onload = () => console.log("✅ 問題画像読み込み完了");
-        img.onerror = () => console.error("❌ 問題画像読み込み失敗");
+        img.onload = function() {
+            console.log("✅ 問題画像読み込み完了");
+        };
+        img.onerror = function() {
+            console.error("❌ 問題画像読み込み失敗");
+        };
         
         questionDiv.appendChild(img);
     }
     
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
-        text.textContent = `${card.problem_number}: ${card.topic}`;
+        text.textContent = card.problem_number + ": " + card.topic;
         text.style.cssText = 'margin: 10px 0; font-weight: bold; text-align: center; color: #333;';
         questionDiv.appendChild(text);
     }
@@ -170,7 +171,7 @@ function renderCard() {
     if (card.image_answer) {
         const answerDiv = document.createElement('div');
         answerDiv.id = 'answer-container';
-        answerDiv.style.cssText = `display: ${showingAnswer ? 'block' : 'none'}; width: 100%; text-align: center;`;
+        answerDiv.style.cssText = 'display: ' + (showingAnswer ? 'block' : 'none') + '; width: 100%; text-align: center;';
         
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
@@ -215,7 +216,7 @@ function toggleAnswerFunction() {
 
 // ========== 回答処理 ==========
 function handleAnswer(result) {
-    console.log(`📝 回答処理開始: ${result}`);
+    console.log("📝 回答処理開始: " + result);
     
     const id = cards[currentIndex].id;
     cardStatus[id] = result;
@@ -229,9 +230,9 @@ function handleAnswer(result) {
         button.style.transform = 'scale(0.95)';
         button.style.backgroundColor = result === 'known' ? '#45a049' : '#da190b';
         
-        setTimeout(() => {
+        setTimeout(function() {
             button.style.transform = 'scale(1)';
-            setTimeout(() => {
+            setTimeout(function() {
                 button.style.backgroundColor = '';
             }, 100);
         }, 150);
@@ -248,18 +249,18 @@ function updateCounters(result) {
     if (result === 'known' && correctSpan) {
         const current = parseInt(correctSpan.textContent) || 0;
         correctSpan.textContent = current + 1;
-        console.log(`✅ 正解カウンター: ${current + 1}`);
+        console.log("✅ 正解カウンター: " + (current + 1));
     } else if (result === 'unknown' && incorrectSpan) {
         const current = parseInt(incorrectSpan.textContent) || 0;
         incorrectSpan.textContent = current + 1;
-        console.log(`❌ 不正解カウンター: ${current + 1}`);
+        console.log("❌ 不正解カウンター: " + (current + 1));
     }
 }
 
 function updateProgress() {
     const progressElement = safeGetElement('progress-info');
     if (progressElement) {
-        progressElement.innerHTML = `<i class="fas fa-chart-line"></i> ${currentIndex + 1} / ${cards.length}`;
+        progressElement.innerHTML = '<i class="fas fa-chart-line"></i> ' + (currentIndex + 1) + ' / ' + cards.length;
     }
 }
 
@@ -303,8 +304,8 @@ function handleServerResponse(data) {
         if (data.redirect_to_prepare) {
             console.log('[SUBMIT] prepare画面に戻ります');
             showMessage(data.message);
-            setTimeout(() => {
-                window.location.href = `/prepare/${getCurrentSource()}`;
+            setTimeout(function() {
+                window.location.href = '/prepare/' + getCurrentSource();
             }, 2000);
             return;
         }
@@ -316,8 +317,8 @@ function handleServerResponse(data) {
         if (data.redirect_to_prepare) {
             console.log('[SUBMIT] prepare画面に戻ります');
             showMessage(data.message);
-            setTimeout(() => {
-                window.location.href = `/prepare/${getCurrentSource()}`;
+            setTimeout(function() {
+                window.location.href = '/prepare/' + getCurrentSource();
             }, 2000);
             return;
         }
@@ -327,7 +328,7 @@ function handleServerResponse(data) {
         console.log('[SUBMIT] 練習継続:', data.remaining_count, '問残り');
         showMessage(data.message);
         
-        setTimeout(() => {
+        setTimeout(function() {
             nextCard();
         }, 1000);
         return;
@@ -335,9 +336,9 @@ function handleServerResponse(data) {
     
     // 通常の次の問題へ
     console.log('[SUBMIT] 通常の次問題へ');
-    setTimeout(() => {
+    setTimeout(function() {
         nextCard();
-    }, 500); // 少し遅延を入れて確実に
+    }, 500);
 }
 
 function nextCard() {
@@ -352,15 +353,15 @@ function nextCard() {
             console.log('[NEXTCARD] 練習モード - リロード');
             showMessage("問題を読み込んでいます...");
             
-            setTimeout(() => {
+            setTimeout(function() {
                 window.location.reload();
             }, 1000);
             return;
         } else {
             console.log('[NEXTCARD] テストモード完了');
             showMessage("✅ テスト完了！");
-            setTimeout(() => {
-                window.location.href = `/prepare/${getCurrentSource()}`;
+            setTimeout(function() {
+                window.location.href = '/prepare/' + getCurrentSource();
             }, 2000);
             return;
         }
@@ -371,7 +372,8 @@ function nextCard() {
 }
 
 // ========== ユーティリティ ==========
-function showMessage(message, type = "info") {
+function showMessage(message, type) {
+    if (!type) type = "info";
     console.log('[MESSAGE]', type, ':', message);
     
     const existingMessage = document.getElementById('messageAlert');
@@ -382,29 +384,21 @@ function showMessage(message, type = "info") {
     const messageDiv = document.createElement('div');
     messageDiv.id = 'messageAlert';
     messageDiv.textContent = message;
-    messageDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#f44336' : '#4CAF50'};
-        color: white;
-        padding: 12px 20px;
-        border-radius: 6px;
-        font-weight: bold;
-        z-index: 1000;
-        transform: translateX(100%);
-        transition: transform 0.3s ease;
-    `;
+    messageDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: ' + 
+        (type === 'error' ? '#f44336' : '#4CAF50') + 
+        '; color: white; padding: 12px 20px; border-radius: 6px; font-weight: bold; z-index: 1000; transform: translateX(100%); transition: transform 0.3s ease;';
     
     document.body.appendChild(messageDiv);
     
-    setTimeout(() => {
+    setTimeout(function() {
         messageDiv.style.transform = 'translateX(0)';
     }, 100);
     
-    setTimeout(() => {
+    setTimeout(function() {
         messageDiv.style.transform = 'translateX(100%)';
-        setTimeout(() => messageDiv.remove(), 300);
+        setTimeout(function() {
+            messageDiv.remove();
+        }, 300);
     }, 3000);
 }
 
@@ -419,7 +413,7 @@ function getCurrentSource() {
 function setupKeyboard() {
     console.log("⌨️ キーボードショートカット設定");
     
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', function(e) {
         console.log("⌨️ キー押下:", e.key);
         
         switch(e.key.toLowerCase()) {
@@ -444,4 +438,4 @@ function setupKeyboard() {
     });
 }
 
-console.log('🔧 エラー修正版 main.js 読み込み完了');
+console.log('🔧 構文エラー修正版 main.js 読み込み完了');
