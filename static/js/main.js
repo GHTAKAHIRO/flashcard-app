@@ -1,29 +1,31 @@
-console.log("🔧 デバッグ修正版 main.js が読み込まれました");
+console.log("🔧 エラー修正版 main.js が読み込まれました");
 
-// ========== デバッグ情報出力 ==========
-function debugCurrentState() {
-    console.log("=== デバッグ情報 ===");
-    console.log("rawCards:", typeof rawCards !== 'undefined' ? rawCards.length : 'undefined');
-    console.log("mode:", typeof mode !== 'undefined' ? mode : 'undefined');
-    console.log("stage:", typeof stage !== 'undefined' ? stage : 'undefined');
-    
-    console.log("DOM要素チェック:");
-    console.log("- flashcard:", document.getElementById('flashcard'));
-    console.log("- knownBtn:", document.getElementById('knownBtn'));
-    console.log("- unknownBtn:", document.getElementById('unknownBtn'));
-    console.log("- correct-count:", document.getElementById('correct-count'));
-    console.log("- incorrect-count:", document.getElementById('incorrect-count'));
-    console.log("==================");
-}
+// ========== グローバル関数定義（HTMLから呼び出される） ==========
+// HTMLテンプレートで onclick="toggleAnswer()" が使われている可能性があるため
 
-// ========== 安全な初期化システム ==========
+window.toggleAnswer = function() {
+    console.log("🔄 解答切り替え (グローバル)");
+    toggleAnswerFunction();
+};
+
+window.markKnown = function() {
+    console.log("✅ 〇ボタンクリック (グローバル)");
+    handleAnswer('known');
+};
+
+window.markUnknown = function() {
+    console.log("❌ ×ボタンクリック (グローバル)");
+    handleAnswer('unknown');
+};
+
+// ========== メイン変数 ==========
 let cards = [];
 let currentIndex = 0;
 let showingAnswer = false;
 let cardStatus = {};
 let isPracticeMode = false;
 
-// DOM要素の安全な取得
+// ========== 安全な要素取得 ==========
 function safeGetElement(id) {
     const element = document.getElementById(id);
     if (!element) {
@@ -32,22 +34,16 @@ function safeGetElement(id) {
     return element;
 }
 
-// 安全なイベントリスナー追加
-function safeAddEventListener(elementId, event, handler) {
-    const element = safeGetElement(elementId);
-    if (element) {
-        element.addEventListener(event, handler);
-        console.log(`✅ イベントリスナー追加成功: ${elementId}`);
-    } else {
-        console.error(`❌ イベントリスナー追加失敗: ${elementId}`);
-    }
-}
-
+// ========== 初期化 ==========
 document.addEventListener('DOMContentLoaded', function () {
     console.log("🚀 DOM読み込み完了");
     
-    // デバッグ情報出力
-    debugCurrentState();
+    // デバッグ情報
+    console.log("=== デバッグ情報 ===");
+    console.log("rawCards:", typeof rawCards !== 'undefined' ? rawCards.length : 'undefined');
+    console.log("mode:", typeof mode !== 'undefined' ? mode : 'undefined');
+    console.log("stage:", typeof stage !== 'undefined' ? stage : 'undefined');
+    console.log("==================");
     
     if (typeof rawCards === "undefined") {
         console.error("❌ rawCards が定義されていません！");
@@ -56,20 +52,51 @@ document.addEventListener('DOMContentLoaded', function () {
 
     console.log(`📊 カードデータ: ${rawCards.length}枚`);
 
-    // 基本的なイベントリスナー設定
-    safeAddEventListener('flashcard', 'click', toggleAnswer);
-    safeAddEventListener('knownBtn', 'click', markKnown);
-    safeAddEventListener('unknownBtn', 'click', markUnknown);
-
     isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
     console.log("📚 練習モード:", isPracticeMode);
     
     initCards(rawCards);
     setupKeyboard();
+    setupClickEvents();
     
     console.log('✅ 初期化完了');
 });
 
+// ========== クリックイベント設定 ==========
+function setupClickEvents() {
+    console.log("🖱️ クリックイベント設定");
+    
+    // 既存のonclick属性を削除して新しいイベントリスナーを追加
+    const flashcard = safeGetElement('flashcard');
+    const knownBtn = safeGetElement('knownBtn');
+    const unknownBtn = safeGetElement('unknownBtn');
+    
+    if (flashcard) {
+        flashcard.removeAttribute('onclick');
+        flashcard.addEventListener('click', function(e) {
+            console.log("🎴 フラッシュカードクリック");
+            toggleAnswerFunction();
+        });
+    }
+    
+    if (knownBtn) {
+        knownBtn.removeAttribute('onclick');
+        knownBtn.addEventListener('click', function(e) {
+            console.log("✅ 〇ボタンクリック");
+            handleAnswer('known');
+        });
+    }
+    
+    if (unknownBtn) {
+        unknownBtn.removeAttribute('onclick');
+        unknownBtn.addEventListener('click', function(e) {
+            console.log("❌ ×ボタンクリック");
+            handleAnswer('unknown');
+        });
+    }
+}
+
+// ========== カード初期化 ==========
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -91,7 +118,7 @@ function initCards(data) {
     renderCard();
 }
 
-// シンプルなカードレンダリング
+// ========== カードレンダリング ==========
 function renderCard() {
     console.log(`🎴 カードレンダリング: ${currentIndex + 1}/${cards.length}`);
     
@@ -115,12 +142,13 @@ function renderCard() {
 
     const questionDiv = document.createElement('div');
     questionDiv.id = 'problem-container';
+    questionDiv.style.cssText = 'display: block; width: 100%; text-align: center;';
     
     if (card.image_problem) {
         console.log("🖼️ 問題画像:", card.image_problem);
         const img = document.createElement('img');
         img.src = card.image_problem;
-        img.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 0 auto;';
+        img.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px;';
         img.alt = '問題画像';
         
         img.onload = () => console.log("✅ 問題画像読み込み完了");
@@ -132,7 +160,7 @@ function renderCard() {
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = `${card.problem_number}: ${card.topic}`;
-        text.style.cssText = 'margin: 10px 0; font-weight: bold; text-align: center;';
+        text.style.cssText = 'margin: 10px 0; font-weight: bold; text-align: center; color: #333;';
         questionDiv.appendChild(text);
     }
 
@@ -142,11 +170,11 @@ function renderCard() {
     if (card.image_answer) {
         const answerDiv = document.createElement('div');
         answerDiv.id = 'answer-container';
-        answerDiv.style.display = showingAnswer ? 'block' : 'none';
+        answerDiv.style.cssText = `display: ${showingAnswer ? 'block' : 'none'}; width: 100%; text-align: center;`;
         
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
-        answerImg.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 0 auto;';
+        answerImg.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px;';
         answerImg.alt = '解答画像';
         answerDiv.appendChild(answerImg);
         
@@ -159,8 +187,9 @@ function renderCard() {
     console.log("✅ カードレンダリング完了");
 }
 
-function toggleAnswer() {
-    console.log("🔄 解答切り替え");
+// ========== 解答切り替え ==========
+function toggleAnswerFunction() {
+    console.log("🔄 解答切り替え実行");
     
     showingAnswer = !showingAnswer;
     
@@ -179,21 +208,14 @@ function toggleAnswer() {
         }
     } else {
         console.error("❌ 解答切り替え要素が見つかりません");
+        console.log("problemContainer:", problemContainer);
+        console.log("answerContainer:", answerContainer);
     }
 }
 
-function markKnown() {
-    console.log("✅ 〇ボタンクリック");
-    handleAnswer('known');
-}
-
-function markUnknown() {
-    console.log("❌ ×ボタンクリック");
-    handleAnswer('unknown');
-}
-
+// ========== 回答処理 ==========
 function handleAnswer(result) {
-    console.log(`📝 回答処理: ${result}`);
+    console.log(`📝 回答処理開始: ${result}`);
     
     const id = cards[currentIndex].id;
     cardStatus[id] = result;
@@ -209,7 +231,9 @@ function handleAnswer(result) {
         
         setTimeout(() => {
             button.style.transform = 'scale(1)';
-            button.style.backgroundColor = '';
+            setTimeout(() => {
+                button.style.backgroundColor = '';
+            }, 100);
         }, 150);
     }
     
@@ -239,10 +263,10 @@ function updateProgress() {
     }
 }
 
-// サーバー送信（既存の関数）
+// ========== サーバー通信 ==========
 async function sendResult(cardId, result) {
     try {
-        console.log('[SUBMIT] 回答送信開始:', cardId, result, 'mode:', mode);
+        console.log('[SUBMIT] 回答送信開始:', cardId, result);
         
         const response = await fetch('/log_result', {
             method: 'POST',
@@ -259,49 +283,7 @@ async function sendResult(cardId, result) {
         console.log('[SUBMIT] レスポンス受信:', data);
 
         if (data.status === 'ok') {
-            // 完了判定
-            if (data.chunk_test_completed || data.stage_test_completed) {
-                console.log('[SUBMIT] テスト完了:', data);
-                
-                if (data.redirect_to_prepare) {
-                    console.log('[SUBMIT] prepare画面に戻ります');
-                    showMessage(data.message);
-                    setTimeout(() => {
-                        const currentSource = getCurrentSource();
-                        window.location.href = `/prepare/${currentSource}`;
-                    }, 2000);
-                    return;
-                }
-            }
-            
-            if (data.practice_completed) {
-                console.log('[SUBMIT] 練習完了:', data);
-                
-                if (data.redirect_to_prepare) {
-                    console.log('[SUBMIT] prepare画面に戻ります');
-                    showMessage(data.message);
-                    setTimeout(() => {
-                        const currentSource = getCurrentSource();
-                        window.location.href = `/prepare/${currentSource}`;
-                    }, 2000);
-                    return;
-                }
-            }
-            
-            if (data.practice_continuing) {
-                console.log('[SUBMIT] 練習継続:', data.remaining_count, '問残り');
-                showMessage(data.message);
-                
-                setTimeout(() => {
-                    nextCard();
-                }, 1000);
-                return;
-            }
-            
-            // 通常の次の問題へ
-            console.log('[SUBMIT] 通常の次問題へ');
-            nextCard();
-            
+            handleServerResponse(data);
         } else {
             throw new Error(data.message || '回答の送信に失敗しました');
         }
@@ -313,6 +295,51 @@ async function sendResult(cardId, result) {
     }
 }
 
+function handleServerResponse(data) {
+    // 完了判定
+    if (data.chunk_test_completed || data.stage_test_completed) {
+        console.log('[SUBMIT] テスト完了:', data);
+        
+        if (data.redirect_to_prepare) {
+            console.log('[SUBMIT] prepare画面に戻ります');
+            showMessage(data.message);
+            setTimeout(() => {
+                window.location.href = `/prepare/${getCurrentSource()}`;
+            }, 2000);
+            return;
+        }
+    }
+    
+    if (data.practice_completed) {
+        console.log('[SUBMIT] 練習完了:', data);
+        
+        if (data.redirect_to_prepare) {
+            console.log('[SUBMIT] prepare画面に戻ります');
+            showMessage(data.message);
+            setTimeout(() => {
+                window.location.href = `/prepare/${getCurrentSource()}`;
+            }, 2000);
+            return;
+        }
+    }
+    
+    if (data.practice_continuing) {
+        console.log('[SUBMIT] 練習継続:', data.remaining_count, '問残り');
+        showMessage(data.message);
+        
+        setTimeout(() => {
+            nextCard();
+        }, 1000);
+        return;
+    }
+    
+    // 通常の次の問題へ
+    console.log('[SUBMIT] 通常の次問題へ');
+    setTimeout(() => {
+        nextCard();
+    }, 500); // 少し遅延を入れて確実に
+}
+
 function nextCard() {
     console.log("➡️ 次のカードへ");
     
@@ -322,7 +349,7 @@ function nextCard() {
         console.log('[NEXTCARD] カード終了:', currentIndex, '/', cards.length);
         
         if (isPracticeMode) {
-            console.log('[NEXTCARD] 練習モード - サーバーから新しいカードを待機');
+            console.log('[NEXTCARD] 練習モード - リロード');
             showMessage("問題を読み込んでいます...");
             
             setTimeout(() => {
@@ -330,11 +357,10 @@ function nextCard() {
             }, 1000);
             return;
         } else {
-            console.log('[NEXTCARD] テストモード完了 - prepare画面に戻る');
+            console.log('[NEXTCARD] テストモード完了');
             showMessage("✅ テスト完了！");
             setTimeout(() => {
-                const currentSource = getCurrentSource();
-                window.location.href = `/prepare/${currentSource}`;
+                window.location.href = `/prepare/${getCurrentSource()}`;
             }, 2000);
             return;
         }
@@ -344,6 +370,7 @@ function nextCard() {
     renderCard();
 }
 
+// ========== ユーティリティ ==========
 function showMessage(message, type = "info") {
     console.log('[MESSAGE]', type, ':', message);
     
@@ -388,28 +415,33 @@ function getCurrentSource() {
     return source;
 }
 
-// キーボードショートカット
+// ========== キーボードショートカット ==========
 function setupKeyboard() {
     console.log("⌨️ キーボードショートカット設定");
     
     document.addEventListener('keydown', (e) => {
+        console.log("⌨️ キー押下:", e.key);
+        
         switch(e.key.toLowerCase()) {
             case 'j':
             case 'arrowleft':
                 e.preventDefault();
-                markKnown();
+                console.log("⌨️ J/左矢印 → 〇");
+                handleAnswer('known');
                 break;
             case 'f':
             case 'arrowright':
                 e.preventDefault();
-                markUnknown();
+                console.log("⌨️ F/右矢印 → ×");
+                handleAnswer('unknown');
                 break;
             case ' ':
                 e.preventDefault();
-                toggleAnswer();
+                console.log("⌨️ Space → 解答切り替え");
+                toggleAnswerFunction();
                 break;
         }
     });
 }
 
-console.log('📈 デバッグ修正版 main.js 読み込み完了');
+console.log('🔧 エラー修正版 main.js 読み込み完了');
