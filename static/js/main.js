@@ -1,316 +1,216 @@
-console.log("🚀 main.js が Render 上で動いています！");
+console.log("⚡ 瞬間応答対応 main.js が Render 上で動いています！");
 
-// ⚡ 超高速化グローバル変数
-let isProcessing = false;
-let nextCardPreloaded = false;
-let optimisticNextIndex = 0;
-let logBatch = [];
-let batchTimer = null;
+// ========== 瞬間応答システム統合版 ==========
 
-// 既存のプリロード管理クラス（高速化版）
-class UltraFastImagePreloader {
-    constructor() {
-        this.preloadedImages = new Map();
-        this.preloadContainer = this.createPreloadContainer();
-    }
-
-    createPreloadContainer() {
-        const container = document.createElement('div');
-        container.id = 'preload-container';
-        container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;opacity:0;pointer-events:none;';
-        document.body.appendChild(container);
-        return container;
-    }
-
-    preloadNext(cardData) {
-        if (!cardData || this.preloadedImages.has(cardData.id)) return;
-
-        // ⚡ 並列プリロード
-        return new Promise((resolve) => {
-            const problemImg = new Image();
-            const answerImg = new Image();
-            
-            let loadedCount = 0;
-            const checkComplete = () => {
-                loadedCount++;
-                if (loadedCount === 2) {
-                    this.preloadedImages.set(cardData.id, {
-                        problem: problemImg.src,
-                        answer: answerImg.src
-                    });
-                    resolve();
-                }
-            };
-            
-            problemImg.onload = checkComplete;
-            problemImg.onerror = checkComplete;
-            answerImg.onload = checkComplete;
-            answerImg.onerror = checkComplete;
-            
-            problemImg.loading = 'eager';
-            answerImg.loading = 'eager';
-            problemImg.src = cardData.image_problem;
-            answerImg.src = cardData.image_answer;
-            
-            this.preloadContainer.appendChild(problemImg);
-            this.preloadContainer.appendChild(answerImg);
-        });
-    }
-}
-
-const ultraFastPreloader = new UltraFastImagePreloader();
-
-document.addEventListener('DOMContentLoaded', function () {
-    if (typeof rawCards === "undefined") {
-        console.error("❌ rawCards が定義されていません！");
-        return;
-    }
-
-    // ⚡ 超高速イベントリスナー
-    document.getElementById('flashcard').addEventListener('click', toggleAnswerUltraFast);
-    document.getElementById('knownBtn').addEventListener('click', () => handleAnswerUltraFast('known', document.getElementById('knownBtn')));
-    document.getElementById('unknownBtn').addEventListener('click', () => handleAnswerUltraFast('unknown', document.getElementById('unknownBtn')));
-
-    isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
-    initCards(rawCards);
-    
-    // ⚡ 超高速化初期化
-    setupUltraFastKeyboard();
-    console.log('⚡ 超高速化システム初期化完了');
-});
-
-let cards = [];
-let currentIndex = 0;
+// 🚀 瞬間応答用グローバル変数
+let isInstantProcessing = false;
+let currentDisplayIndex = 0;
+let totalCardsCount = 0;
+let cardsArray = [];
 let showingAnswer = false;
 let cardStatus = {};
 let isPracticeMode = false;
 
-function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
+// 🎯 DOM要素キャッシュ
+const domCache = {
+    flashcard: null,
+    knownBtn: null,
+    unknownBtn: null,
+    correctCount: null,
+    incorrectCount: null,
+    progressInfo: null
+};
 
-function initCards(data) {
-    cards = shuffle(data.slice());
-    currentIndex = 0;
-    optimisticNextIndex = 0;
-    showingAnswer = false;
-    cardStatus = {};
-    renderCardUltraFast();
-    
-    // ⚡ 次の5枚を並列プリロード
-    preloadNextCardsUltraFast();
-}
-
-// ⚡ 超高速カードレンダリング
-function renderCardUltraFast() {
-    const card = cards[currentIndex];
-    const cardDiv = document.getElementById('flashcard');
-    
-    // ⚡ DOM更新最小化
-    cardDiv.style.opacity = '0.8';
-    
-    // DocumentFragmentで一括DOM操作
-    const fragment = document.createDocumentFragment();
-    
-    const questionDiv = document.createElement('div');
-    questionDiv.id = 'problem-container';
-    
-    if (card.image_problem) {
-        const img = document.createElement('img');
-        img.id = 'problem-image';
-        img.src = card.image_problem;
-        img.dataset.cardId = card.id;
-        img.loading = 'eager';
-        img.style.cssText = 'max-width: 100%; height: auto; display: block;';
-        questionDiv.appendChild(img);
-    }
-    
-    if (card.problem_number && card.topic) {
-        const text = document.createElement('p');
-        text.textContent = `${card.problem_number}: ${card.topic}`;
-        text.style.cssText = 'margin: 10px 0; font-weight: bold; text-align: center;';
-        questionDiv.appendChild(text);
+// ⚡ 瞬間切り替えシステム
+class InstantSwitchSystem {
+    constructor() {
+        this.cardContainers = new Map();
+        this.isReady = false;
+        this.logQueue = [];
+        this.batchTimer = null;
     }
 
-    fragment.appendChild(questionDiv);
-
-    // ⚡ 解答部分も事前準備
-    if (card.image_answer) {
-        const answerDiv = document.createElement('div');
-        answerDiv.id = 'answer-container';
-        answerDiv.style.display = showingAnswer ? 'block' : 'none';
+    // 🚀 全カードを事前レンダリング
+    prerenderAllCards(cards) {
+        console.log(`⚡ ${cards.length}枚のカードを事前レンダリング中...`);
         
-        const answerImg = document.createElement('img');
-        answerImg.id = 'answer-image';
-        answerImg.src = card.image_answer;
-        answerImg.loading = 'eager';
-        answerImg.style.cssText = 'max-width: 100%; height: auto; display: block;';
-        answerDiv.appendChild(answerImg);
+        // フラッシュカードエリアを相対配置に設定
+        domCache.flashcard.style.position = 'relative';
+        domCache.flashcard.innerHTML = '';
         
-        fragment.appendChild(answerDiv);
-    }
-    
-    // ⚡ 一括DOM更新
-    cardDiv.innerHTML = '';
-    cardDiv.appendChild(fragment);
-    
-    // ⚡ スムーズ表示（GPU加速）
-    requestAnimationFrame(() => {
-        cardDiv.style.opacity = '1';
-    });
-    
-    // 進捗更新
-    updateProgressDisplayUltraFast();
-}
-
-// ⚡ 超高速解答切り替え
-function toggleAnswerUltraFast() {
-    showingAnswer = !showingAnswer;
-    
-    const problemContainer = document.getElementById('problem-container');
-    const answerContainer = document.getElementById('answer-container');
-    
-    if (problemContainer && answerContainer) {
-        // ⚡ CSS transitionを一時無効化
-        problemContainer.style.transition = 'none';
-        answerContainer.style.transition = 'none';
-        
-        if (showingAnswer) {
-            problemContainer.style.display = 'none';
-            answerContainer.style.display = 'block';
-        } else {
-            problemContainer.style.display = 'block';
-            answerContainer.style.display = 'none';
-        }
-        
-        // 次フレームでtransition復活
-        requestAnimationFrame(() => {
-            problemContainer.style.transition = '';
-            answerContainer.style.transition = '';
-        });
-    }
-}
-
-// ⚡ 超高速回答処理（メイン関数）
-function handleAnswerUltraFast(result, element) {
-    if (isProcessing) return;
-    isProcessing = true;
-    
-    // ========== 瞬間UI更新（1-3ms） ==========
-    updateUIInstantly(result, element);
-    
-    // ========== 楽観的次カード表示（5-10ms） ==========
-    optimisticCardAdvance();
-    
-    // ========== バックグラウンドでログ処理（0ms待機） ==========
-    requestIdleCallback(() => {
-        logResultUltraFast(result).finally(() => {
-            isProcessing = false;
-        });
-    });
-}
-
-// ⚡ 瞬間UI更新
-function updateUIInstantly(result, element) {
-    // GPU加速アニメーション
-    element.style.willChange = 'transform';
-    element.style.transform = 'scale3d(0.95, 0.95, 1)';
-    element.style.backgroundColor = result === 'known' ? '#45a049' : '#da190b';
-    
-    // カウンター即座更新
-    updateCountersUltraFast(result);
-    
-    // 次フレームで元に戻す
-    requestAnimationFrame(() => {
-        element.style.transform = 'scale3d(1, 1, 1)';
-        element.style.willChange = 'auto';
-        setTimeout(() => {
-            element.style.backgroundColor = '';
-        }, 100);
-    });
-}
-
-function updateCountersUltraFast(result) {
-    const correctSpan = document.getElementById('correct-count');
-    const incorrectSpan = document.getElementById('incorrect-count');
-    
-    if (result === 'known' && correctSpan) {
-        correctSpan.textContent = parseInt(correctSpan.textContent || '0') + 1;
-    } else if (result === 'unknown' && incorrectSpan) {
-        incorrectSpan.textContent = parseInt(incorrectSpan.textContent || '0') + 1;
-    }
-}
-
-// ⚡ 楽観的次カード表示
-function optimisticCardAdvance() {
-    const id = cards[currentIndex].id;
-    currentIndex++;
-    optimisticNextIndex = currentIndex;
-
-    if (currentIndex >= cards.length) {
-        // カード終了処理
-        handleCardEndUltraFast();
-        return;
-    }
-
-    showingAnswer = false;
-    renderCardUltraFast();
-    
-    // さらに次のカードをプリロード
-    preloadNextCardsUltraFast();
-}
-
-// ⚡ 超高速プリロード
-function preloadNextCardsUltraFast() {
-    const preloadPromises = [];
-    
-    for (let i = 1; i <= 3; i++) {
-        const nextIndex = currentIndex + i;
-        if (nextIndex < cards.length) {
-            const nextCard = cards[nextIndex];
-            if (nextCard) {
-                preloadPromises.push(ultraFastPreloader.preloadNext(nextCard));
+        cards.forEach((card, index) => {
+            const cardContainer = this.createCardContainer(card, index);
+            this.cardContainers.set(index, cardContainer);
+            
+            // 最初のカード以外は非表示
+            if (index !== 0) {
+                cardContainer.style.display = 'none';
             }
+            
+            domCache.flashcard.appendChild(cardContainer);
+        });
+        
+        this.isReady = true;
+        console.log(`🚀 事前レンダリング完了: ${cards.length}枚`);
+    }
+
+    // 📝 カードコンテナ作成
+    createCardContainer(card, index) {
+        const container = document.createElement('div');
+        container.className = 'instant-card-container';
+        container.dataset.cardIndex = index;
+        container.dataset.cardId = card.id;
+        
+        // 🚀 絶対配置でオーバーレイ
+        container.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            will-change: transform;
+            transform: translateZ(0);
+        `;
+
+        // 問題表示部分
+        const problemDiv = document.createElement('div');
+        problemDiv.className = 'problem-container';
+        problemDiv.style.cssText = 'display: block; width: 100%; text-align: center;';
+        
+        if (card.image_problem) {
+            const img = document.createElement('img');
+            img.src = card.image_problem;
+            img.loading = 'eager';
+            img.style.cssText = 'max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);';
+            problemDiv.appendChild(img);
+        }
+        
+        if (card.problem_number && card.topic) {
+            const text = document.createElement('p');
+            text.textContent = `${card.problem_number}: ${card.topic}`;
+            text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333;';
+            problemDiv.appendChild(text);
+        }
+
+        // 解答表示部分
+        const answerDiv = document.createElement('div');
+        answerDiv.className = 'answer-container';
+        answerDiv.style.cssText = 'display: none; width: 100%; text-align: center;';
+        
+        if (card.image_answer) {
+            const answerImg = document.createElement('img');
+            answerImg.src = card.image_answer;
+            answerImg.loading = 'eager';
+            answerImg.style.cssText = 'max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);';
+            answerDiv.appendChild(answerImg);
+        }
+
+        container.appendChild(problemDiv);
+        container.appendChild(answerDiv);
+        
+        return container;
+    }
+
+    // ⚡ 瞬間カード切り替え（0-2ms）
+    switchToCard(index) {
+        if (!this.isReady || index >= this.cardContainers.size) {
+            return false;
+        }
+
+        // 🚀 現在のカードを非表示
+        const currentContainer = this.cardContainers.get(currentDisplayIndex);
+        if (currentContainer) {
+            currentContainer.style.display = 'none';
+        }
+
+        // 🚀 次のカードを表示
+        const nextContainer = this.cardContainers.get(index);
+        if (nextContainer) {
+            nextContainer.style.display = 'flex';
+            // 問題表示状態にリセット
+            this.resetToProblemView(nextContainer);
+        }
+
+        currentDisplayIndex = index;
+        this.updateProgress(index);
+        
+        return true;
+    }
+
+    // 📖 問題表示状態にリセット
+    resetToProblemView(container) {
+        const problemDiv = container.querySelector('.problem-container');
+        const answerDiv = container.querySelector('.answer-container');
+        
+        if (problemDiv && answerDiv) {
+            problemDiv.style.display = 'block';
+            answerDiv.style.display = 'none';
+        }
+        showingAnswer = false;
+    }
+
+    // 🔄 解答表示切り替え
+    toggleAnswer() {
+        const currentContainer = this.cardContainers.get(currentDisplayIndex);
+        if (!currentContainer) return;
+
+        const problemDiv = currentContainer.querySelector('.problem-container');
+        const answerDiv = currentContainer.querySelector('.answer-container');
+        
+        if (problemDiv && answerDiv) {
+            showingAnswer = !showingAnswer;
+            
+            problemDiv.style.display = showingAnswer ? 'none' : 'block';
+            answerDiv.style.display = showingAnswer ? 'block' : 'none';
         }
     }
-    
-    Promise.allSettled(preloadPromises);
-}
 
-function updateProgressDisplayUltraFast() {
-    const progressElement = document.getElementById('progress-info');
-    if (progressElement) {
-        progressElement.innerHTML = `<i class="fas fa-chart-line"></i> ${currentIndex + 1} / ${cards.length}`;
+    // 📊 進捗更新
+    updateProgress(index) {
+        if (domCache.progressInfo) {
+            domCache.progressInfo.innerHTML = `<i class="fas fa-chart-line"></i> ${index + 1} / ${totalCardsCount}`;
+        }
     }
-}
 
-// ⚡ 超高速ログ処理（バッチ処理）
-async function logResultUltraFast(result) {
-    const cardId = cards[currentIndex - 1]?.id; // 既に次に進んでいるので-1
-    
-    const logEntry = {
-        card_id: cardId,
-        result: result,
-        stage: stage,
-        mode: mode,
-        timestamp: Date.now()
-    };
-    
-    logBatch.push(logEntry);
-    
-    // ⚡ デバウンス処理（50ms）
-    if (batchTimer) {
-        clearTimeout(batchTimer);
+    // 📝 現在のカードID取得
+    getCurrentCardId() {
+        const currentContainer = this.cardContainers.get(currentDisplayIndex);
+        return currentContainer ? currentContainer.dataset.cardId : null;
     }
-    
-    batchTimer = setTimeout(async () => {
-        const currentBatch = [...logBatch];
-        logBatch = [];
+
+    // 📤 ログキューイング
+    queueLog(result) {
+        const cardId = this.getCurrentCardId();
         
+        this.logQueue.push({
+            card_id: cardId,
+            result: result,
+            stage: stage,
+            mode: mode,
+            timestamp: performance.now()
+        });
+
+        // デバウンス処理
+        if (this.batchTimer) {
+            clearTimeout(this.batchTimer);
+        }
+
+        this.batchTimer = setTimeout(() => {
+            this.processBatchLogs();
+        }, 100);
+    }
+
+    // 📤 バッチログ送信
+    async processBatchLogs() {
+        if (this.logQueue.length === 0) return;
+        
+        const currentBatch = [...this.logQueue];
+        this.logQueue = [];
+
         try {
             const latestEntry = currentBatch[currentBatch.length - 1];
             
@@ -322,183 +222,255 @@ async function logResultUltraFast(result) {
 
             const data = await response.json();
             
-            if (data.status === 'ok') {
-                handleLogSuccessUltraFast(data);
+            if (data.redirect_to_prepare) {
+                this.showMessage(data.message);
+                setTimeout(() => {
+                    window.location.href = `/prepare/${getCurrentSource()}`;
+                }, 1000);
             }
         } catch (error) {
-            console.error('[SUBMIT] エラー:', error);
+            console.error('ログ送信エラー:', error);
         }
-    }, 50);
-}
+    }
 
-// ⚡ 超高速成功処理
-function handleLogSuccessUltraFast(data) {
-    if (data.redirect_to_prepare) {
-        showToastUltraFast(data.message, 'success');
+    // 💬 メッセージ表示
+    showMessage(message) {
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        requestAnimationFrame(() => {
+            toast.style.transform = 'translateX(0)';
+        });
+        
         setTimeout(() => {
-            const currentSource = getCurrentSource();
-            window.location.href = `/prepare/${currentSource}`;
-        }, 800);
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
     }
 }
 
-function handleCardEndUltraFast() {
-    console.log('[NEXTCARD] カード終了:', currentIndex, '/', cards.length);
-    
-    if (isPracticeMode) {
-        showToastUltraFast("問題を読み込んでいます...", 'info');
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000);
-    } else {
-        showToastUltraFast("✅ テスト完了！", 'success');
-        setTimeout(() => {
-            const currentSource = getCurrentSource();
-            window.location.href = `/prepare/${currentSource}`;
-        }, 800);
+// 🚀 瞬間システムインスタンス
+const instantSystem = new InstantSwitchSystem();
+
+// ========== 既存関数との統合 ==========
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof rawCards === "undefined") {
+        console.error("❌ rawCards が定義されていません！");
+        return;
     }
+
+    isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
+    
+    // DOM要素キャッシュ初期化
+    initializeDOMCache();
+    
+    // 瞬間システムで初期化
+    initCards(rawCards);
+    
+    console.log('⚡ 瞬間応答システム初期化完了');
+});
+
+// 🚀 DOM要素キャッシュ初期化
+function initializeDOMCache() {
+    domCache.flashcard = document.getElementById('flashcard');
+    domCache.knownBtn = document.getElementById('knownBtn');
+    domCache.unknownBtn = document.getElementById('unknownBtn');
+    domCache.correctCount = document.getElementById('correct-count');
+    domCache.incorrectCount = document.getElementById('incorrect-count');
+    domCache.progressInfo = document.getElementById('progress-info');
 }
 
-// ⚡ 超高速トースト
-function showToastUltraFast(message, type = 'info') {
-    const existingToast = document.getElementById('speedToast');
-    if (existingToast) {
-        existingToast.remove();
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+function initCards(data) {
+    cardsArray = shuffle(data.slice());
+    totalCardsCount = cardsArray.length;
+    currentDisplayIndex = 0;
+    showingAnswer = false;
+    cardStatus = {};
+    
+    // 🚀 瞬間システムで事前レンダリング
+    instantSystem.prerenderAllCards(cardsArray);
+    
+    // 🚀 イベントリスナー設定
+    if (domCache.knownBtn) {
+        domCache.knownBtn.addEventListener('click', () => 
+            handleInstantAnswer('known', domCache.knownBtn)
+        );
     }
     
-    const toast = document.createElement('div');
-    toast.id = 'speedToast';
-    toast.textContent = message;
+    if (domCache.unknownBtn) {
+        domCache.unknownBtn.addEventListener('click', () => 
+            handleInstantAnswer('unknown', domCache.unknownBtn)
+        );
+    }
     
-    Object.assign(toast.style, {
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        padding: '12px 20px',
-        borderRadius: '6px',
-        color: 'white',
-        fontWeight: 'bold',
-        zIndex: '1000',
-        maxWidth: '300px',
-        fontSize: '14px',
-        background: type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3',
-        transform: 'translateX(100%)',
-        transition: 'transform 0.2s ease'
-    });
+    if (domCache.flashcard) {
+        domCache.flashcard.addEventListener('click', toggleAnswerInstant);
+    }
     
-    document.body.appendChild(toast);
+    // キーボード設定
+    setupInstantKeyboard();
+}
+
+// ⚡ 瞬間応答処理（1-3ms以内）
+function handleInstantAnswer(result, element) {
+    if (isInstantProcessing) return;
+    isInstantProcessing = true;
+
+    // 🚀 STEP 1: 瞬間ボタンフィードバック（同期、<1ms）
+    triggerInstantButtonFeedback(element, result);
+
+    // 🚀 STEP 2: 瞬間カウンター更新（同期、<1ms）
+    updateCounterInstantly(result);
+
+    // 🚀 STEP 3: 瞬間次カード表示（同期、1-2ms）
+    const success = instantSystem.switchToCard(currentDisplayIndex + 1);
+
+    if (!success) {
+        // カード終了処理
+        handleInstantCompletion();
+        return;
+    }
+
+    // 🚀 STEP 4: 非同期ログ処理（バックグラウンド）
+    instantSystem.queueLog(result);
+
+    // 🚀 処理完了
+    isInstantProcessing = false;
+}
+
+// ⚡ 瞬間ボタンフィードバック
+function triggerInstantButtonFeedback(element, result) {
+    element.style.transform = 'scale(0.95)';
+    element.style.backgroundColor = result === 'known' ? '#45a049' : '#da190b';
     
     requestAnimationFrame(() => {
-        toast.style.transform = 'translateX(0)';
+        element.style.transform = 'scale(1)';
+        setTimeout(() => {
+            element.style.backgroundColor = '';
+        }, 80);
     });
-    
-    setTimeout(() => {
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => toast.remove(), 200);
-    }, type === 'success' ? 700 : 1500);
 }
 
-// ⚡ 超高速キーボード
-function setupUltraFastKeyboard() {
-    let keyDownTime = {};
+// ⚡ 瞬間カウンター更新
+function updateCounterInstantly(result) {
+    if (result === 'known' && domCache.correctCount) {
+        const current = parseInt(domCache.correctCount.textContent) || 0;
+        domCache.correctCount.textContent = current + 1;
+    } else if (result === 'unknown' && domCache.incorrectCount) {
+        const current = parseInt(domCache.incorrectCount.textContent) || 0;
+        domCache.incorrectCount.textContent = current + 1;
+    }
+}
+
+// ⚡ 瞬間完了処理
+function handleInstantCompletion() {
+    instantSystem.showMessage("✅ 完了しました！");
     
-    document.addEventListener('keydown', (e) => {
-        if (isProcessing) return;
-        
-        const key = e.key.toLowerCase();
-        const now = performance.now();
-        
-        // ⚡ キーリピート防止（高速連打対応）
-        if (keyDownTime[key] && now - keyDownTime[key] < 100) {
-            return;
+    setTimeout(() => {
+        if (isPracticeMode) {
+            window.location.reload();
+        } else {
+            window.location.href = `/prepare/${getCurrentSource()}`;
         }
-        keyDownTime[key] = now;
-        
-        switch(key) {
+    }, 1000);
+}
+
+// ⚡ 瞬間解答切り替え
+function toggleAnswerInstant() {
+    instantSystem.toggleAnswer();
+}
+
+// 🎹 瞬間キーボード処理
+function setupInstantKeyboard() {
+    document.addEventListener('keydown', (e) => {
+        if (isInstantProcessing) return;
+
+        switch(e.key.toLowerCase()) {
             case 'j':
             case 'arrowleft':
                 e.preventDefault();
-                handleAnswerUltraFast('known', document.getElementById('knownBtn'));
+                handleInstantAnswer('known', domCache.knownBtn);
                 break;
             case 'f':
             case 'arrowright':
                 e.preventDefault();
-                handleAnswerUltraFast('unknown', document.getElementById('unknownBtn'));
+                handleInstantAnswer('unknown', domCache.unknownBtn);
                 break;
             case ' ':
                 e.preventDefault();
-                toggleAnswerUltraFast();
+                toggleAnswerInstant();
                 break;
         }
     });
 }
 
-// 既存関数の互換性維持
-function getCurrentSource() {
-    const pathParts = window.location.pathname.split('/');
-    const source = pathParts[pathParts.length - 1];
-    return source;
+// ========== 既存関数との互換性維持 ==========
+
+function renderCard() {
+    // 瞬間システムでは事前レンダリング済みなので何もしない
+    console.log('[RENDERCARD] 瞬間システムでは事前レンダリング済み');
 }
 
-// 後方互換性のための関数
+function toggleAnswer() {
+    toggleAnswerInstant();
+}
+
 function markKnown() {
-    handleAnswerUltraFast('known', document.getElementById('knownBtn'));
+    handleInstantAnswer('known', domCache.knownBtn);
 }
 
 function markUnknown() {
-    handleAnswerUltraFast('unknown', document.getElementById('unknownBtn'));
+    handleInstantAnswer('unknown', domCache.unknownBtn);
 }
 
 function nextCard() {
-    // 楽観的更新で既に処理済み
-    console.log('[NEXTCARD] 楽観的更新で処理済み');
+    // 瞬間システムでは自動で次カードに進んでいる
+    console.log('[NEXTCARD] 瞬間システムで自動処理済み');
 }
 
 function nextCardFast() {
     nextCard();
 }
 
-function renderCard() {
-    renderCardUltraFast();
-}
-
-function toggleAnswer() {
-    toggleAnswerUltraFast();
-}
-
-function showToast(message, type = "info") {
-    showToastUltraFast(message, type);
-}
-
-function showMessage(message, type = "info") {
-    showToastUltraFast(message, type);
-}
-
-// 既存のsendResult関数（互換性）
-async function sendResult(cardId, result) {
-    // 新しいシステムでは楽観的更新で処理済み
-    console.log('[SENDRESULT] 互換性関数 - 楽観的更新で処理済み');
-    return Promise.resolve({ status: 'ok' });
-}
-
-async function sendResultFast(cardId, result) {
-    return sendResult(cardId, result);
-}
-
 function handleAnswer(result, element) {
-    handleAnswerUltraFast(result, element);
+    handleInstantAnswer(result, element);
 }
 
 function handleAnswerFast(result) {
-    const element = result === 'known' ? 
-        document.getElementById('knownBtn') : 
-        document.getElementById('unknownBtn');
-    handleAnswerUltraFast(result, element);
+    const element = result === 'known' ? domCache.knownBtn : domCache.unknownBtn;
+    handleInstantAnswer(result, element);
+}
+
+function handleAnswerUltraFast(result, element) {
+    handleInstantAnswer(result, element);
 }
 
 function loadNextCard() {
-    // 楽観的更新で既に処理済み
-    console.log('[LOADNEXTCARD] 楽観的更新で処理済み');
+    console.log('[LOADNEXTCARD] 瞬間システムで自動処理済み');
 }
 
 function loadNextCardFast() {
@@ -506,73 +478,135 @@ function loadNextCardFast() {
 }
 
 function updateCounters(result) {
-    updateCountersUltraFast(result);
+    updateCounterInstantly(result);
+}
+
+function updateCountersUltraFast(result) {
+    updateCounterInstantly(result);
+}
+
+function showToast(message, type = "info") {
+    instantSystem.showMessage(message);
+}
+
+function showToastUltraFast(message, type = "info") {
+    instantSystem.showMessage(message);
+}
+
+function showMessage(message, type = "info") {
+    instantSystem.showMessage(message);
 }
 
 function preloadNextCards() {
-    preloadNextCardsUltraFast();
+    // 瞬間システムでは事前レンダリング済み
+    console.log('[PRELOAD] 瞬間システムでは事前レンダリング済み');
 }
 
-// ⚡ CSS最適化スタイル追加
-function addUltraFastStyles() {
-    if (!document.getElementById('ultra-fast-styles')) {
+function preloadNextCardsUltraFast() {
+    preloadNextCards();
+}
+
+// 既存のsendResult関数（互換性）
+async function sendResult(cardId, result) {
+    // 瞬間システムではキューイングで処理
+    console.log('[SENDRESULT] 瞬間システムではキューイングで処理済み');
+    return Promise.resolve({ status: 'ok' });
+}
+
+async function sendResultFast(cardId, result) {
+    return sendResult(cardId, result);
+}
+
+async function sendResultUltraFast(cardId, result) {
+    return sendResult(cardId, result);
+}
+
+async function logResultUltraFast(result) {
+    // 瞬間システムではキューイングで処理
+    return sendResult(null, result);
+}
+
+// 🔧 ユーティリティ関数
+function getCurrentSource() {
+    const pathParts = window.location.pathname.split('/');
+    return pathParts[pathParts.length - 1];
+}
+
+// 🚀 CSS最適化（瞬間切り替え用）
+function addInstantStyles() {
+    if (!document.getElementById('instant-styles')) {
         const style = document.createElement('style');
-        style.id = 'ultra-fast-styles';
+        style.id = 'instant-styles';
         style.textContent = `
-            /* ⚡ GPU加速最適化 */
+            /* ⚡ 瞬間切り替え最適化 */
             #flashcard {
-                will-change: opacity;
-                transform: translateZ(0);
+                min-height: 450px;
+                position: relative !important;
+                overflow: hidden;
             }
             
+            .instant-card-container {
+                transition: none !important;
+                animation: none !important;
+            }
+            
+            .instant-card-container img {
+                image-rendering: -webkit-optimize-contrast;
+                image-rendering: crisp-edges;
+                image-rendering: auto;
+            }
+            
+            /* ⚡ ボタン最適化 */
             #knownBtn, #unknownBtn {
                 will-change: transform, background-color;
                 transform: translateZ(0);
+                transition: all 0.05s ease !important;
             }
             
-            #problem-container, #answer-container {
+            #knownBtn:active, #unknownBtn:active {
+                transform: scale(0.95) !important;
+            }
+            
+            /* ⚡ カウンター最適化 */
+            #correct-count, #incorrect-count {
+                will-change: contents;
+                font-variant-numeric: tabular-nums;
+            }
+            
+            /* ⚡ 進捗表示最適化 */
+            #progress-info {
+                will-change: contents;
+                font-variant-numeric: tabular-nums;
+            }
+            
+            /* ⚡ GPU加速 */
+            .problem-container, .answer-container {
                 will-change: transform;
                 transform: translateZ(0);
             }
             
-            /* ⚡ 高速切り替え用 */
-            .no-transition {
-                transition: none !important;
+            /* ⚡ レイアウトシフト防止 */
+            .instant-card-container p {
+                margin: 15px 0 0 0 !important;
+                line-height: 1.4;
             }
             
             /* ⚡ 画像読み込み最適化 */
-            img {
-                image-rendering: -webkit-optimize-contrast;
-                image-rendering: crisp-edges;
-            }
-            
-            /* ⚡ ボタン応答性向上 */
-            #knownBtn:active, #unknownBtn:active {
-                transform: scale3d(0.95, 0.95, 1) !important;
-                transition: transform 0.05s ease !important;
-            }
-            
-            /* ⚡ リフロー削減 */
-            .card-info span {
-                display: inline-block;
-                will-change: contents;
-            }
-            
-            /* ⚡ プリロード画像最適化 */
-            #preload-container img {
-                position: absolute;
-                width: 1px;
-                height: 1px;
-                opacity: 0;
-                pointer-events: none;
+            .instant-card-container img {
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             }
         `;
         document.head.appendChild(style);
     }
 }
 
-// ⚡ パフォーマンス監視
-function startPerformanceMonitoring() {
+// 🚀 パフォーマンス監視
+function startInstantPerformanceMonitoring() {
     let clickStartTime = 0;
     
     document.addEventListener('mousedown', (e) => {
@@ -581,63 +615,54 @@ function startPerformanceMonitoring() {
         }
     });
     
-    document.addEventListener('mouseup', (e) => {
-        if (e.target.id === 'knownBtn' || e.target.id === 'unknownBtn') {
+    // カード切り替え完了を監視
+    const observer = new MutationObserver(() => {
+        if (clickStartTime > 0) {
             const responseTime = performance.now() - clickStartTime;
-            console.log(`⚡ ボタン応答時間: ${responseTime.toFixed(2)}ms`);
+            console.log(`⚡ 瞬間応答時間: ${responseTime.toFixed(2)}ms`);
             
-            // 50ms以下なら成功
-            if (responseTime < 50) {
-                console.log('🚀 超高速応答達成！');
+            if (responseTime < 10) {
+                console.log('🚀 瞬間応答達成！(10ms未満)');
+            } else if (responseTime < 20) {
+                console.log('🏃 高速応答達成！(20ms未満)');
             }
+            
+            clickStartTime = 0;
         }
     });
+    
+    if (domCache.flashcard) {
+        observer.observe(domCache.flashcard, { 
+            childList: true, 
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style']
+        });
+    }
 }
 
-// ⚡ メモリ最適化
-function optimizeMemory() {
-    // 不要なイベントリスナー削除
-    const oldListeners = document.querySelectorAll('[onclick]');
-    oldListeners.forEach(el => {
-        el.removeAttribute('onclick');
-    });
+// 🚀 初期化統合
+function initializeInstantOptimization() {
+    addInstantStyles();
+    startInstantPerformanceMonitoring();
     
-    // 定期的なガベージコレクション促進
+    // メモリ最適化
     setInterval(() => {
         if (window.gc && typeof window.gc === 'function') {
             window.gc();
         }
-    }, 60000); // 1分毎
+    }, 30000);
+    
+    console.log('⚡ 瞬間システム完全初期化完了');
+    console.log('🎯 目標応答時間: <5ms (クリック同時)');
 }
 
-// ⚡ 初期化統合
-function initializeUltraFastSystem() {
-    addUltraFastStyles();
-    optimizeMemory();
-    startPerformanceMonitoring();
-    
-    // Web Workers対応チェック
-    if (typeof Worker !== 'undefined') {
-        console.log('⚡ Web Workers利用可能');
-    }
-    
-    // 画像デコード最適化
-    if ('decode' in HTMLImageElement.prototype) {
-        console.log('⚡ 画像デコード最適化利用可能');
-    }
-    
-    // Intersection Observer対応
-    if ('IntersectionObserver' in window) {
-        console.log('⚡ Intersection Observer利用可能');
-    }
-    
-    console.log('⚡ 超高速システム完全初期化完了');
-    console.log('🎯 期待される応答時間: <20ms');
-}
-
-// ⚡ DOMContentLoaded時の初期化に追加
+// ⚡ DOMContentLoaded時の追加初期化
 document.addEventListener('DOMContentLoaded', function() {
-    initializeUltraFastSystem();
+    // 少し遅延させて他の初期化完了後に実行
+    setTimeout(() => {
+        initializeInstantOptimization();
+    }, 100);
 });
 
-console.log('📈 超高速対応 main.js 読み込み完了');
+console.log('⚡ 瞬間応答対応 main.js 読み込み完了 - クリック同時切り替え実装'); '
