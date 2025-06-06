@@ -179,58 +179,7 @@ function preloadNextPracticeCards() {
     });
 }
 
-// ========== 練習完了時の高速処理 ==========
-function handlePracticeCompletionFast(cardId, result) {
-    console.log("🎯 練習完了 - 高速処理開始");
-    
-    // 1. 完了アニメーション表示
-    const overlay = showPracticeCompletionAnimation();
-    
-    // 2. サーバーに結果送信（高速レスポンス期待）
-    fetch('/log_result', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            card_id: cardId,
-            result: result,
-            stage: stage,
-            mode: mode
-        })
-    }).then(response => response.json())
-    .then(data => {
-        console.log("📨 練習完了サーバーレスポンス:", data);
-        
-        setTimeout(() => {
-            overlay.remove();
-            
-            // 🚀 高速継続フラグをチェック
-            if (data.fast_continue === true && data.next_cards && data.next_cards.length > 0) {
-                console.log("⚡ 高速継続: サーバーから次のカードを受信");
-                
-                practiceRoundCount++;
-                totalPracticeCards = data.remaining_count;
-                
-                // サーバーから受信したカードで即座に更新
-                updateCardsInstantly(data.next_cards);
-                showPracticeRoundTransition(practiceRoundCount, totalPracticeCards);
-                
-                // 次の次のカードを事前取得
-                setTimeout(() => {
-                    preloadNextPracticeCards();
-                }, 1000);
-                
-            } else if (data.practice_continuing && data.remaining_count > 0) {
-                // 従来の継続処理（リロード）
-                console.log("🔄 練習継続: ページリロード");
-                showPracticeRoundTransition(practiceRoundCount + 1, data.remaining_count);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-                
-            } else if (data.practice_completed || data.redirect_to_prepare) {
-                // 練習完了
-                console.log("✅ 練習完了: 準備画面へ");
-                showInstantMessage(data.message || "✅ 練習完了！");
+data.message || "✅ 練習完了！");
                 setTimeout(() => {
                     window.location.href = '/prepare/' + getCurrentSource();
                 }, 2000);
@@ -439,7 +388,7 @@ function updateProgressInstantly() {
     }
 }
 
-// ========== 瞬間回答処理（既存） ==========
+// ========== 瞬間回答処理（修正版） ==========
 function handleAnswerInstantly(result) {
     console.log("⚡ 瞬間回答: " + result + " (カード" + (currentIndex + 1) + "/" + cards.length + ")");
     
@@ -448,15 +397,27 @@ function handleAnswerInstantly(result) {
     updateCountersInstantly(result);
     triggerButtonFeedback(result);
     
-    const success = switchToCardInstantly(currentIndex + 1);
+    // 🔧 修正：最後のカードかどうかを先にチェック
+    const isLastCard = (currentIndex + 1) >= cards.length;
     
-    if (!success) {
-        console.log("🏁 全カード完了");
+    if (isLastCard) {
+        console.log("🏁 最後のカード完了");
+        // 最後のカードの場合はカード切り替えせずに直接完了処理
         handleCardCompletionSync(currentCardId, result);
         return;
     }
     
-    sendResultBackground(currentCardId, result);
+    // 最後でない場合は通常のカード切り替え
+    const success = switchToCardInstantly(currentIndex + 1);
+    
+    if (success) {
+        // 非同期でログ送信
+        sendResultBackground(currentCardId, result);
+    } else {
+        // 切り替えに失敗した場合（通常起こらない）
+        console.warn("⚠️ カード切り替え失敗");
+        handleCardCompletionSync(currentCardId, result);
+    }
 }
 
 function updateCountersInstantly(result) {
@@ -540,6 +501,54 @@ function handleDefaultCompletion() {
             window.location.href = '/prepare/' + getCurrentSource();
         }, 2000);
     }
+}
+
+function showCompletionMessage(message) {
+    console.log("🎉 完了メッセージ表示:", message);
+    
+    // 大きな完了メッセージを表示
+    const completionDiv = document.createElement('div');
+    completionDiv.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        padding: 30px 50px;
+        border-radius: 15px;
+        font-size: 24px;
+        font-weight: bold;
+        z-index: 9999;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        text-align: center;
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.8);
+        transition: all 0.3s ease;
+    `;
+    
+    completionDiv.innerHTML = `
+        <div style="font-size: 3rem; margin-bottom: 10px;">🎉</div>
+        <div>${message}</div>
+        <div style="font-size: 16px; margin-top: 10px; opacity: 0.9;">準備画面に戻ります...</div>
+    `;
+    
+    document.body.appendChild(completionDiv);
+    
+    // アニメーション開始
+    requestAnimationFrame(() => {
+        completionDiv.style.opacity = '1';
+        completionDiv.style.transform = 'translate(-50%, -50%) scale(1)';
+    });
+    
+    // 自動削除
+    setTimeout(() => {
+        completionDiv.style.opacity = '0';
+        completionDiv.style.transform = 'translate(-50%, -50%) scale(0.8)';
+        setTimeout(() => {
+            completionDiv.remove();
+        }, 300);
+    }, 500); // 短時間表示
 }
 
 function showInstantMessage(message) {
