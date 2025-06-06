@@ -7,12 +7,11 @@ let showingAnswer = false;
 let cardStatus = {};
 let isPracticeMode = false;
 let prerenderedCards = [];
-let practiceRoundCount = 0; // 練習ラウンド数
-let totalPracticeCards = 0; // 総練習カード数
+let practiceRoundCount = 0;
+let totalPracticeCards = 0;
 
 // ========== 練習完了時の視覚的フィードバック ==========
 function showPracticeCompletionAnimation() {
-    // 画面全体にオーバーレイを表示
     const overlay = document.createElement('div');
     overlay.style.cssText = `
         position: fixed;
@@ -54,7 +53,6 @@ function showPracticeCompletionAnimation() {
     overlay.appendChild(content);
     document.body.appendChild(overlay);
     
-    // アニメーション開始
     requestAnimationFrame(() => {
         overlay.style.opacity = '1';
         content.style.transform = 'scale(1)';
@@ -101,13 +99,11 @@ function showPracticeRoundTransition(newRoundCount, newTotalCards) {
     transition.appendChild(content);
     document.body.appendChild(transition);
     
-    // アニメーション開始
     requestAnimationFrame(() => {
         transition.style.opacity = '1';
         content.style.transform = 'translateY(0)';
     });
     
-    // 2秒後に削除
     setTimeout(() => {
         transition.style.opacity = '0';
         setTimeout(() => {
@@ -138,7 +134,6 @@ function preloadNextPracticeCards() {
             nextPracticeCardsCache = data.cards;
             console.log("✅ 次の練習カード事前取得完了:", data.cards.length + "問");
             
-            // 画像を並列プリロード（高速化）
             const imagePromises = [];
             data.cards.forEach(card => {
                 if (card.image_problem) {
@@ -159,7 +154,6 @@ function preloadNextPracticeCards() {
                 }
             });
             
-            // すべての画像プリロード完了を待つ
             Promise.all(imagePromises).then(() => {
                 console.log("🖼️ 次の練習カード画像プリロード完了");
             });
@@ -179,25 +173,90 @@ function preloadNextPracticeCards() {
     });
 }
 
-data.message || "✅ 練習完了！");
+// ========== 練習完了時の高速処理（修正版） ==========
+function handlePracticeCompletionFast(cardId, result) {
+    console.log("🎯 練習完了 - 高速処理開始");
+    
+    const flashcard = document.getElementById('flashcard');
+    if (flashcard) {
+        flashcard.style.opacity = '0.3';
+        flashcard.style.pointerEvents = 'none';
+    }
+    
+    const overlay = showPracticeCompletionAnimation();
+    
+    fetch('/log_result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            card_id: cardId,
+            result: result,
+            stage: stage,
+            mode: mode
+        })
+    }).then(response => response.json())
+    .then(data => {
+        console.log("📨 練習完了サーバーレスポンス:", data);
+        
+        if (data.practice_completed || data.redirect_to_prepare) {
+            console.log("✅ 練習完了: 即座に準備画面へ");
+            
+            setTimeout(() => {
+                overlay.remove();
+                showCompletionMessage(data.message || "✅ 練習完了！");
+                
                 setTimeout(() => {
                     window.location.href = '/prepare/' + getCurrentSource();
-                }, 2000);
+                }, 800);
+            }, 800);
+            
+            return;
+        }
+        
+        setTimeout(() => {
+            overlay.remove();
+            
+            if (flashcard) {
+                flashcard.style.opacity = '1';
+                flashcard.style.pointerEvents = 'auto';
+            }
+            
+            if (data.fast_continue === true && data.next_cards && data.next_cards.length > 0) {
+                console.log("⚡ 高速継続: サーバーから次のカードを受信");
                 
+                practiceRoundCount++;
+                totalPracticeCards = data.remaining_count;
+                
+                updateCardsInstantly(data.next_cards);
+                showPracticeRoundTransition(practiceRoundCount, totalPracticeCards);
+                
+                setTimeout(() => {
+                    preloadNextPracticeCards();
+                }, 1000);
+                
+            } else if (data.practice_continuing && data.remaining_count > 0) {
+                console.log("🔄 練習継続: ページリロード");
+                showPracticeRoundTransition(practiceRoundCount + 1, data.remaining_count);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
             } else {
-                // フォールバック
                 console.log("🔧 フォールバック処理");
                 handleDefaultCompletion();
             }
             
-        }, 1200); // 完了アニメーション時間
+        }, 1200);
         
     }).catch(error => {
         console.error("❌ 練習完了エラー:", error);
         setTimeout(() => {
             overlay.remove();
             
-            // キャッシュがあれば使用、なければフォールバック
+            if (flashcard) {
+                flashcard.style.opacity = '1';
+                flashcard.style.pointerEvents = 'auto';
+            }
+            
             if (nextPracticeCardsCache && nextPracticeCardsCache.length > 0) {
                 console.log("🔄 エラー時キャッシュフォールバック");
                 practiceRoundCount++;
@@ -214,18 +273,12 @@ data.message || "✅ 練習完了！");
 function updateCardsInstantly(newCards) {
     console.log("⚡ カード即座更新:", newCards.length + "問");
     
-    // 古いカードを削除
     cards = newCards.slice();
     currentIndex = 0;
     showingAnswer = false;
     
-    // カウンターリセット
     resetCounters();
-    
-    // 事前レンダリング更新
     prerenderAllCards();
-    
-    // 進捗更新
     updateProgressInstantly();
     
     console.log("✅ カード更新完了");
@@ -244,10 +297,8 @@ function handleCardCompletionSync(cardId, result) {
     console.log("🔧 カード完了時処理:", cardId, result);
     
     if (isPracticeMode) {
-        // 練習モードは高速処理
         handlePracticeCompletionFast(cardId, result);
     } else {
-        // テストモードは従来通り
         fetch('/log_result', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -278,7 +329,7 @@ function handleCardCompletionSync(cardId, result) {
     }
 }
 
-// ========== 事前レンダリングシステム（既存） ==========
+// ========== 事前レンダリングシステム ==========
 function prerenderAllCards() {
     console.log("🚀 全カード事前レンダリング開始");
     
@@ -289,7 +340,6 @@ function prerenderAllCards() {
     flashcard.style.overflow = 'hidden';
     flashcard.innerHTML = '';
     
-    // 古い事前レンダリングカードをクリア
     prerenderedCards = [];
     
     cards.forEach(function(card, index) {
@@ -312,7 +362,6 @@ function createCardElement(card, index) {
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
-    // 問題部分
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container';
     problemDiv.style.cssText = 'display: block; width: 100%; text-align: center;';
@@ -332,7 +381,6 @@ function createCardElement(card, index) {
         problemDiv.appendChild(text);
     }
     
-    // 解答部分
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container';
     answerDiv.style.cssText = 'display: none; width: 100%; text-align: center;';
@@ -351,7 +399,7 @@ function createCardElement(card, index) {
     return container;
 }
 
-// ========== 瞬間カード切り替え（既存） ==========
+// ========== 瞬間カード切り替え ==========
 function switchToCardInstantly(newIndex) {
     if (newIndex >= cards.length) return false;
     
@@ -397,24 +445,19 @@ function handleAnswerInstantly(result) {
     updateCountersInstantly(result);
     triggerButtonFeedback(result);
     
-    // 🔧 修正：最後のカードかどうかを先にチェック
     const isLastCard = (currentIndex + 1) >= cards.length;
     
     if (isLastCard) {
         console.log("🏁 最後のカード完了");
-        // 最後のカードの場合はカード切り替えせずに直接完了処理
         handleCardCompletionSync(currentCardId, result);
         return;
     }
     
-    // 最後でない場合は通常のカード切り替え
     const success = switchToCardInstantly(currentIndex + 1);
     
     if (success) {
-        // 非同期でログ送信
         sendResultBackground(currentCardId, result);
     } else {
-        // 切り替えに失敗した場合（通常起こらない）
         console.warn("⚠️ カード切り替え失敗");
         handleCardCompletionSync(currentCardId, result);
     }
@@ -451,7 +494,7 @@ function triggerButtonFeedback(result) {
     }
 }
 
-// ========== 瞬間解答切り替え（既存） ==========
+// ========== 瞬間解答切り替え ==========
 function toggleAnswerInstantly() {
     if (!prerenderedCards[currentIndex]) return;
     
@@ -471,7 +514,7 @@ function toggleAnswerInstantly() {
     }
 }
 
-// ========== ログ処理（既存） ==========
+// ========== ログ処理 ==========
 function sendResultBackground(cardId, result) {
     fetch('/log_result', {
         method: 'POST',
@@ -506,7 +549,6 @@ function handleDefaultCompletion() {
 function showCompletionMessage(message) {
     console.log("🎉 完了メッセージ表示:", message);
     
-    // 大きな完了メッセージを表示
     const completionDiv = document.createElement('div');
     completionDiv.style.cssText = `
         position: fixed;
@@ -535,20 +577,18 @@ function showCompletionMessage(message) {
     
     document.body.appendChild(completionDiv);
     
-    // アニメーション開始
     requestAnimationFrame(() => {
         completionDiv.style.opacity = '1';
         completionDiv.style.transform = 'translate(-50%, -50%) scale(1)';
     });
     
-    // 自動削除
     setTimeout(() => {
         completionDiv.style.opacity = '0';
         completionDiv.style.transform = 'translate(-50%, -50%) scale(0.8)';
         setTimeout(() => {
             completionDiv.remove();
         }, 300);
-    }, 500); // 短時間表示
+    }, 500);
 }
 
 function showInstantMessage(message) {
@@ -594,7 +634,6 @@ document.addEventListener('DOMContentLoaded', function () {
     setupInstantEvents();
     setupInstantKeyboard();
     
-    // 練習モードの場合、事前に次のカードを取得開始
     if (isPracticeMode) {
         setTimeout(() => {
             preloadNextPracticeCards();
@@ -652,7 +691,7 @@ function setupInstantKeyboard() {
     });
 }
 
-// ========== ユーティリティ（既存） ==========
+// ========== ユーティリティ ==========
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
