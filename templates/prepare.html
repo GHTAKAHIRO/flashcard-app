@@ -583,21 +583,18 @@
                             <!-- 練習ボタン（×問題がある場合のみ表示） -->
                             {% if chunk.practice_needed %}
                                 {% if chunk.can_start_practice %}
-                                    {% if chunk.practice_completed %}
-                                        <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
-                                           class="btn btn-outline-mini">
-                                            <i class="fas fa-redo"></i> 再練習
-                                        </a>
-                                    {% else %}
-                                        <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
-                                           class="btn btn-success-mini">
-                                            <i class="fas fa-dumbbell"></i> 
-                                            練習開始
-                                            {% if chunk.remaining_practice_cards and chunk.remaining_practice_cards > 0 %}
-                                                <span style="font-size: 0.7em; margin-left: 0.2rem;">({{ chunk.remaining_practice_cards }}問)</span>
-                                            {% endif %}
-                                        </a>
-                                    {% endif %}
+                                    <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
+                                       class="btn btn-success-mini">
+                                        <i class="fas fa-dumbbell"></i> 
+                                        練習開始
+                                        {% if chunk.remaining_practice_cards and chunk.remaining_practice_cards > 0 %}
+                                            <span style="font-size: 0.7em; margin-left: 0.2rem;">({{ chunk.remaining_practice_cards }}問)</span>
+                                        {% endif %}
+                                    </a>
+                                {% elif chunk.practice_completed %}
+                                    <button class="btn btn-disabled-mini" disabled>
+                                        <i class="fas fa-check"></i> 練習完了
+                                    </button>
                                 {% else %}
                                     <button class="btn btn-disabled-mini" disabled>
                                         <i class="fas fa-lock"></i> 練習待機

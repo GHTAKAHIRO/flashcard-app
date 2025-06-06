@@ -217,6 +217,9 @@ function sendResultBackground(cardId, result) {
 function handleCardCompletionSync(cardId, result) {
     console.log("🔧 カード完了時同期処理:", cardId, result);
     
+    // 🚀 完了時にボタンを無効化（誤操作防止）
+    disableAllButtons();
+    
     // 🔧 修正：完了時は必ずサーバーレスポンスを待ってから処理
     fetch('/log_result', {
         method: 'POST',
@@ -232,39 +235,97 @@ function handleCardCompletionSync(cardId, result) {
     }).then(function(data) {
         console.log("✅ 完了時サーバーレスポンス:", data);
         
-        // 🔧 修正：サーバーからの指示に従う
+        // 🔧 修正：分かりやすいオーバーレイ表示
         if (data.redirect_to_prepare === true) {
             console.log("🎯 サーバー指示：prepare画面へリダイレクト");
-            if (data.message) {
-                showInstantMessage(data.message);
-            }
+            
+            const isTestMode = !isPracticeMode;
+            const overlay = showCompletionOverlay(data.message || (isTestMode ? "テスト完了！" : "練習完了！"), isTestMode);
+            
             setTimeout(function() {
+                overlay.remove();
                 window.location.href = '/prepare/' + getCurrentSource();
-            }, 2000);
+            }, 3000); // 3秒間表示
         } else {
             console.log("🔧 サーバー指示なし：デフォルト処理");
             handleDefaultCompletion();
         }
     }).catch(function(error) {
         console.error('❌ 完了時ログエラー:', error);
+        enableAllButtons(); // エラー時はボタンを復活
         handleDefaultCompletion();
     });
+}
+
+function disableAllButtons() {
+    console.log("🔒 全ボタン無効化");
+    
+    const knownBtn = document.getElementById('knownBtn');
+    const unknownBtn = document.getElementById('unknownBtn');
+    const flashcard = document.getElementById('flashcard');
+    
+    if (knownBtn) {
+        knownBtn.disabled = true;
+        knownBtn.style.opacity = '0.5';
+        knownBtn.style.cursor = 'not-allowed';
+    }
+    
+    if (unknownBtn) {
+        unknownBtn.disabled = true;
+        unknownBtn.style.opacity = '0.5';
+        unknownBtn.style.cursor = 'not-allowed';
+    }
+    
+    if (flashcard) {
+        flashcard.style.pointerEvents = 'none';
+        flashcard.style.opacity = '0.7';
+    }
+}
+
+function enableAllButtons() {
+    console.log("🔓 全ボタン有効化");
+    
+    const knownBtn = document.getElementById('knownBtn');
+    const unknownBtn = document.getElementById('unknownBtn');
+    const flashcard = document.getElementById('flashcard');
+    
+    if (knownBtn) {
+        knownBtn.disabled = false;
+        knownBtn.style.opacity = '1';
+        knownBtn.style.cursor = 'pointer';
+    }
+    
+    if (unknownBtn) {
+        unknownBtn.disabled = false;
+        unknownBtn.style.opacity = '1';
+        unknownBtn.style.cursor = 'pointer';
+    }
+    
+    if (flashcard) {
+        flashcard.style.pointerEvents = 'auto';
+        flashcard.style.opacity = '1';
+    }
 }
 
 function handleDefaultCompletion() {
     console.log("🔧 デフォルト完了処理");
     
+    // ボタン無効化
+    disableAllButtons();
+    
     if (isPracticeMode) {
         // 🚀 練習モードも必ずprepare画面に戻る（シンプル化）
-        showInstantMessage("✅ 練習ラウンド完了！");
+        const overlay = showCompletionOverlay("練習ラウンド完了！", false);
         setTimeout(function() {
+            overlay.remove();
             window.location.href = '/prepare/' + getCurrentSource();
-        }, 1500);
+        }, 3000);
     } else {
-        showInstantMessage("✅ テスト完了！");
+        const overlay = showCompletionOverlay("テスト完了！", true);
         setTimeout(function() {
+            overlay.remove();
             window.location.href = '/prepare/' + getCurrentSource();
-        }, 2000);
+        }, 3000);
     }
 }
 
@@ -287,6 +348,64 @@ function showInstantMessage(message) {
             toast.remove();
         }, 300);
     }, 2000);
+}
+
+function showCompletionOverlay(message, isTest = false) {
+    console.log("🎉 完了オーバーレイ表示:", message);
+    
+    // 画面全体を覆うオーバーレイ
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: ${isTest ? 'linear-gradient(135deg, rgba(0, 123, 255, 0.95), rgba(102, 126, 234, 0.95))' : 'linear-gradient(135deg, rgba(40, 167, 69, 0.95), rgba(34, 197, 94, 0.95))'};
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 24px;
+        font-weight: bold;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    `;
+    
+    const content = document.createElement('div');
+    content.style.cssText = `
+        text-align: center;
+        transform: scale(0.8);
+        transition: transform 0.5s ease;
+    `;
+    
+    const emoji = isTest ? '🎯' : '🎉';
+    const subtitle = isTest ? 'テスト完了' : '練習完了';
+    
+    content.innerHTML = `
+        <div style="font-size: 5rem; margin-bottom: 1rem;">${emoji}</div>
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">${subtitle}</div>
+        <div style="font-size: 1.5rem; opacity: 0.9; margin-bottom: 2rem;">${message}</div>
+        <div style="font-size: 1.2rem; opacity: 0.8;">準備画面に戻ります...</div>
+        <div style="margin-top: 2rem;">
+            <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; border-width: 0.3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `;
+    
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+    
+    // アニメーション開始
+    requestAnimationFrame(() => {
+        overlay.style.opacity = '1';
+        content.style.transform = 'scale(1)';
+    });
+    
+    return overlay;
 }
 
 // ========== 初期化 ==========
