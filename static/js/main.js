@@ -255,10 +255,11 @@ function handleDefaultCompletion() {
     console.log("🔧 デフォルト完了処理");
     
     if (isPracticeMode) {
-        showInstantMessage("問題を読み込んでいます...");
+        // 🚀 練習モードも必ずprepare画面に戻る（シンプル化）
+        showInstantMessage("✅ 練習ラウンド完了！");
         setTimeout(function() {
-            window.location.reload();
-        }, 1000);
+            window.location.href = '/prepare/' + getCurrentSource();
+        }, 1500);
     } else {
         showInstantMessage("✅ テスト完了！");
         setTimeout(function() {

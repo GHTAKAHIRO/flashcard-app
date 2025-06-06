@@ -985,7 +985,7 @@ def create_fallback_stage_info(source, page_range, difficulty, user_id):
 # ========== Redis除去版 パート9: ステージ詳細進捗関数 ==========
 
 def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
-    """指定ステージの詳細進捗を取得（エラーハンドリング強化版）"""
+    """指定ステージの詳細進捗を取得（練習表示改善版）"""
     try:
         # Stage 3の前提条件チェック
         if stage == 3:
@@ -1013,7 +1013,6 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
             app.logger.debug(f"[STAGE_PROGRESS] Stage{stage}: 対象カードなし")
             return None
         
-        # 以下は既存のロジックと同じ...
         subject = target_cards[0]['subject']
         
         if stage == 1:
@@ -1067,11 +1066,16 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
                     # チャンク状態を判定
                     test_completed = len(test_results) == len(chunk_card_ids)
                     test_wrong_cards = [cid for cid, result in test_results.items() if result == 'unknown']
+                    
+                    # 🚀 練習状況の詳細チェック（シンプル化）
                     practice_completed = True
+                    remaining_practice_cards = 0
                     
                     if test_wrong_cards:
                         practice_correct_cards = [cid for cid, result in practice_results.items() if result == 'known']
-                        practice_completed = len(set(test_wrong_cards) & set(practice_correct_cards)) == len(test_wrong_cards)
+                        remaining_wrong_cards = [cid for cid in test_wrong_cards if cid not in practice_correct_cards]
+                        remaining_practice_cards = len(remaining_wrong_cards)
+                        practice_completed = remaining_practice_cards == 0
                     
                     chunk_completed = test_completed and practice_completed
                     
@@ -1092,9 +1096,10 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
                         'test_wrong': len(test_wrong_cards),
                         'practice_needed': len(test_wrong_cards) > 0,
                         'practice_completed': practice_completed,
+                        'remaining_practice_cards': remaining_practice_cards,  # 🚀 残り練習カード数を追加
                         'chunk_completed': chunk_completed,
                         'can_start_test': can_start_test,
-                        'can_start_practice': test_completed and len(test_wrong_cards) > 0
+                        'can_start_practice': test_completed and remaining_practice_cards > 0  # 🚀 練習可能判定を改善
                     }
                     
                     chunks_progress.append(chunk_progress)
@@ -1535,10 +1540,12 @@ def study(source):
 
 # ========== Redis除去版 パート13: ログ記録とデバッグルート（最終パート） ==========
 
+# ========== 練習モード完了処理の修正（シンプル版） ==========
+
 @app.route('/log_result', methods=['POST'])
 @login_required
 def log_result():
-    """高速化されたログ記録（非同期処理）"""
+    """シンプル化されたログ記録（練習モードは常にprepare画面に戻る）"""
     data = request.get_json()
     card_id = data.get('card_id')
     result = data.get('result')
@@ -1563,7 +1570,17 @@ def log_result():
             daemon=True
         ).start()
         
-        # 完了チェックロジック（既存のものを維持）
+        # 🚀 練習モードは常にprepare画面に戻る（シンプル化）
+        if session_mode in ['practice', 'chunk_practice']:
+            response_data.update({
+                'practice_completed': True,
+                'message': "✅ 練習ラウンド完了！",
+                'redirect_to_prepare': True
+            })
+            app.logger.info(f"🎯 練習モード完了: Stage{stage} → prepare画面へ")
+            return jsonify(response_data)
+        
+        # 以下はテストモードの処理（既存のまま）
         source = session.get('current_source')
         page_range = session.get('page_range', '').strip()
         difficulty = session.get('difficulty', '').strip()
@@ -1589,7 +1606,7 @@ def log_result():
                                 tested_count = cur.fetchone()[0]
                     
                         # テスト完了時は常にprepare画面に戻る
-                        if tested_count >= len(chunk_card_ids):  # >= を使用（ログが重複する可能性を考慮）
+                        if tested_count >= len(chunk_card_ids):
                             practice_cards = get_chunk_practice_cards(user_id, source, stage, current_chunk, page_range, difficulty)
                             
                             if practice_cards:
@@ -1612,32 +1629,6 @@ def log_result():
                             
                 except Exception as e:
                     app.logger.error(f"チャンク完了チェックエラー: {e}")
-        
-        # ステージ1の練習モード完了チェック
-        elif stage == 1 and session_mode == 'chunk_practice':
-            practicing_chunk = session.get('practicing_chunk')
-            
-            if source and practicing_chunk:
-                try:
-                    remaining_practice_cards = get_chunk_practice_cards(user_id, source, stage, practicing_chunk, page_range, difficulty)
-                    
-                    if not remaining_practice_cards:
-                        response_data.update({
-                            'practice_completed': True,
-                            'completed_chunk': practicing_chunk,
-                            'message': f"✅ チャンク{practicing_chunk}の練習完了！",
-                            'redirect_to_prepare': True
-                        })
-                    else:
-                        response_data.update({
-                            'practice_continuing': True,
-                            'remaining_count': len(remaining_practice_cards),
-                            'message': f"残り{len(remaining_practice_cards)}問の練習を続けます。",
-                            'redirect_to_prepare': False
-                        })
-                        
-                except Exception as e:
-                    app.logger.error(f"練習完了チェックエラー: {e}")
         
         # ステージ2・3のテストモード完了チェック
         elif stage in [2, 3] and session_mode == 'test':
@@ -1683,30 +1674,6 @@ def log_result():
                         
                 except Exception as e:
                     app.logger.error(f"ステージ{stage}テスト完了チェックエラー: {e}")
-        
-        # ステージ2・3の練習モード完了チェック
-        elif stage in [2, 3] and session_mode == 'practice':
-            if source:
-                try:
-                    remaining_practice_cards = get_chunk_practice_cards_universal(user_id, source, stage, 1, page_range, difficulty)
-                    
-                    if not remaining_practice_cards:
-                        response_data.update({
-                            'practice_completed': True,
-                            'completed_stage': stage,
-                            'message': f"✅ ステージ{stage}の練習完了！すべての×問題を克服しました。",
-                            'redirect_to_prepare': True
-                        })
-                    else:
-                        response_data.update({
-                            'practice_continuing': True,
-                            'remaining_count': len(remaining_practice_cards),
-                            'message': f"残り{len(remaining_practice_cards)}問の練習を続けます。",
-                            'redirect_to_prepare': False
-                        })
-                        
-                except Exception as e:
-                    app.logger.error(f"ステージ{stage}練習完了チェックエラー: {e}")
         
         return jsonify(response_data)
         
@@ -1819,7 +1786,7 @@ if __name__ == '__main__':
 @app.route('/images_batch/<source>')
 @login_required
 def get_images_batch(source):
-    """複数画像を一括取得（プリロード用）"""
+    """画像バッチ取得（練習モード特殊処理を削除してシンプル化）"""
     try:
         user_id = str(current_user.id)
         page_range = session.get('page_range', '').strip()
@@ -1827,7 +1794,7 @@ def get_images_batch(source):
         stage = session.get('stage', 1)
         mode = session.get('mode', 'test')
         
-        # 現在のチャンクの次の5枚を取得
+        # テストモードのみの処理（練習モードの特殊処理は削除）
         if stage == 1:
             chunk_number = session.get('current_chunk', 1)
             cards = get_study_cards(source, stage, mode, page_range, user_id, difficulty, chunk_number)
@@ -1839,7 +1806,7 @@ def get_images_batch(source):
         
         # 最大5枚まで返す
         batch_data = []
-        for card in cards[:5]:
+        for card in (cards or [])[:5]:
             batch_data.append({
                 'id': card['id'],
                 'image_problem': card['image_problem'],
