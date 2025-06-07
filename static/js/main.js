@@ -214,6 +214,22 @@ function sendResultBackground(cardId, result) {
     });
 }
 
+// ========== ページ遷移時のクリーンアップ（エラー予防） ==========
+window.addEventListener('beforeunload', function() {
+    console.log("🧹 ページ遷移前のクリーンアップ");
+    
+    // 進行中のfetchリクエストを中断
+    if (window.currentFetchController) {
+        window.currentFetchController.abort();
+    }
+    
+    // タイマーをクリア
+    if (window.redirectTimer) {
+        clearTimeout(window.redirectTimer);
+    }
+});
+
+// ========== 修正版：フェッチリクエストにAbortController追加 ==========
 function handleCardCompletionSync(cardId, result) {
     console.log("🔧 カード完了時同期処理:", cardId, result);
     
@@ -224,6 +240,10 @@ function handleCardCompletionSync(cardId, result) {
     const isTestMode = !isPracticeMode;
     const overlay = showCompletionOverlay("処理中...", isTestMode);
     
+    // AbortControllerを作成（ページ遷移時のエラー予防）
+    const controller = new AbortController();
+    window.currentFetchController = controller;
+    
     // 🔧 修正：完了時は必ずサーバーレスポンスを待ってから処理
     fetch('/log_result', {
         method: 'POST',
@@ -233,7 +253,8 @@ function handleCardCompletionSync(cardId, result) {
             result: result,
             stage: stage,
             mode: mode
-        })
+        }),
+        signal: controller.signal  // AbortController追加
     }).then(function(response) {
         return response.json();
     }).then(function(data) {
@@ -246,7 +267,7 @@ function handleCardCompletionSync(cardId, result) {
             updateOverlayMessage(overlay, data.message || (isTestMode ? "テスト完了！" : "練習完了！"));
             
             // 🚀 オーバーレイを削除せずにリダイレクト（画面切り替わりまで表示）
-            setTimeout(function() {
+            window.redirectTimer = setTimeout(function() {
                 window.location.href = '/prepare/' + getCurrentSource();
             }, 1500); // メッセージ表示後1.5秒でリダイレクト
         } else {
@@ -254,12 +275,21 @@ function handleCardCompletionSync(cardId, result) {
             handleDefaultCompletion(overlay);
         }
     }).catch(function(error) {
+        // AbortErrorは無視（正常なページ遷移）
+        if (error.name === 'AbortError') {
+            console.log("📄 ページ遷移によるリクエスト中断（正常）");
+            return;
+        }
+        
         console.error('❌ 完了時ログエラー:', error);
         updateOverlayMessage(overlay, "エラーが発生しました");
         setTimeout(function() {
             overlay.remove();
             enableAllButtons(); // エラー時はボタンを復活
         }, 2000);
+    }).finally(function() {
+        // クリーンアップ
+        window.currentFetchController = null;
     });
 }
 
@@ -346,7 +376,7 @@ function handleDefaultCompletion(existingOverlay = null) {
     }
     
     // 🚀 オーバーレイを削除せずにリダイレクト（画面切り替わりまで表示）
-    setTimeout(function() {
+    window.redirectTimer = setTimeout(function() {
         window.location.href = '/prepare/' + getCurrentSource();
     }, 1500);
 }
