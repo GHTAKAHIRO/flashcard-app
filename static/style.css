@@ -46,32 +46,48 @@ h1 {
             transition: opacity 0.1s ease;
         }
         
-        /* 🖼️ 画像表示改善 */
+        /* 🖼️ 画面全体活用の画像表示 */
         #flashcard img {
-            display: block;
-            margin: 0 auto 10px;
-            max-width: min(900px, 90vw) !important;
-            max-height: 70vh !important;
+            max-width: min(1200px, 95vw) !important;
+            max-height: calc(100vh - 200px) !important;
             width: auto !important;
             height: auto !important;
             object-fit: contain;
             border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: block;
+            margin: 0 auto;
         }
         
         /* プリレンダリングされた画像にも適用 */
         .prerendered-card img {
-            display: block;
-            margin: 0 auto 10px;
-            max-width: min(900px, 90vw) !important;
-            max-height: 70vh !important;
+            max-width: min(1200px, 95vw) !important;
+            max-height: calc(100vh - 200px) !important;
             width: auto !important;
             height: auto !important;
             object-fit: contain;
             border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: block;
+            margin: 0 auto;
         }
-
+        
+        /* PC用の適切な制限 */
+        @media (min-width: 1400px) {
+            #flashcard img,
+            .prerendered-card img {
+                max-width: 1200px !important;
+            }
+        }
+        
+        /* タブレット用 */
+        @media (max-width: 1024px) and (min-width: 769px) {
+            #flashcard img,
+            .prerendered-card img {
+                max-width: 90vw !important;
+                max-height: calc(100vh - 180px) !important;
+            }
+        }
 
 .card img {
     display: block;

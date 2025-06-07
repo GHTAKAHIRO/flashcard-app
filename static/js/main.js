@@ -1,4 +1,71 @@
-console.log("🔧 最終修正版 瞬間応答 main.js が読み込まれました");
+function createCardElement(card, index) {
+    const container = document.createElement('div');
+    container.className = 'prerendered-card';
+    // 🚀 画面全体活用方式：フラッシュカードの制約を取り除く
+    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box;';
+    container.dataset.cardIndex = index;
+    container.dataset.cardId = card.id;
+    
+    // 問題部分
+    const problemDiv = document.createElement('div');
+    problemDiv.className = 'problem-container';
+    problemDiv.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; flex-grow: 1; text-align: center;';
+    
+    if (card.image_problem) {
+        const img = document.createElement('img');
+        img.src = card.image_problem;
+        // 🚀 レスポンシブ画像サイズ：PC・タブレット・スマホに最適化
+        img.style.cssText = `
+            max-width: min(1200px, 95vw);
+            max-height: calc(100vh - 200px);
+            width: auto;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        `;
+        img.loading = 'eager';
+        problemDiv.appendChild(img);
+    }
+    
+    if (card.problem_number && card.topic) {
+        const text = document.createElement('p');
+        text.textContent = card.problem_number + ": " + card.topic;
+        text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word; max-width: 1200px;';
+        problemDiv.appendChild(text);
+    }
+    
+    // 解答部分
+    const answerDiv = document.createElement('div');
+    answerDiv.className = 'answer-container';
+    answerDiv.style.cssText = 'display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; flex-grow: 1; text-align: center;';
+    
+    if (card.image_answer) {
+        const answerImg = document.createElement('img');
+        answerImg.src = card.image_answer;
+        // 🚀 同じレスポンシブ設定
+        answerImg.style.cssText = `
+            max-width: min(1200px, 95vw);
+            max-height: calc(100vh - 200px);
+            width: auto;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        `;
+        answerImg.loading = 'eager';
+        answerDiv.appendChild(answerImg);
+    }
+    
+    container.appendChild(problemDiv);
+    container.appendChild(answerDiv);
+    
+    return container;
+}console.log("🔧 最終修正版 瞬間応答 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
