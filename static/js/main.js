@@ -14,7 +14,7 @@ function createCardElement(card, index) {
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
-        // 🚀 レスポンシブ画像サイズ：PC・タブレット・スマホに最適化
+        // 🔧 修正：CSS calc()の正しい書き方
         img.style.cssText = `
             max-width: min(1200px, 95vw);
             max-height: calc(100vh - 200px);
@@ -45,7 +45,7 @@ function createCardElement(card, index) {
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
-        // 🚀 同じレスポンシブ設定
+        // 🔧 修正：CSS calc()の正しい書き方
         answerImg.style.cssText = `
             max-width: min(1200px, 95vw);
             max-height: calc(100vh - 200px);
