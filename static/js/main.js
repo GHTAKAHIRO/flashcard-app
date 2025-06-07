@@ -1,8 +1,8 @@
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
-    // 🚀 画面全体活用方式：フラッシュカードの制約を取り除く
-    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box;';
+    // 🎨 シンプルレイアウト：背景なし、中央配置
+    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 0; box-sizing: border-box;';
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
@@ -14,14 +14,12 @@ function createCardElement(card, index) {
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
-        // 🔧 修正：CSS calc()の正しい書き方
+        // 🎨 シンプル画像：シャドウなし、ボーダーなし
         img.style.cssText = `
             max-width: min(1200px, 95vw);
             max-height: calc(100vh - 200px);
             width: auto;
             height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             object-fit: contain;
             display: block;
             margin: 0 auto;
@@ -33,7 +31,7 @@ function createCardElement(card, index) {
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
-        text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word; max-width: 1200px;';
+        text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word; max-width: min(1200px, 95vw);';
         problemDiv.appendChild(text);
     }
     
@@ -45,14 +43,12 @@ function createCardElement(card, index) {
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
-        // 🔧 修正：CSS calc()の正しい書き方
+        // 🎨 シンプル画像：シャドウなし、ボーダーなし
         answerImg.style.cssText = `
             max-width: min(1200px, 95vw);
             max-height: calc(100vh - 200px);
             width: auto;
             height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             object-fit: contain;
             display: block;
             margin: 0 auto;
