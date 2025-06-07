@@ -1,119 +1,400 @@
+/* 🚀 高速化のためのCSS最適化 */
 body {
-    font-family: sans-serif;
-    background-color: #f8f8f8;
+    background: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    /* GPU加速を有効化 */
+    transform: translateZ(0);
 }
 
-h1 {
-    text-align: center;
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
 }
 
-/* フラッシュカード基本設定 */
+.header-info {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.stage-info {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.counters {
+    display: flex;
+    gap: 15px;
+    font-weight: bold;
+}
+
+.counters span {
+    background: rgba(255,255,255,0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* ========== フラッシュカード修正版（画像表示強化） ========== */
 #flashcard {
     background: white;
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    padding: 0;
+    padding: 0 !important;
     margin-bottom: 25px;
     min-height: 400px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch; /* center から stretch に変更 */
     justify-content: center;
     cursor: pointer;
-    overflow: hidden;
+    overflow: hidden !important;
     position: relative;
+    /* 画像表示高速化 */
+    image-rendering: auto;
+    image-rendering: crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    /* トランジション最適化 */
+    transition: opacity 0.1s ease;
+}
+
+/* ========== 画像の全幅表示設定（最重要・強化版） ========== */
+#flashcard img,
+.prerendered-card img {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    /* 🔥 画像表示を強制 */
+    visibility: visible !important;
+    opacity: 1 !important;
+    /* 🔥 レイアウト固定 */
+    min-width: 0 !important;
+    min-height: 0 !important;
+    /* 🔥 flex設定を追加 */
+    flex-shrink: 0 !important;
+    /* 🔥 位置設定を明確化 */
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* ========== プリレンダリングカードの調整（画像表示強化版） ========== */
+.prerendered-card {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important; /* center から stretch に変更 */
+    justify-content: center !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    /* 🔥 画像コンテナとして最適化 */
+    contain: layout style paint !important;
+}
+
+/* ========== 問題・解答コンテナの調整（画像表示強化版） ========== */
+.problem-container,
+.answer-container {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important; /* center から stretch に変更 */
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important; /* 高さを100%に設定 */
+    text-align: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    /* 🔥 画像コンテナとして最適化 */
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+/* ========== 画像専用スタイル強化 ========== */
+.problem-container img,
+.answer-container img {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: 100% !important; /* 最大高さを制限 */
+    object-fit: contain !important;
+    object-position: center !important;
+    display: block !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    /* 🔥 確実な表示設定 */
+    visibility: visible !important;
+    opacity: 1 !important;
+    /* 🔥 レイアウト安定化 */
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    /* 🔥 GPU加速 */
+    transform: translateZ(0) !important;
+    backface-visibility: hidden !important;
+    /* 🔥 アンチエイリアシング */
+    image-rendering: -webkit-optimize-contrast !important;
+    image-rendering: optimize-contrast !important;
+    image-rendering: crisp-edges !important;
+}
+
+/* ========== テキスト部分の調整（画像と競合しないように） ========== */
+.prerendered-card p {
+    margin: 10px !important;
+    font-weight: bold !important;
+    font-size: 16px !important;
+    color: #333 !important;
+    word-wrap: break-word !important;
+    max-width: 100% !important;
+    padding: 10px !important;
+    line-height: 1.4 !important;
+    background: rgba(255,255,255,0.9) !important;
+    border-radius: 4px !important;
+    position: relative !important;
+    z-index: 2 !important; /* 画像より前面に */
+    /* 🔥 テキストがある場合のフレックス設定 */
+    flex: 0 0 auto !important;
+    order: 2 !important; /* 画像の後に表示 */
+}
+
+/* ========== 画像の順序設定 ========== */
+.problem-container img,
+.answer-container img {
+    order: 1 !important; /* テキストより前に表示 */
+}
+
+/* ========== スクロールバーの完全削除 ========== */
+#flashcard::-webkit-scrollbar,
+.prerendered-card::-webkit-scrollbar,
+.problem-container::-webkit-scrollbar,
+.answer-container::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
+}
+
+#flashcard,
+.prerendered-card,
+.problem-container,
+.answer-container {
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE */
 }
 
 #flashcard:hover {
     box-shadow: 0 6px 25px rgba(0,0,0,0.15);
 }
 
-/* プリレンダリングカード */
-.prerendered-card {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.controls {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.button-row {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 10px;
-    box-sizing: border-box;
+    gap: 15px;
+    margin-bottom: 15px;
 }
 
-/* 問題・解答コンテナ */
-.problem-container,
-.answer-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    text-align: center;
-}
-
-/* 画像設定：画面幅いっぱい */
-#flashcard img,
-.prerendered-card img {
-    width: 100%;
-    max-width: 100%;
-    height: auto;
-    object-fit: contain;
-    display: block;
-    margin: 0 auto;
-}
-
-/* テキスト設定 */
-.prerendered-card p {
-    margin: 10px 0 0 0;
-    font-weight: bold;
-    font-size: 16px;
-    color: #333;
-    word-wrap: break-word;
-}
-
-/* スクロールバー削除 */
-#flashcard::-webkit-scrollbar {
-    display: none;
-}
-
-#flashcard {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-/* フッター */
-.footer {
-    text-align: center;
-    margin-top: 30px;
-}
-
-.footer button {
-    font-size: 18px;
-    padding: 8px 16px;
-    margin: 0 10px;
+.btn-custom {
+    flex: 1;
+    padding: 15px;
     border: none;
-    border-radius: 5px;
-    background-color: #007BFF;
-    color: white;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
     cursor: pointer;
+    /* ボタン応答性向上 */
+    transition: all 0.1s ease;
+    transform: translateZ(0);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
 }
 
-.footer button:hover {
-    background-color: #0056b3;
+.btn-custom:active {
+    transform: scale(0.98);
 }
 
-/* モバイル対応 */
+.btn-answer {
+    background: #17a2b8;
+    color: white;
+    font-size: 16px;
+}
+
+.btn-answer:hover {
+    background: #138496;
+}
+
+#knownBtn {
+    background: #28a745;
+    color: white;
+    font-size: 24px;
+}
+
+#knownBtn:hover {
+    background: #218838;
+}
+
+#unknownBtn {
+    background: #dc3545;
+    color: white;
+    font-size: 24px;
+}
+
+#unknownBtn:hover {
+    background: #c82333;
+}
+
+.shortcuts-info {
+    text-align: center;
+    color: #6c757d;
+    font-size: 14px;
+    margin-top: 15px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.progress-info {
+    text-align: center;
+    color: #6c757d;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+/* プリロード用の非表示画像 */
+#preload-container {
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* トースト表示用アニメーション */
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+/* ========== 画像読み込みエラー時のスタイル ========== */
+.image-error {
+    background-color: #f8f9fa !important;
+    border: 2px dashed #dee2e6 !important;
+    min-height: 200px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    color: #6c757d !important;
+    text-align: center !important;
+}
+
+/* ========== レスポンシブ対応（画像表示強化版） ========== */
 @media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
     #flashcard {
         min-height: 300px;
         max-height: 70vh;
     }
     
     .prerendered-card p {
-        font-size: 14px;
+        font-size: 14px !important;
+        padding: 8px !important;
+        margin: 8px !important;
     }
+    
+    .btn-custom {
+        padding: 12px;
+        font-size: 16px;
+    }
+    
+    #knownBtn, #unknownBtn {
+        font-size: 20px;
+    }
+    
+    /* 🔥 モバイルでの画像表示最適化 */
+    .problem-container img,
+    .answer-container img {
+        max-height: 60vh !important;
+    }
+}
+
+/* タブレット対応 */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .prerendered-card p {
+        font-size: 15px !important;
+    }
+    
+    /* 🔥 タブレットでの画像表示最適化 */
+    .problem-container img,
+    .answer-container img {
+        max-height: 70vh !important;
+    }
+}
+
+/* デスクトップ対応 */
+@media (min-width: 1025px) {
+    .prerendered-card p {
+        font-size: 18px !important;
+    }
+    
+    /* 🔥 デスクトップでの画像表示最適化 */
+    .problem-container img,
+    .answer-container img {
+        max-height: 75vh !important;
+    }
+}
+
+/* ========== 画像読み込み中のスタイル ========== */
+.problem-container img[src=""],
+.answer-container img[src=""] {
+    background: linear-gradient(90deg, #f0f0f0 25%, transparent 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ========== デバッグ用スタイル（開発時のみ） ========== */
+.debug-border {
+    border: 2px solid red !important;
+}
+
+.debug-visible {
+    background-color: rgba(255, 255, 0, 0.3) !important;
 }
