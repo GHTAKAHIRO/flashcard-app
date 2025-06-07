@@ -110,34 +110,40 @@ def get_db_connection():
     )
 
 def optimize_database_indexes():
-    """🔥 データベースインデックス最適化（超高速化）"""
+    """🔥 データベースインデックス最適化（トランザクションエラー修正版）"""
     indexes = [
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_image_source_page ON image(source, page_number);",
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_image_source_level ON image(source, level);",
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);"
+        "CREATE INDEX IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
+        "CREATE INDEX IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_image_source_page ON image(source, page_number);",
+        "CREATE INDEX IF NOT EXISTS idx_image_source_level ON image(source, level);",
+        "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
+        "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);"
     ]
     
     success_count = 0
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                for index_sql in indexes:
-                    try:
-                        cur.execute(index_sql)
-                        conn.commit()
-                        success_count += 1
-                    except Exception as e:
-                        if "already exists" not in str(e):
-                            app.logger.error(f"インデックス作成エラー: {e}")
-                        conn.rollback()
+        # 🔧 修正：CONCURRENTLYを削除し、通常のCREATE INDEXに変更
+        conn = get_db_connection()
+        conn.autocommit = True  # 🔧 追加：オートコミットモードに設定
         
+        with conn.cursor() as cur:
+            for index_sql in indexes:
+                try:
+                    cur.execute(index_sql)
+                    success_count += 1
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        app.logger.error(f"インデックス作成エラー: {e}")
+        
+        conn.close()
         app.logger.info(f"📊 データベース最適化完了: {success_count}個のインデックス")
     except Exception as e:
         app.logger.error(f"データベース最適化エラー: {e}")
+        try:
+            conn.close()
+        except:
+            pass
 
 # ========== Redis除去版 パート3: インメモリキャッシュシステム ==========
 
