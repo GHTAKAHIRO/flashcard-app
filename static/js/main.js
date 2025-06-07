@@ -1,4 +1,4 @@
-console.log("🔧 シンプル修正版 main.js が読み込まれました");
+console.log("🔧 統一修正版 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
@@ -35,24 +35,23 @@ function prerenderAllCards() {
     console.log("✅ 事前レンダリング完了: " + cards.length + "枚");
 }
 
-// ========== シンプルなカード作成関数 ==========
+// ========== HTML内CSS対応のカード作成関数 ==========
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
-    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box;';
+    // HTML内CSSの.prerendered-cardスタイルを活用
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
     // 問題部分
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container';
-    problemDiv.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; text-align: center;';
+    // HTML内CSSの.problem-containerスタイルを活用
     
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
-        // シンプルな画像設定：画面幅いっぱい
-        img.style.cssText = 'width: 100%; max-width: 100%; height: auto; object-fit: contain; display: block; margin: 0 auto;';
+        // HTML内CSSの画像スタイルを活用（.prerendered-card img）
         img.loading = 'eager';
         problemDiv.appendChild(img);
     }
@@ -60,21 +59,20 @@ function createCardElement(card, index) {
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
-        text.style.cssText = 'margin: 10px 0 0 0; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word;';
+        // HTML内CSSの.prerendered-card pスタイルを活用
         problemDiv.appendChild(text);
     }
     
     // 解答部分
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container';
-    // 最初は確実に非表示
-    answerDiv.style.cssText = 'display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; text-align: center;';
+    // 最初は確実に非表示に設定
+    answerDiv.style.display = 'none';
     
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
-        // 解答画像も画面幅いっぱい
-        answerImg.style.cssText = 'width: 100%; max-width: 100%; height: auto; object-fit: contain; display: block; margin: 0 auto;';
+        // HTML内CSSの画像スタイルを活用
         answerImg.loading = 'eager';
         answerDiv.appendChild(answerImg);
     }
@@ -102,6 +100,7 @@ function switchToCardInstantly(newIndex) {
         const problemDiv = prerenderedCards[newIndex].querySelector('.problem-container');
         const answerDiv = prerenderedCards[newIndex].querySelector('.answer-container');
         if (problemDiv && answerDiv) {
+            // 問題を表示、解答を非表示
             problemDiv.style.display = 'flex';
             answerDiv.style.display = 'none';
         }
@@ -134,11 +133,15 @@ function toggleAnswerInstantly() {
         showingAnswer = !showingAnswer;
         
         if (showingAnswer) {
+            // 解答を表示、問題を非表示
             problemDiv.style.display = 'none';
             answerDiv.style.display = 'flex';
+            console.log("👁️ 解答表示");
         } else {
+            // 問題を表示、解答を非表示
             problemDiv.style.display = 'flex';
             answerDiv.style.display = 'none';
+            console.log("📝 問題表示");
         }
     }
 }
@@ -251,9 +254,45 @@ function handleCardCompletionSync(cardId, result) {
     });
 }
 
+// ========== デバッグ機能 ==========
+function debugStatus() {
+    console.log("=== デバッグ情報 ===");
+    console.log("カード数:", cards.length);
+    console.log("現在のインデックス:", currentIndex);
+    console.log("解答表示中:", showingAnswer);
+    console.log("プリレンダリングカード数:", prerenderedCards.length);
+    
+    // 画像要素の確認
+    const images = document.querySelectorAll('#flashcard img');
+    console.log("画像要素数:", images.length);
+    
+    images.forEach(function(img, i) {
+        console.log("画像" + i + ":", {
+            src: img.src,
+            display: img.style.display,
+            width: img.offsetWidth,
+            height: img.offsetHeight,
+            visible: img.offsetParent !== null
+        });
+    });
+    
+    // 現在表示中のカード
+    if (prerenderedCards[currentIndex]) {
+        const currentCard = prerenderedCards[currentIndex];
+        const problemDiv = currentCard.querySelector('.problem-container');
+        const answerDiv = currentCard.querySelector('.answer-container');
+        
+        console.log("現在のカード表示状態:", {
+            card_display: currentCard.style.display,
+            problem_display: problemDiv ? problemDiv.style.display : "not found",
+            answer_display: answerDiv ? answerDiv.style.display : "not found"
+        });
+    }
+}
+
 // ========== 初期化 ==========
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("🔧 シンプル修正版初期化開始");
+    console.log("🔧 統一修正版初期化開始");
     
     if (typeof rawCards === "undefined") {
         console.error("❌ rawCards が定義されていません");
@@ -271,7 +310,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setupInstantEvents();
     setupInstantKeyboard();
     
-    console.log("🔧 シンプル修正版初期化完了");
+    // デバッグ情報を表示
+    setTimeout(debugStatus, 1000);
+    
+    console.log("🔧 統一修正版初期化完了");
 });
 
 function setupInstantEvents() {
@@ -351,4 +393,7 @@ window.markUnknown = function() {
     handleAnswerInstantly('unknown');
 };
 
-console.log("🔧 シンプル修正版読み込み完了");
+// デバッグ用グローバル関数
+window.debugStatus = debugStatus;
+
+console.log("🔧 統一修正版読み込み完了");
