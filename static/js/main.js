@@ -38,21 +38,24 @@ function prerenderAllCards() {
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
-    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;';
+    // 🔧 修正：高さ制限と中央寄せの制約を緩和
+    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; overflow-y: auto;';
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
     // 問題部分
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container';
-    problemDiv.style.cssText = 'display: block; width: 100%; text-align: center; max-width: 900px;';
+    // 🔧 修正：幅制限を緩和し、自然な表示に
+    problemDiv.style.cssText = 'display: block; width: 100%; text-align: center; flex-grow: 1; display: flex; flex-direction: column; justify-content: center;';
     
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
+        // 🔧 修正：より自然な画像サイズ設定
         img.style.cssText = `
-            max-width: min(900px, 90vw);
-            max-height: 70vh;
+            max-width: min(900px, calc(100vw - 80px));
+            max-height: calc(80vh - 150px);
             width: auto;
             height: auto;
             border-radius: 8px;
@@ -68,21 +71,23 @@ function createCardElement(card, index) {
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
-        text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333; max-width: 900px; word-wrap: break-word;';
+        text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word; flex-shrink: 0;';
         problemDiv.appendChild(text);
     }
     
     // 解答部分
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container';
-    answerDiv.style.cssText = 'display: none; width: 100%; text-align: center; max-width: 900px;';
+    // 🔧 修正：解答部分も同様に調整
+    answerDiv.style.cssText = 'display: none; width: 100%; text-align: center; flex-grow: 1; display: flex; flex-direction: column; justify-content: center;';
     
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
+        // 🔧 修正：同じ画像サイズ設定
         answerImg.style.cssText = `
-            max-width: min(900px, 90vw);
-            max-height: 70vh;
+            max-width: min(900px, calc(100vw - 80px));
+            max-height: calc(80vh - 150px);
             width: auto;
             height: auto;
             border-radius: 8px;
@@ -118,7 +123,10 @@ function switchToCardInstantly(newIndex) {
         const problemDiv = prerenderedCards[newIndex].querySelector('.problem-container');
         const answerDiv = prerenderedCards[newIndex].querySelector('.answer-container');
         if (problemDiv && answerDiv) {
-            problemDiv.style.display = 'block';
+            // 🔧 修正：flex表示に統一
+            problemDiv.style.display = 'flex';
+            problemDiv.style.flexDirection = 'column';
+            problemDiv.style.justifyContent = 'center';
             answerDiv.style.display = 'none';
         }
     }
@@ -208,10 +216,16 @@ function toggleAnswerInstantly() {
         showingAnswer = !showingAnswer;
         
         if (showingAnswer) {
+            // 🔧 修正：表示切り替えを改善
             problemDiv.style.display = 'none';
-            answerDiv.style.display = 'block';
+            answerDiv.style.display = 'flex'; // flex に変更
+            answerDiv.style.flexDirection = 'column';
+            answerDiv.style.justifyContent = 'center';
         } else {
-            problemDiv.style.display = 'block';
+            // 🔧 修正：表示切り替えを改善
+            problemDiv.style.display = 'flex'; // flex に変更
+            problemDiv.style.flexDirection = 'column';
+            problemDiv.style.justifyContent = 'center';
             answerDiv.style.display = 'none';
         }
     }
