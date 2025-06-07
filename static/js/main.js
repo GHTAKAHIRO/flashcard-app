@@ -1,4 +1,4 @@
-console.log("🔧 統一修正版 main.js が読み込まれました");
+console.log("🔧 問題・解答分離修正版 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
@@ -8,7 +8,7 @@ let cardStatus = {};
 let isPracticeMode = false;
 let prerenderedCards = []; // 事前レンダリング済みカード
 
-// ========== 事前レンダリングシステム ==========
+// ========== 事前レンダリングシステム（修正版） ==========
 function prerenderAllCards() {
     console.log("🚀 全カード事前レンダリング開始");
     
@@ -35,45 +35,46 @@ function prerenderAllCards() {
     console.log("✅ 事前レンダリング完了: " + cards.length + "枚");
 }
 
-// ========== HTML内CSS対応のカード作成関数 ==========
+// ========== 修正版カード作成関数（問題・解答分離強化） ==========
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
-    // HTML内CSSの.prerendered-cardスタイルを活用
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
-    // 問題部分
+    // 問題部分（必ず表示）
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container';
-    // HTML内CSSの.problem-containerスタイルを活用
+    problemDiv.dataset.section = 'problem';
     
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
-        // HTML内CSSの画像スタイルを活用（.prerendered-card img）
         img.loading = 'eager';
+        img.alt = '問題画像';
         problemDiv.appendChild(img);
     }
     
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
-        // HTML内CSSの.prerendered-card pスタイルを活用
         problemDiv.appendChild(text);
     }
     
-    // 解答部分
+    // 解答部分（必ず非表示で開始）
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container';
-    // 最初は確実に非表示に設定
-    answerDiv.style.display = 'none';
+    answerDiv.dataset.section = 'answer';
+    // 🔥 重要：解答は必ず非表示で開始
+    answerDiv.style.display = 'none !important';
+    answerDiv.style.visibility = 'hidden';
+    answerDiv.style.opacity = '0';
     
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
-        // HTML内CSSの画像スタイルを活用
         answerImg.loading = 'eager';
+        answerImg.alt = '解答画像';
         answerDiv.appendChild(answerImg);
     }
     
@@ -83,11 +84,11 @@ function createCardElement(card, index) {
     return container;
 }
 
-// ========== 瞬間カード切り替え ==========
+// ========== 修正版カード切り替え（問題・解答状態リセット強化） ==========
 function switchToCardInstantly(newIndex) {
     if (newIndex >= cards.length) return false;
     
-    // 現在のカードを非表示
+    // 現在のカードを完全に非表示
     if (prerenderedCards[currentIndex]) {
         prerenderedCards[currentIndex].style.display = 'none';
     }
@@ -96,18 +97,27 @@ function switchToCardInstantly(newIndex) {
     if (prerenderedCards[newIndex]) {
         prerenderedCards[newIndex].style.display = 'flex';
         
-        // 問題・解答の表示状態をリセット
+        // 🔥 重要：問題・解答の表示状態を強制リセット
         const problemDiv = prerenderedCards[newIndex].querySelector('.problem-container');
         const answerDiv = prerenderedCards[newIndex].querySelector('.answer-container');
+        
         if (problemDiv && answerDiv) {
-            // 問題を表示、解答を非表示
+            // 問題を確実に表示
             problemDiv.style.display = 'flex';
+            problemDiv.style.visibility = 'visible';
+            problemDiv.style.opacity = '1';
+            
+            // 解答を確実に非表示
             answerDiv.style.display = 'none';
+            answerDiv.style.visibility = 'hidden';
+            answerDiv.style.opacity = '0';
+            
+            console.log(`📝 カード${newIndex + 1}: 問題表示、解答非表示に設定`);
         }
     }
     
     currentIndex = newIndex;
-    showingAnswer = false;
+    showingAnswer = false; // 🔥 重要：フラグもリセット
     
     // 進捗更新
     updateProgressInstantly();
@@ -122,7 +132,7 @@ function updateProgressInstantly() {
     }
 }
 
-// ========== 瞬間解答切り替え ==========
+// ========== 修正版解答切り替え（状態管理強化） ==========
 function toggleAnswerInstantly() {
     if (!prerenderedCards[currentIndex]) return;
     
@@ -135,13 +145,25 @@ function toggleAnswerInstantly() {
         if (showingAnswer) {
             // 解答を表示、問題を非表示
             problemDiv.style.display = 'none';
+            problemDiv.style.visibility = 'hidden';
+            problemDiv.style.opacity = '0';
+            
             answerDiv.style.display = 'flex';
-            console.log("👁️ 解答表示");
+            answerDiv.style.visibility = 'visible';
+            answerDiv.style.opacity = '1';
+            
+            console.log("👁️ 解答表示モード");
         } else {
             // 問題を表示、解答を非表示
             problemDiv.style.display = 'flex';
+            problemDiv.style.visibility = 'visible';
+            problemDiv.style.opacity = '1';
+            
             answerDiv.style.display = 'none';
-            console.log("📝 問題表示");
+            answerDiv.style.visibility = 'hidden';
+            answerDiv.style.opacity = '0';
+            
+            console.log("📝 問題表示モード");
         }
     }
 }
@@ -254,7 +276,7 @@ function handleCardCompletionSync(cardId, result) {
     });
 }
 
-// ========== デバッグ機能 ==========
+// ========== デバッグ機能（修正版） ==========
 function debugStatus() {
     console.log("=== デバッグ情報 ===");
     console.log("カード数:", cards.length);
@@ -262,21 +284,7 @@ function debugStatus() {
     console.log("解答表示中:", showingAnswer);
     console.log("プリレンダリングカード数:", prerenderedCards.length);
     
-    // 画像要素の確認
-    const images = document.querySelectorAll('#flashcard img');
-    console.log("画像要素数:", images.length);
-    
-    images.forEach(function(img, i) {
-        console.log("画像" + i + ":", {
-            src: img.src,
-            display: img.style.display,
-            width: img.offsetWidth,
-            height: img.offsetHeight,
-            visible: img.offsetParent !== null
-        });
-    });
-    
-    // 現在表示中のカード
+    // 現在表示中のカードの詳細状態
     if (prerenderedCards[currentIndex]) {
         const currentCard = prerenderedCards[currentIndex];
         const problemDiv = currentCard.querySelector('.problem-container');
@@ -285,14 +293,28 @@ function debugStatus() {
         console.log("現在のカード表示状態:", {
             card_display: currentCard.style.display,
             problem_display: problemDiv ? problemDiv.style.display : "not found",
-            answer_display: answerDiv ? answerDiv.style.display : "not found"
+            problem_visibility: problemDiv ? problemDiv.style.visibility : "not found",
+            answer_display: answerDiv ? answerDiv.style.display : "not found",
+            answer_visibility: answerDiv ? answerDiv.style.visibility : "not found",
+            showingAnswer_flag: showingAnswer
+        });
+        
+        // 画像要素の確認
+        const problemImg = problemDiv ? problemDiv.querySelector('img') : null;
+        const answerImg = answerDiv ? answerDiv.querySelector('img') : null;
+        
+        console.log("画像表示状態:", {
+            problem_img_visible: problemImg ? problemImg.offsetParent !== null : false,
+            answer_img_visible: answerImg ? answerImg.offsetParent !== null : false,
+            problem_img_src: problemImg ? problemImg.src : "なし",
+            answer_img_src: answerImg ? answerImg.src : "なし"
         });
     }
 }
 
-// ========== 初期化 ==========
+// ========== 初期化（修正版） ==========
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("🔧 統一修正版初期化開始");
+    console.log("🔧 問題・解答分離修正版初期化開始");
     
     if (typeof rawCards === "undefined") {
         console.error("❌ rawCards が定義されていません");
@@ -301,6 +323,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     cards = shuffle(rawCards.slice());
     currentIndex = 0;
+    showingAnswer = false; // 🔥 重要：初期状態は必ず問題表示
     isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
     
     console.log("📊 カードデータ: " + cards.length + "枚");
@@ -310,10 +333,30 @@ document.addEventListener('DOMContentLoaded', function() {
     setupInstantEvents();
     setupInstantKeyboard();
     
-    // デバッグ情報を表示
-    setTimeout(debugStatus, 1000);
+    // 初期表示状態を確実に設定
+    setTimeout(function() {
+        if (prerenderedCards[0]) {
+            const problemDiv = prerenderedCards[0].querySelector('.problem-container');
+            const answerDiv = prerenderedCards[0].querySelector('.answer-container');
+            
+            if (problemDiv && answerDiv) {
+                problemDiv.style.display = 'flex';
+                problemDiv.style.visibility = 'visible';
+                problemDiv.style.opacity = '1';
+                
+                answerDiv.style.display = 'none';
+                answerDiv.style.visibility = 'hidden';
+                answerDiv.style.opacity = '0';
+                
+                console.log("🎯 初期表示状態確認完了: 問題表示、解答非表示");
+            }
+        }
+        
+        // デバッグ情報を表示
+        debugStatus();
+    }, 500);
     
-    console.log("🔧 統一修正版初期化完了");
+    console.log("🔧 問題・解答分離修正版初期化完了");
 });
 
 function setupInstantEvents() {
@@ -396,4 +439,4 @@ window.markUnknown = function() {
 // デバッグ用グローバル関数
 window.debugStatus = debugStatus;
 
-console.log("🔧 統一修正版読み込み完了");
+console.log("🔧 問題・解答分離修正版読み込み完了");
