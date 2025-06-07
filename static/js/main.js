@@ -1,4 +1,4 @@
-console.log("🔧 最終修正版 瞬間応答 main.js が読み込まれました");
+console.log("🔧 構文エラー修正版 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
@@ -35,55 +35,23 @@ function prerenderAllCards() {
     console.log("✅ 事前レンダリング完了: " + cards.length + "枚");
 }
 
-// ========== 画像表示修正版（スライドなし・画面幅対応） ==========
-
+// ========== 画像表示修正版カード作成関数 ==========
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
-    // 🎨 修正：スクロール削除、シンプルな縦並び表示
-    container.style.cssText = `
-        position: absolute; 
-        top: 0; 
-        left: 0; 
-        width: 100%; 
-        height: 100%; 
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
-        justify-content: flex-start;
-        padding: 20px 0;
-        box-sizing: border-box;
-        overflow-y: auto;
-    `;
+    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px 10px; box-sizing: border-box; overflow-y: auto;';
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
     // 問題部分
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container';
-    problemDiv.style.cssText = `
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
-        width: 100%; 
-        text-align: center;
-        margin-bottom: 20px;
-    `;
+    problemDiv.style.cssText = 'display: flex; flex-direction: column; align-items: center; width: 100%; text-align: center; margin-bottom: 20px;';
     
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
-        // 🎨 修正：画面幅に合わせた画像サイズ（スライドなし）
-        img.style.cssText = `
-            width: 100%;
-            max-width: 100%;
-            height: auto;
-            object-fit: contain;
-            display: block;
-            margin: 0 auto 15px auto;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        `;
+        img.style.cssText = 'width: 100%; max-width: 100%; height: auto; object-fit: contain; display: block; margin: 0 auto 15px auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
         img.loading = 'eager';
         problemDiv.appendChild(img);
     }
@@ -91,43 +59,19 @@ function createCardElement(card, index) {
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
-        text.style.cssText = `
-            margin: 0; 
-            font-weight: bold; 
-            font-size: 16px; 
-            color: #333; 
-            word-wrap: break-word;
-            max-width: 100%;
-        `;
+        text.style.cssText = 'margin: 0; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word; max-width: 100%; padding: 0 10px; line-height: 1.4;';
         problemDiv.appendChild(text);
     }
     
     // 解答部分
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container';
-    answerDiv.style.cssText = `
-        display: none; 
-        flex-direction: column; 
-        align-items: center; 
-        width: 100%; 
-        text-align: center;
-        margin-bottom: 20px;
-    `;
+    answerDiv.style.cssText = 'display: none; flex-direction: column; align-items: center; width: 100%; text-align: center; margin-bottom: 20px;';
     
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
-        // 🎨 修正：解答画像も画面幅に合わせる
-        answerImg.style.cssText = `
-            width: 100%;
-            max-width: 100%;
-            height: auto;
-            object-fit: contain;
-            display: block;
-            margin: 0 auto 15px auto;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        `;
+        answerImg.style.cssText = 'width: 100%; max-width: 100%; height: auto; object-fit: contain; display: block; margin: 0 auto 15px auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
         answerImg.loading = 'eager';
         answerDiv.appendChild(answerImg);
     }
@@ -137,56 +81,6 @@ function createCardElement(card, index) {
     
     return container;
 }
-
-// ========== 瞬間解答切り替え（修正版） ==========
-function toggleAnswerInstantly() {
-    if (!prerenderedCards[currentIndex]) return;
-    
-    const problemDiv = prerenderedCards[currentIndex].querySelector('.problem-container');
-    const answerDiv = prerenderedCards[currentIndex].querySelector('.answer-container');
-    
-    if (problemDiv && answerDiv) {
-        showingAnswer = !showingAnswer;
-        
-        if (showingAnswer) {
-            // 問題を非表示、解答を表示
-            problemDiv.style.display = 'none';
-            answerDiv.style.display = 'flex';
-            answerDiv.style.flexDirection = 'column';
-            answerDiv.style.alignItems = 'center';
-        } else {
-            // 解答を非表示、問題を表示
-            problemDiv.style.display = 'flex';
-            problemDiv.style.flexDirection = 'column';
-            problemDiv.style.alignItems = 'center';
-            answerDiv.style.display = 'none';
-        }
-    }
-}
-
-// ========== レスポンシブ対応の追加 ==========
-function adjustImageSizes() {
-    """画面サイズ変更時に画像サイズを調整"""
-    const images = document.querySelectorAll('.prerendered-card img');
-    images.forEach(img => {
-        // 画面幅に合わせて再調整
-        img.style.width = '100%';
-        img.style.maxWidth = '100%';
-        img.style.height = 'auto';
-    });
-}
-
-// 画面リサイズ時に画像サイズを調整
-window.addEventListener('resize', function() {
-    adjustImageSizes();
-});
-
-// 初期化時にも調整
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(adjustImageSizes, 100); // 少し遅延させて確実に適用
-});
-
-console.log("🎨 画像表示修正版（スライドなし・画面幅対応）読み込み完了");
 
 // ========== 瞬間カード切り替え ==========
 function switchToCardInstantly(newIndex) {
@@ -207,7 +101,7 @@ function switchToCardInstantly(newIndex) {
         if (problemDiv && answerDiv) {
             problemDiv.style.display = 'flex';
             problemDiv.style.flexDirection = 'column';
-            problemDiv.style.justifyContent = 'center';
+            problemDiv.style.alignItems = 'center';
             answerDiv.style.display = 'none';
         }
     }
@@ -228,7 +122,7 @@ function updateProgressInstantly() {
     }
 }
 
-// ========== 瞬間回答処理（最終修正版） ==========
+// ========== 瞬間回答処理 ==========
 function handleAnswerInstantly(result) {
     console.log("⚡ 瞬間回答: " + result + " (カード" + (currentIndex + 1) + "/" + cards.length + ")");
     
@@ -246,12 +140,11 @@ function handleAnswerInstantly(result) {
     
     if (!success) {
         console.log("🏁 全カード完了");
-        // 🔧 修正：完了時は必ずサーバーレスポンスを待つ
         handleCardCompletionSync(currentCardId, result);
         return;
     }
     
-    // 4. 通常カード - 非同期ログ送信（レスポンス無視）
+    // 4. 通常カード - 非同期ログ送信
     sendResultBackground(currentCardId, result);
 }
 
@@ -300,19 +193,18 @@ function toggleAnswerInstantly() {
             problemDiv.style.display = 'none';
             answerDiv.style.display = 'flex';
             answerDiv.style.flexDirection = 'column';
-            answerDiv.style.justifyContent = 'center';
+            answerDiv.style.alignItems = 'center';
         } else {
             problemDiv.style.display = 'flex';
             problemDiv.style.flexDirection = 'column';
-            problemDiv.style.justifyContent = 'center';
+            problemDiv.style.alignItems = 'center';
             answerDiv.style.display = 'none';
         }
     }
 }
 
-// ========== 最終修正版ログ処理 ==========
+// ========== ログ処理 ==========
 function sendResultBackground(cardId, result) {
-    // 🔧 非同期ログ送信（レスポンス処理なし）
     fetch('/log_result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -327,37 +219,31 @@ function sendResultBackground(cardId, result) {
     });
 }
 
-// ========== ページ遷移時のクリーンアップ（エラー予防） ==========
+// ========== ページ遷移時のクリーンアップ ==========
 window.addEventListener('beforeunload', function() {
     console.log("🧹 ページ遷移前のクリーンアップ");
     
-    // 進行中のfetchリクエストを中断
     if (window.currentFetchController) {
         window.currentFetchController.abort();
     }
     
-    // タイマーをクリア
     if (window.redirectTimer) {
         clearTimeout(window.redirectTimer);
     }
 });
 
-// ========== 修正版：フェッチリクエストにAbortController追加 ==========
+// ========== 完了処理 ==========
 function handleCardCompletionSync(cardId, result) {
     console.log("🔧 カード完了時同期処理:", cardId, result);
     
-    // 🚀 完了時にボタンを無効化（誤操作防止）
     disableAllButtons();
     
-    // 🚀 即座にオーバーレイ表示（リダイレクトまで表示し続ける）
     const isTestMode = !isPracticeMode;
     const overlay = showCompletionOverlay("処理中...", isTestMode);
     
-    // AbortControllerを作成（ページ遷移時のエラー予防）
     const controller = new AbortController();
     window.currentFetchController = controller;
     
-    // 🔧 修正：完了時は必ずサーバーレスポンスを待ってから処理
     fetch('/log_result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -367,28 +253,24 @@ function handleCardCompletionSync(cardId, result) {
             stage: stage,
             mode: mode
         }),
-        signal: controller.signal  // AbortController追加
+        signal: controller.signal
     }).then(function(response) {
         return response.json();
     }).then(function(data) {
         console.log("✅ 完了時サーバーレスポンス:", data);
         
-        // 🔧 修正：オーバーレイのメッセージを更新
         if (data.redirect_to_prepare === true) {
             console.log("🎯 サーバー指示：prepare画面へリダイレクト");
-            
             updateOverlayMessage(overlay, data.message || (isTestMode ? "テスト完了！" : "練習完了！"));
             
-            // 🚀 オーバーレイを削除せずにリダイレクト（画面切り替わりまで表示）
             window.redirectTimer = setTimeout(function() {
                 window.location.href = '/prepare/' + getCurrentSource();
-            }, 1500); // メッセージ表示後1.5秒でリダイレクト
+            }, 1500);
         } else {
             console.log("🔧 サーバー指示なし：デフォルト処理");
             handleDefaultCompletion(overlay);
         }
     }).catch(function(error) {
-        // AbortErrorは無視（正常なページ遷移）
         if (error.name === 'AbortError') {
             console.log("📄 ページ遷移によるリクエスト中断（正常）");
             return;
@@ -398,10 +280,9 @@ function handleCardCompletionSync(cardId, result) {
         updateOverlayMessage(overlay, "エラーが発生しました");
         setTimeout(function() {
             overlay.remove();
-            enableAllButtons(); // エラー時はボタンを復活
+            enableAllButtons();
         }, 2000);
     }).finally(function() {
-        // クリーンアップ
         window.currentFetchController = null;
     });
 }
@@ -411,12 +292,11 @@ function updateOverlayMessage(overlay, newMessage) {
     if (messageDiv) {
         messageDiv.textContent = newMessage;
     } else {
-        // メッセージ要素を探して更新
         const contentDiv = overlay.querySelector('div > div');
         if (contentDiv) {
             const children = contentDiv.children;
             if (children.length >= 3) {
-                children[2].textContent = newMessage; // 3番目の要素がメッセージ
+                children[2].textContent = newMessage;
             }
         }
     }
@@ -472,100 +352,42 @@ function enableAllButtons() {
     }
 }
 
-function handleDefaultCompletion(existingOverlay = null) {
+function handleDefaultCompletion(existingOverlay) {
     console.log("🔧 デフォルト完了処理");
     
-    // ボタン無効化（まだの場合）
     disableAllButtons();
     
     let overlay = existingOverlay;
     
     if (!overlay) {
-        // 新しいオーバーレイを作成
         overlay = showCompletionOverlay(isPracticeMode ? "練習ラウンド完了！" : "テスト完了！", !isPracticeMode);
     } else {
-        // 既存のオーバーレイのメッセージを更新
         updateOverlayMessage(overlay, isPracticeMode ? "練習ラウンド完了！" : "テスト完了！");
     }
     
-    // 🚀 オーバーレイを削除せずにリダイレクト（画面切り替わりまで表示）
     window.redirectTimer = setTimeout(function() {
         window.location.href = '/prepare/' + getCurrentSource();
     }, 1500);
 }
 
-function showInstantMessage(message) {
-    console.log("💬 メッセージ表示:", message);
-    
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 12px 20px; border-radius: 6px; font-weight: bold; z-index: 1000; transform: translateX(100%); transition: transform 0.3s ease;';
-    
-    document.body.appendChild(toast);
-    
-    requestAnimationFrame(function() {
-        toast.style.transform = 'translateX(0)';
-    });
-    
-    setTimeout(function() {
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(function() {
-            toast.remove();
-        }, 300);
-    }, 2000);
-}
-
-function showCompletionOverlay(message, isTest = false) {
+function showCompletionOverlay(message, isTest) {
     console.log("🎉 完了オーバーレイ表示:", message);
     
-    // 画面全体を覆うオーバーレイ
     const overlay = document.createElement('div');
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: ${isTest ? 'linear-gradient(135deg, rgba(0, 123, 255, 0.95), rgba(102, 126, 234, 0.95))' : 'linear-gradient(135deg, rgba(40, 167, 69, 0.95), rgba(34, 197, 94, 0.95))'};
-        z-index: 10000;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 24px;
-        font-weight: bold;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    `;
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: ' + (isTest ? 'linear-gradient(135deg, rgba(0, 123, 255, 0.95), rgba(102, 126, 234, 0.95))' : 'linear-gradient(135deg, rgba(40, 167, 69, 0.95), rgba(34, 197, 94, 0.95))') + '; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; opacity: 0; transition: opacity 0.3s ease;';
     
     const content = document.createElement('div');
-    content.style.cssText = `
-        text-align: center;
-        transform: scale(0.8);
-        transition: transform 0.5s ease;
-    `;
+    content.style.cssText = 'text-align: center; transform: scale(0.8); transition: transform 0.5s ease;';
     
     const emoji = isTest ? '🎯' : '🎉';
     const subtitle = isTest ? 'テスト完了' : '練習完了';
     
-    content.innerHTML = `
-        <div style="font-size: 5rem; margin-bottom: 1rem;">${emoji}</div>
-        <div style="font-size: 2.5rem; margin-bottom: 1rem;">${subtitle}</div>
-        <div data-message style="font-size: 1.5rem; opacity: 0.9; margin-bottom: 2rem;">${message}</div>
-        <div style="font-size: 1.2rem; opacity: 0.8;">準備画面に戻ります...</div>
-        <div style="margin-top: 2rem;">
-            <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; border-width: 0.3rem;">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
-    `;
+    content.innerHTML = '<div style="font-size: 5rem; margin-bottom: 1rem;">' + emoji + '</div><div style="font-size: 2.5rem; margin-bottom: 1rem;">' + subtitle + '</div><div data-message style="font-size: 1.5rem; opacity: 0.9; margin-bottom: 2rem;">' + message + '</div><div style="font-size: 1.2rem; opacity: 0.8;">準備画面に戻ります...</div>';
     
     overlay.appendChild(content);
     document.body.appendChild(overlay);
     
-    // アニメーション開始
-    requestAnimationFrame(() => {
+    requestAnimationFrame(function() {
         overlay.style.opacity = '1';
         content.style.transform = 'scale(1)';
     });
@@ -573,16 +395,29 @@ function showCompletionOverlay(message, isTest = false) {
     return overlay;
 }
 
+// ========== レスポンシブ対応 ==========
+function adjustImageSizes() {
+    const images = document.querySelectorAll('.prerendered-card img');
+    images.forEach(function(img) {
+        img.style.width = '100%';
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+    });
+}
+
+window.addEventListener('resize', function() {
+    adjustImageSizes();
+});
+
 // ========== 初期化 ==========
-document.addEventListener('DOMContentLoaded', function () {
-    console.log("🔧 最終修正版初期化開始");
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("🔧 構文エラー修正版初期化開始");
     
     if (typeof rawCards === "undefined") {
         console.error("❌ rawCards が定義されていません");
         return;
     }
     
-    // カード準備
     cards = shuffle(rawCards.slice());
     currentIndex = 0;
     isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
@@ -590,14 +425,13 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log("📊 カードデータ: " + cards.length + "枚");
     console.log("📚 練習モード: " + isPracticeMode);
     
-    // 事前レンダリング
     prerenderAllCards();
-    
-    // イベント設定
     setupInstantEvents();
     setupInstantKeyboard();
     
-    console.log("🔧 最終修正版初期化完了");
+    setTimeout(adjustImageSizes, 100);
+    
+    console.log("🔧 構文エラー修正版初期化完了");
 });
 
 function setupInstantEvents() {
@@ -652,7 +486,9 @@ function setupInstantKeyboard() {
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+        const temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
     }
     return array;
 }
@@ -675,4 +511,4 @@ window.markUnknown = function() {
     handleAnswerInstantly('unknown');
 };
 
-console.log("🔧 最終修正版 瞬間応答システム読み込み完了");
+console.log("🔧 構文エラー修正版読み込み完了");
