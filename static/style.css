@@ -24,6 +24,55 @@ h1 {
     background: #fff;
 }
 
+#flashcard {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 25px;
+            min-height: 400px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            overflow: auto;
+            /* 画像表示高速化 */
+            image-rendering: auto;
+            image-rendering: crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            /* トランジション最適化 */
+            transition: opacity 0.1s ease;
+        }
+        
+        /* 🖼️ 画像表示改善 */
+        #flashcard img {
+            display: block;
+            margin: 0 auto 10px;
+            max-width: min(900px, 90vw) !important;
+            max-height: 70vh !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        /* プリレンダリングされた画像にも適用 */
+        .prerendered-card img {
+            display: block;
+            margin: 0 auto 10px;
+            max-width: min(900px, 90vw) !important;
+            max-height: 70vh !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+
 .card img {
     display: block;
     margin: 0 auto 10px;  /* 中央寄せ */

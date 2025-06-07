@@ -38,40 +38,60 @@ function prerenderAllCards() {
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
-    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;';
+    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;';
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
     // 問題部分
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container';
-    problemDiv.style.cssText = 'display: block; width: 100%; text-align: center;';
+    problemDiv.style.cssText = 'display: block; width: 100%; text-align: center; max-width: 900px;';
     
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
-        img.style.cssText = 'max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);';
-        img.loading = 'eager'; // 即座読み込み
+        img.style.cssText = `
+            max-width: min(900px, 90vw);
+            max-height: 70vh;
+            width: auto;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        `;
+        img.loading = 'eager';
         problemDiv.appendChild(img);
     }
     
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
-        text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333;';
+        text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333; max-width: 900px; word-wrap: break-word;';
         problemDiv.appendChild(text);
     }
     
     // 解答部分
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container';
-    answerDiv.style.cssText = 'display: none; width: 100%; text-align: center;';
+    answerDiv.style.cssText = 'display: none; width: 100%; text-align: center; max-width: 900px;';
     
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
-        answerImg.style.cssText = 'max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);';
-        answerImg.loading = 'eager'; // 即座読み込み
+        answerImg.style.cssText = `
+            max-width: min(900px, 90vw);
+            max-height: 70vh;
+            width: auto;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        `;
+        answerImg.loading = 'eager';
         answerDiv.appendChild(answerImg);
     }
     
