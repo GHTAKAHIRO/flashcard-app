@@ -1,4 +1,4 @@
-/* 🚀 大画面表示版 CSS */
+/* 🚀 大画面表示版 CSS - 独立ファイル版 */
 body {
     background: #f8f9fa;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -48,7 +48,7 @@ body {
     background: white;
     border-radius: 16px; /* 角丸を大きく */
     box-shadow: 0 6px 30px rgba(0,0,0,0.1); /* 影を大きく */
-    padding: 40px; /* パディングを大幅に増加 */
+    padding: 40px !important; /* パディングを大幅に増加 */
     margin-bottom: 40px; /* マージンを増加 */
     min-height: auto;
     max-height: none;
@@ -57,7 +57,7 @@ body {
     align-items: center;
     justify-content: flex-start;
     cursor: pointer;
-    overflow: visible;
+    overflow: visible !important;
     position: relative;
     transition: opacity 0.1s ease;
 }
@@ -268,7 +268,7 @@ body {
     }
     
     #flashcard {
-        padding: 20px;
+        padding: 20px !important;
     }
     
     .prerendered-card p,
@@ -313,7 +313,7 @@ body {
     }
     
     #flashcard {
-        padding: 35px;
+        padding: 35px !important;
     }
 }
 
@@ -330,7 +330,7 @@ body {
     }
     
     #flashcard {
-        padding: 45px; /* さらに大きく */
+        padding: 45px !important; /* さらに大きく */
     }
     
     /* 大画面では画像をさらに大きく */
@@ -358,7 +358,7 @@ body {
     }
     
     #flashcard {
-        padding: 50px;
+        padding: 50px !important;
     }
     
     .btn-custom {
@@ -398,23 +398,22 @@ body {
     }
 }
 
-/* ========== スクロールバーのカスタマイズ ========== */
-#flashcard::-webkit-scrollbar {
-    width: 12px; /* スクロールバーを太く */
+/* ========== スクロールバーの削除 ========== */
+#flashcard::-webkit-scrollbar,
+.prerendered-card::-webkit-scrollbar,
+.problem-container::-webkit-scrollbar,
+.answer-container::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
 }
 
-#flashcard::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 6px;
-}
-
-#flashcard::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 6px;
-}
-
-#flashcard::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+#flashcard,
+.prerendered-card,
+.problem-container,
+.answer-container {
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE */
 }
 
 /* ========== デバッグ用スタイル（開発時のみ） ========== */

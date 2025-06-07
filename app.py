@@ -267,6 +267,11 @@ def load_user(user_id):
         app.logger.error(f"ユーザー読み込みエラー: {e}")
     return None
 
+# ========== キャッシュバスター追加（ここに追加） ==========
+@app.context_processor
+def inject_timestamp():
+    return {'timestamp': int(time.time())}
+
 # ========== Redis除去版 パート5: 学習履歴チェック関数 ==========
 
 @simple_cache(expire_time=300)
