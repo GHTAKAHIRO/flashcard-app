@@ -1,4 +1,4 @@
-console.log("🔧 構文エラー修正版 main.js が読み込まれました");
+console.log("🔧 画像全幅表示対応 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
@@ -35,23 +35,26 @@ function prerenderAllCards() {
     console.log("✅ 事前レンダリング完了: " + cards.length + "枚");
 }
 
-// ========== 画像表示修正版カード作成関数 ==========
+// ========== 画像全幅表示対応カード作成関数 ==========
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
-    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px 10px; box-sizing: border-box; overflow-y: auto;';
+    // 🎨 修正：パディング削除、スクロールバー削除、全幅対応
+    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: stretch; justify-content: center; padding: 0; box-sizing: border-box; overflow: hidden;';
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
     // 問題部分
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container';
-    problemDiv.style.cssText = 'display: flex; flex-direction: column; align-items: center; width: 100%; text-align: center; margin-bottom: 20px;';
+    // 🎨 修正：全幅に伸ばす設定
+    problemDiv.style.cssText = 'display: flex; flex-direction: column; align-items: stretch; width: 100%; text-align: center; margin: 0; padding: 0;';
     
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
-        img.style.cssText = 'width: 100%; max-width: 100%; height: auto; object-fit: contain; display: block; margin: 0 auto 15px auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
+        // 🎨 修正：完全に画面幅いっぱいの画像設定
+        img.style.cssText = 'width: 100%; max-width: 100%; height: auto; object-fit: contain; display: block; margin: 0; border: none; box-shadow: none; border-radius: 0;';
         img.loading = 'eager';
         problemDiv.appendChild(img);
     }
@@ -59,19 +62,22 @@ function createCardElement(card, index) {
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
-        text.style.cssText = 'margin: 0; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word; max-width: 100%; padding: 0 10px; line-height: 1.4;';
+        // 🎨 修正：テキストは背景付きで見やすく
+        text.style.cssText = 'margin: 10px; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word; max-width: 100%; padding: 10px; line-height: 1.4; background: rgba(255,255,255,0.9); border-radius: 4px; position: relative; z-index: 1;';
         problemDiv.appendChild(text);
     }
     
     // 解答部分
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container';
-    answerDiv.style.cssText = 'display: none; flex-direction: column; align-items: center; width: 100%; text-align: center; margin-bottom: 20px;';
+    // 🎨 修正：解答も全幅対応
+    answerDiv.style.cssText = 'display: none; flex-direction: column; align-items: stretch; width: 100%; text-align: center; margin: 0; padding: 0;';
     
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
-        answerImg.style.cssText = 'width: 100%; max-width: 100%; height: auto; object-fit: contain; display: block; margin: 0 auto 15px auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);';
+        // 🎨 修正：解答画像も完全に画面幅いっぱい
+        answerImg.style.cssText = 'width: 100%; max-width: 100%; height: auto; object-fit: contain; display: block; margin: 0; border: none; box-shadow: none; border-radius: 0;';
         answerImg.loading = 'eager';
         answerDiv.appendChild(answerImg);
     }
@@ -101,7 +107,7 @@ function switchToCardInstantly(newIndex) {
         if (problemDiv && answerDiv) {
             problemDiv.style.display = 'flex';
             problemDiv.style.flexDirection = 'column';
-            problemDiv.style.alignItems = 'center';
+            problemDiv.style.alignItems = 'stretch';
             answerDiv.style.display = 'none';
         }
     }
@@ -193,14 +199,50 @@ function toggleAnswerInstantly() {
             problemDiv.style.display = 'none';
             answerDiv.style.display = 'flex';
             answerDiv.style.flexDirection = 'column';
-            answerDiv.style.alignItems = 'center';
+            answerDiv.style.alignItems = 'stretch';
         } else {
             problemDiv.style.display = 'flex';
             problemDiv.style.flexDirection = 'column';
-            problemDiv.style.alignItems = 'center';
+            problemDiv.style.alignItems = 'stretch';
             answerDiv.style.display = 'none';
         }
     }
+}
+
+// ========== 画像サイズ強制調整 ==========
+function forceImageFullWidth() {
+    console.log("🎨 画像を強制的に全幅表示に調整");
+    
+    // 全ての画像を取得
+    const images = document.querySelectorAll('#flashcard img, .prerendered-card img');
+    
+    images.forEach(function(img) {
+        // 強制的に全幅設定を適用
+        img.style.setProperty('width', '100%', 'important');
+        img.style.setProperty('max-width', '100%', 'important');
+        img.style.setProperty('height', 'auto', 'important');
+        img.style.setProperty('object-fit', 'contain', 'important');
+        img.style.setProperty('display', 'block', 'important');
+        img.style.setProperty('margin', '0', 'important');
+        img.style.setProperty('border', 'none', 'important');
+        img.style.setProperty('box-shadow', 'none', 'important');
+        img.style.setProperty('border-radius', '0', 'important');
+    });
+    
+    // フラッシュカードのスクロールバーも強制削除
+    const flashcard = document.getElementById('flashcard');
+    if (flashcard) {
+        flashcard.style.setProperty('overflow', 'hidden', 'important');
+        flashcard.style.setProperty('padding', '0', 'important');
+    }
+    
+    // プリレンダリングカードのスクロールバーも強制削除
+    const prerenderedCards = document.querySelectorAll('.prerendered-card');
+    prerenderedCards.forEach(function(card) {
+        card.style.setProperty('overflow', 'hidden', 'important');
+        card.style.setProperty('padding', '0', 'important');
+        card.style.setProperty('align-items', 'stretch', 'important');
+    });
 }
 
 // ========== ログ処理 ==========
@@ -395,23 +437,14 @@ function showCompletionOverlay(message, isTest) {
     return overlay;
 }
 
-// ========== レスポンシブ対応 ==========
-function adjustImageSizes() {
-    const images = document.querySelectorAll('.prerendered-card img');
-    images.forEach(function(img) {
-        img.style.width = '100%';
-        img.style.maxWidth = '100%';
-        img.style.height = 'auto';
-    });
-}
-
+// ========== 画面リサイズ対応 ==========
 window.addEventListener('resize', function() {
-    adjustImageSizes();
+    forceImageFullWidth();
 });
 
 // ========== 初期化 ==========
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("🔧 構文エラー修正版初期化開始");
+    console.log("🔧 画像全幅表示対応初期化開始");
     
     if (typeof rawCards === "undefined") {
         console.error("❌ rawCards が定義されていません");
@@ -429,9 +462,12 @@ document.addEventListener('DOMContentLoaded', function() {
     setupInstantEvents();
     setupInstantKeyboard();
     
-    setTimeout(adjustImageSizes, 100);
+    // 🎨 画像の強制全幅表示（複数回実行して確実に適用）
+    setTimeout(forceImageFullWidth, 100);
+    setTimeout(forceImageFullWidth, 500);
+    setTimeout(forceImageFullWidth, 1000);
     
-    console.log("🔧 構文エラー修正版初期化完了");
+    console.log("🔧 画像全幅表示対応初期化完了");
 });
 
 function setupInstantEvents() {
@@ -511,4 +547,7 @@ window.markUnknown = function() {
     handleAnswerInstantly('unknown');
 };
 
-console.log("🔧 構文エラー修正版読み込み完了");
+// ========== 強制画像調整のグローバル関数 ==========
+window.forceImageFullWidth = forceImageFullWidth;
+
+console.log("🔧 画像全幅表示対応版読み込み完了");
