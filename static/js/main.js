@@ -220,6 +220,10 @@ function handleCardCompletionSync(cardId, result) {
     // 🚀 完了時にボタンを無効化（誤操作防止）
     disableAllButtons();
     
+    // 🚀 即座にオーバーレイ表示（リダイレクトまで表示し続ける）
+    const isTestMode = !isPracticeMode;
+    const overlay = showCompletionOverlay("処理中...", isTestMode);
+    
     // 🔧 修正：完了時は必ずサーバーレスポンスを待ってから処理
     fetch('/log_result', {
         method: 'POST',
@@ -235,26 +239,44 @@ function handleCardCompletionSync(cardId, result) {
     }).then(function(data) {
         console.log("✅ 完了時サーバーレスポンス:", data);
         
-        // 🔧 修正：分かりやすいオーバーレイ表示
+        // 🔧 修正：オーバーレイのメッセージを更新
         if (data.redirect_to_prepare === true) {
             console.log("🎯 サーバー指示：prepare画面へリダイレクト");
             
-            const isTestMode = !isPracticeMode;
-            const overlay = showCompletionOverlay(data.message || (isTestMode ? "テスト完了！" : "練習完了！"), isTestMode);
+            updateOverlayMessage(overlay, data.message || (isTestMode ? "テスト完了！" : "練習完了！"));
             
+            // 🚀 オーバーレイを削除せずにリダイレクト（画面切り替わりまで表示）
             setTimeout(function() {
-                overlay.remove();
                 window.location.href = '/prepare/' + getCurrentSource();
-            }, 3000); // 3秒間表示
+            }, 1500); // メッセージ表示後1.5秒でリダイレクト
         } else {
             console.log("🔧 サーバー指示なし：デフォルト処理");
-            handleDefaultCompletion();
+            handleDefaultCompletion(overlay);
         }
     }).catch(function(error) {
         console.error('❌ 完了時ログエラー:', error);
-        enableAllButtons(); // エラー時はボタンを復活
-        handleDefaultCompletion();
+        updateOverlayMessage(overlay, "エラーが発生しました");
+        setTimeout(function() {
+            overlay.remove();
+            enableAllButtons(); // エラー時はボタンを復活
+        }, 2000);
     });
+}
+
+function updateOverlayMessage(overlay, newMessage) {
+    const messageDiv = overlay.querySelector('[data-message]');
+    if (messageDiv) {
+        messageDiv.textContent = newMessage;
+    } else {
+        // メッセージ要素を探して更新
+        const contentDiv = overlay.querySelector('div > div');
+        if (contentDiv) {
+            const children = contentDiv.children;
+            if (children.length >= 3) {
+                children[2].textContent = newMessage; // 3番目の要素がメッセージ
+            }
+        }
+    }
 }
 
 function disableAllButtons() {
@@ -307,26 +329,26 @@ function enableAllButtons() {
     }
 }
 
-function handleDefaultCompletion() {
+function handleDefaultCompletion(existingOverlay = null) {
     console.log("🔧 デフォルト完了処理");
     
-    // ボタン無効化
+    // ボタン無効化（まだの場合）
     disableAllButtons();
     
-    if (isPracticeMode) {
-        // 🚀 練習モードも必ずprepare画面に戻る（シンプル化）
-        const overlay = showCompletionOverlay("練習ラウンド完了！", false);
-        setTimeout(function() {
-            overlay.remove();
-            window.location.href = '/prepare/' + getCurrentSource();
-        }, 3000);
+    let overlay = existingOverlay;
+    
+    if (!overlay) {
+        // 新しいオーバーレイを作成
+        overlay = showCompletionOverlay(isPracticeMode ? "練習ラウンド完了！" : "テスト完了！", !isPracticeMode);
     } else {
-        const overlay = showCompletionOverlay("テスト完了！", true);
-        setTimeout(function() {
-            overlay.remove();
-            window.location.href = '/prepare/' + getCurrentSource();
-        }, 3000);
+        // 既存のオーバーレイのメッセージを更新
+        updateOverlayMessage(overlay, isPracticeMode ? "練習ラウンド完了！" : "テスト完了！");
     }
+    
+    // 🚀 オーバーレイを削除せずにリダイレクト（画面切り替わりまで表示）
+    setTimeout(function() {
+        window.location.href = '/prepare/' + getCurrentSource();
+    }, 1500);
 }
 
 function showInstantMessage(message) {
@@ -387,7 +409,7 @@ function showCompletionOverlay(message, isTest = false) {
     content.innerHTML = `
         <div style="font-size: 5rem; margin-bottom: 1rem;">${emoji}</div>
         <div style="font-size: 2.5rem; margin-bottom: 1rem;">${subtitle}</div>
-        <div style="font-size: 1.5rem; opacity: 0.9; margin-bottom: 2rem;">${message}</div>
+        <div data-message style="font-size: 1.5rem; opacity: 0.9; margin-bottom: 2rem;">${message}</div>
         <div style="font-size: 1.2rem; opacity: 0.8;">準備画面に戻ります...</div>
         <div style="margin-top: 2rem;">
             <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; border-width: 0.3rem;">
