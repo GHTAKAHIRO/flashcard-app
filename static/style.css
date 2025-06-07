@@ -65,13 +65,15 @@ body {
     transition: opacity 0.1s ease;
 }
 
-/* ========== 画像の全幅表示設定（最重要・強化版） ========== */
+/* ========== 画像の全幅表示設定（サイズ制御強化版） ========== */
 #flashcard img,
 .prerendered-card img {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: none !important; /* max-widthの制限を削除 */
     height: auto !important;
+    max-height: 80vh !important; /* 画面高さの80%まで */
     object-fit: contain !important;
+    object-position: center !important;
     display: block !important;
     margin: 0 auto !important;
     border: none !important;
@@ -88,6 +90,12 @@ body {
     /* 🔥 位置設定を明確化 */
     position: relative !important;
     z-index: 1 !important;
+    /* 🔥 GPU加速とアンチエイリアシング */
+    transform: translateZ(0) !important;
+    backface-visibility: hidden !important;
+    image-rendering: -webkit-optimize-contrast !important;
+    image-rendering: optimize-contrast !important;
+    image-rendering: crisp-edges !important;
 }
 
 /* ========== プリレンダリングカードの調整（画像表示強化版） ========== */
@@ -125,13 +133,13 @@ body {
     position: relative !important;
 }
 
-/* ========== 画像専用スタイル強化 ========== */
+/* ========== 画像専用スタイル強化（サイズ制御強化版） ========== */
 .problem-container img,
 .answer-container img {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: none !important; /* サイズ制限を削除 */
     height: auto !important;
-    max-height: 100% !important; /* 最大高さを制限 */
+    max-height: 80vh !important; /* 画面高さの80%まで */
     object-fit: contain !important;
     object-position: center !important;
     display: block !important;
