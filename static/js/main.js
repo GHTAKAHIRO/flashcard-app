@@ -35,33 +35,54 @@ function prerenderAllCards() {
     console.log("✅ 事前レンダリング完了: " + cards.length + "枚");
 }
 
-// ========== 統一されたcreateCardElement関数 ==========
+// ========== 画像表示修正版（スライドなし・画面幅対応） ==========
+
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
-    // 🔧 修正：スクロール可能で柔軟なレイアウト
-    container.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; overflow-y: auto;';
+    // 🎨 修正：スクロール削除、シンプルな縦並び表示
+    container.style.cssText = `
+        position: absolute; 
+        top: 0; 
+        left: 0; 
+        width: 100%; 
+        height: 100%; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: flex-start;
+        padding: 20px 0;
+        box-sizing: border-box;
+        overflow-y: auto;
+    `;
     container.dataset.cardIndex = index;
     container.dataset.cardId = card.id;
     
     // 問題部分
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container';
-    problemDiv.style.cssText = 'display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; flex-grow: 1; text-align: center;';
+    problemDiv.style.cssText = `
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        width: 100%; 
+        text-align: center;
+        margin-bottom: 20px;
+    `;
     
     if (card.image_problem) {
         const img = document.createElement('img');
         img.src = card.image_problem;
+        // 🎨 修正：画面幅に合わせた画像サイズ（スライドなし）
         img.style.cssText = `
-            max-width: min(900px, calc(100vw - 80px));
-            max-height: calc(80vh - 150px);
-            width: auto;
+            width: 100%;
+            max-width: 100%;
             height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             object-fit: contain;
             display: block;
-            margin: 0 auto;
+            margin: 0 auto 15px auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         `;
         img.loading = 'eager';
         problemDiv.appendChild(img);
@@ -70,28 +91,42 @@ function createCardElement(card, index) {
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
-        text.style.cssText = 'margin: 15px 0 0 0; font-weight: bold; font-size: 16px; color: #333; word-wrap: break-word; flex-shrink: 0;';
+        text.style.cssText = `
+            margin: 0; 
+            font-weight: bold; 
+            font-size: 16px; 
+            color: #333; 
+            word-wrap: break-word;
+            max-width: 100%;
+        `;
         problemDiv.appendChild(text);
     }
     
     // 解答部分
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container';
-    answerDiv.style.cssText = 'display: none; flex-direction: column; justify-content: center; align-items: center; width: 100%; flex-grow: 1; text-align: center;';
+    answerDiv.style.cssText = `
+        display: none; 
+        flex-direction: column; 
+        align-items: center; 
+        width: 100%; 
+        text-align: center;
+        margin-bottom: 20px;
+    `;
     
     if (card.image_answer) {
         const answerImg = document.createElement('img');
         answerImg.src = card.image_answer;
+        // 🎨 修正：解答画像も画面幅に合わせる
         answerImg.style.cssText = `
-            max-width: min(900px, calc(100vw - 80px));
-            max-height: calc(80vh - 150px);
-            width: auto;
+            width: 100%;
+            max-width: 100%;
             height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             object-fit: contain;
             display: block;
-            margin: 0 auto;
+            margin: 0 auto 15px auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         `;
         answerImg.loading = 'eager';
         answerDiv.appendChild(answerImg);
@@ -102,6 +137,56 @@ function createCardElement(card, index) {
     
     return container;
 }
+
+// ========== 瞬間解答切り替え（修正版） ==========
+function toggleAnswerInstantly() {
+    if (!prerenderedCards[currentIndex]) return;
+    
+    const problemDiv = prerenderedCards[currentIndex].querySelector('.problem-container');
+    const answerDiv = prerenderedCards[currentIndex].querySelector('.answer-container');
+    
+    if (problemDiv && answerDiv) {
+        showingAnswer = !showingAnswer;
+        
+        if (showingAnswer) {
+            // 問題を非表示、解答を表示
+            problemDiv.style.display = 'none';
+            answerDiv.style.display = 'flex';
+            answerDiv.style.flexDirection = 'column';
+            answerDiv.style.alignItems = 'center';
+        } else {
+            // 解答を非表示、問題を表示
+            problemDiv.style.display = 'flex';
+            problemDiv.style.flexDirection = 'column';
+            problemDiv.style.alignItems = 'center';
+            answerDiv.style.display = 'none';
+        }
+    }
+}
+
+// ========== レスポンシブ対応の追加 ==========
+function adjustImageSizes() {
+    """画面サイズ変更時に画像サイズを調整"""
+    const images = document.querySelectorAll('.prerendered-card img');
+    images.forEach(img => {
+        // 画面幅に合わせて再調整
+        img.style.width = '100%';
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+    });
+}
+
+// 画面リサイズ時に画像サイズを調整
+window.addEventListener('resize', function() {
+    adjustImageSizes();
+});
+
+// 初期化時にも調整
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(adjustImageSizes, 100); // 少し遅延させて確実に適用
+});
+
+console.log("🎨 画像表示修正版（スライドなし・画面幅対応）読み込み完了");
 
 // ========== 瞬間カード切り替え ==========
 function switchToCardInstantly(newIndex) {
