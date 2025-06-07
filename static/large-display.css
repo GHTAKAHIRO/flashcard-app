@@ -1,4 +1,4 @@
-/* 🚀 大画面表示版 CSS - 独立ファイル版 */
+/* 🚀 大画面表示版 CSS */
 body {
     background: #f8f9fa;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -8,17 +8,17 @@ body {
 }
 
 .container {
-    max-width: 1400px; /* 幅をさらに拡大 */
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 30px; /* パディングを増加 */
+    padding: 30px;
 }
 
 .header-info {
     background: linear-gradient(135deg, #007bff, #0056b3);
     color: white;
-    padding: 20px 30px; /* パディングを増加 */
-    border-radius: 12px; /* 角丸を大きく */
-    margin-bottom: 30px; /* マージンを増加 */
+    padding: 20px 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -27,29 +27,29 @@ body {
 
 .stage-info {
     font-weight: bold;
-    font-size: 20px; /* フォントサイズを拡大 */
+    font-size: 20px;
 }
 
 .counters {
     display: flex;
-    gap: 20px; /* ギャップを増加 */
+    gap: 20px;
     font-weight: bold;
 }
 
 .counters span {
     background: rgba(255,255,255,0.2);
-    padding: 8px 16px; /* パディングを増加 */
+    padding: 8px 16px;
     border-radius: 6px;
-    font-size: 16px; /* フォントサイズを追加 */
+    font-size: 16px;
 }
 
 /* ========== 大画面フラッシュカード ========== */
 #flashcard {
     background: white;
-    border-radius: 16px; /* 角丸を大きく */
-    box-shadow: 0 6px 30px rgba(0,0,0,0.1); /* 影を大きく */
-    padding: 40px !important; /* パディングを大幅に増加 */
-    margin-bottom: 40px; /* マージンを増加 */
+    border-radius: 16px;
+    box-shadow: 0 6px 30px rgba(0,0,0,0.1);
+    padding: 40px !important;
+    margin-bottom: 40px;
     min-height: auto;
     max-height: none;
     display: flex;
@@ -107,33 +107,27 @@ body {
 .problem-container img,
 .answer-container img,
 .ultra-image {
-    /* サイズ設定：より大きく表示 */
-    max-width: 95% !important; /* 幅を拡大 */
+    max-width: 95% !important;
     width: auto !important;
     height: auto !important;
-    max-height: 85vh !important; /* 画面高さの85%まで */
+    max-height: 85vh !important;
     
-    /* 表示設定 */
     display: block !important;
-    margin: 0 auto 30px auto !important; /* マージンを増加 */
+    margin: 0 auto 30px auto !important;
     padding: 0 !important;
     
-    /* 枠線・装飾 */
     border: none !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important; /* 影を追加 */
-    border-radius: 12px !important; /* 角丸を大きく */
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+    border-radius: 12px !important;
     
-    /* レンダリング最適化 */
     object-fit: contain !important;
     object-position: center !important;
     image-rendering: -webkit-optimize-contrast !important;
     image-rendering: optimize-contrast !important;
     
-    /* GPU加速 */
     transform: translateZ(0) !important;
     backface-visibility: hidden !important;
     
-    /* 確実な表示 */
     visibility: visible !important;
     opacity: 1 !important;
 }
@@ -141,42 +135,42 @@ body {
 /* ========== 大画面テキスト部分 ========== */
 .prerendered-card p,
 .ultra-text {
-    margin: 0 0 30px 0 !important; /* マージンを増加 */
+    margin: 0 0 30px 0 !important;
     font-weight: bold !important;
-    font-size: 24px !important; /* フォントサイズを大幅に拡大 */
+    font-size: 24px !important;
     color: #333 !important;
     word-wrap: break-word !important;
     max-width: 100% !important;
-    padding: 20px 30px !important; /* パディングを増加 */
-    line-height: 1.6 !important; /* 行間を拡大 */
+    padding: 20px 30px !important;
+    line-height: 1.6 !important;
     background: rgba(248, 249, 250, 0.9) !important;
-    border-radius: 12px !important; /* 角丸を大きく */
+    border-radius: 12px !important;
     position: relative !important;
     z-index: 1 !important;
     text-align: center !important;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important; /* 影を追加 */
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
 }
 
 /* ========== 大画面コントロール ========== */
 .controls {
     background: white;
-    padding: 30px; /* パディングを増加 */
-    border-radius: 16px; /* 角丸を大きく */
+    padding: 30px;
+    border-radius: 16px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
 .button-row {
     display: flex;
-    gap: 20px; /* ギャップを増加 */
-    margin-bottom: 20px; /* マージンを増加 */
+    gap: 20px;
+    margin-bottom: 20px;
 }
 
 .btn-custom {
     flex: 1;
-    padding: 20px 25px; /* パディングを増加 */
+    padding: 20px 25px;
     border: none;
-    border-radius: 12px; /* 角丸を大きく */
-    font-size: 22px; /* フォントサイズを拡大 */
+    border-radius: 12px;
+    font-size: 22px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.1s ease;
@@ -192,7 +186,7 @@ body {
 .btn-answer {
     background: #17a2b8;
     color: white;
-    font-size: 18px; /* フォントサイズを調整 */
+    font-size: 18px;
 }
 
 .btn-answer:hover {
@@ -202,7 +196,7 @@ body {
 #knownBtn {
     background: #28a745;
     color: white;
-    font-size: 28px; /* フォントサイズを拡大 */
+    font-size: 28px;
 }
 
 #knownBtn:hover {
@@ -212,7 +206,7 @@ body {
 #unknownBtn {
     background: #dc3545;
     color: white;
-    font-size: 28px; /* フォントサイズを拡大 */
+    font-size: 28px;
 }
 
 #unknownBtn:hover {
@@ -222,9 +216,9 @@ body {
 .shortcuts-info {
     text-align: center;
     color: #6c757d;
-    font-size: 16px; /* フォントサイズを拡大 */
-    margin-top: 20px; /* マージンを増加 */
-    padding: 15px; /* パディングを増加 */
+    font-size: 16px;
+    margin-top: 20px;
+    padding: 15px;
     background: #f8f9fa;
     border-radius: 8px;
 }
@@ -232,9 +226,9 @@ body {
 .progress-info {
     text-align: center;
     color: #6c757d;
-    font-size: 18px; /* フォントサイズを拡大 */
-    margin-bottom: 15px; /* マージンを増加 */
-    font-weight: 500; /* フォントウェイトを追加 */
+    font-size: 18px;
+    margin-bottom: 15px;
+    font-weight: 500;
 }
 
 /* プリロード用の非表示画像 */
@@ -250,11 +244,11 @@ body {
 .image-error {
     background-color: #f8f9fa !important;
     border: 2px dashed #dee2e6 !important;
-    min-height: 300px !important; /* 高さを増加 */
+    min-height: 300px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 18px !important; /* フォントサイズを拡大 */
+    font-size: 18px !important;
     color: #6c757d !important;
     text-align: center !important;
     border-radius: 12px !important;
@@ -325,15 +319,14 @@ body {
     
     .prerendered-card p,
     .ultra-text {
-        font-size: 26px !important; /* より大きく */
+        font-size: 26px !important;
         padding: 25px 35px !important;
     }
     
     #flashcard {
-        padding: 45px !important; /* さらに大きく */
+        padding: 45px !important;
     }
     
-    /* 大画面では画像をさらに大きく */
     #flashcard img,
     .prerendered-card img,
     .problem-container img,
@@ -353,7 +346,7 @@ body {
     
     .prerendered-card p,
     .ultra-text {
-        font-size: 28px !important; /* 最大サイズ */
+        font-size: 28px !important;
         padding: 30px 40px !important;
     }
     
@@ -412,8 +405,8 @@ body {
 .prerendered-card,
 .problem-container,
 .answer-container {
-    scrollbar-width: none !important; /* Firefox */
-    -ms-overflow-style: none !important; /* IE */
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
 }
 
 /* ========== デバッグ用スタイル（開発時のみ） ========== */
