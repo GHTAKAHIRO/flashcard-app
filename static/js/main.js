@@ -1,4 +1,4 @@
-console.log("🔧 画像表示修正版 main.js が読み込まれました");
+console.log("🔧 カード表示修正版 main.js v2 が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
@@ -12,12 +12,13 @@ let prerenderedCards = []; // 事前レンダリング済みカード
 let imageLoadTracker = {
     totalImages: 0,
     loadedImages: 0,
-    failedImages: 0
+    failedImages: 0,
+    imageStatus: {} // 各画像の詳細状況
 };
 
-// ========== 事前レンダリングシステム（画像読み込み強化版） ==========
+// ========== 事前レンダリングシステム（初期表示修正版） ==========
 function prerenderAllCards() {
-    console.log("🚀 全カード事前レンダリング開始（画像読み込み強化版）");
+    console.log("🚀 全カード事前レンダリング開始（初期表示修正版）");
     
     const flashcard = document.getElementById('flashcard');
     if (!flashcard) return;
@@ -28,7 +29,7 @@ function prerenderAllCards() {
     flashcard.innerHTML = '';
     
     // 画像読み込み状況をリセット
-    imageLoadTracker = { totalImages: 0, loadedImages: 0, failedImages: 0 };
+    imageLoadTracker = { totalImages: 0, loadedImages: 0, failedImages: 0, imageStatus: {} };
     
     // 全カードを事前に作成
     cards.forEach(function(card, index) {
@@ -36,8 +37,11 @@ function prerenderAllCards() {
         flashcard.appendChild(cardElement);
         prerenderedCards.push(cardElement);
         
-        // 最初のカード以外は非表示
-        if (index !== 0) {
+        // 🔥 修正：最初のカードは表示、それ以外は非表示
+        if (index === 0) {
+            cardElement.style.display = 'flex';
+            console.log(`🎯 カード1を初期表示に設定`);
+        } else {
             cardElement.style.display = 'none';
         }
     });
@@ -46,7 +50,7 @@ function prerenderAllCards() {
     console.log("📸 画像読み込み状況: 総数=" + imageLoadTracker.totalImages + ", 読み込み完了=" + imageLoadTracker.loadedImages + ", 失敗=" + imageLoadTracker.failedImages);
 }
 
-// ========== 修正版カード作成関数（画像読み込み強化） ==========
+// ========== 修正版カード作成関数（画像番号修正） ==========
 function createCardElement(card, index) {
     const container = document.createElement('div');
     container.className = 'prerendered-card';
@@ -58,9 +62,12 @@ function createCardElement(card, index) {
     problemDiv.className = 'problem-container';
     problemDiv.dataset.section = 'problem';
     
-    // 問題画像の処理（改良版）
+    // 🔥 修正：カード番号を1から開始に変更
+    const cardNumber = index + 1;
+    
+    // 問題画像の処理（カード番号修正版）
     if (card.image_problem) {
-        const img = createImageElement(card.image_problem, '問題画像', index, 'problem');
+        const img = createImageElement(card.image_problem, '問題画像', cardNumber, 'problem');
         problemDiv.appendChild(img);
         imageLoadTracker.totalImages++;
     }
@@ -88,9 +95,9 @@ function createCardElement(card, index) {
     answerDiv.style.visibility = 'hidden';
     answerDiv.style.opacity = '0';
     
-    // 解答画像の処理（改良版）
+    // 解答画像の処理（カード番号修正版）
     if (card.image_answer) {
-        const answerImg = createImageElement(card.image_answer, '解答画像', index, 'answer');
+        const answerImg = createImageElement(card.image_answer, '解答画像', cardNumber, 'answer');
         answerDiv.appendChild(answerImg);
         imageLoadTracker.totalImages++;
     }
@@ -101,15 +108,19 @@ function createCardElement(card, index) {
     return container;
 }
 
-// ========== 画像要素作成関数（エラーハンドリング強化） ==========
-function createImageElement(src, alt, cardIndex, type) {
+// ========== 画像要素作成関数（状況追跡強化） ==========
+function createImageElement(src, alt, cardNumber, type) {
     const img = document.createElement('img');
+    
+    // 🔥 修正：画像IDを作成
+    const imageId = `card${cardNumber}_${type}`;
     
     // 基本属性設定
     img.src = src;
     img.alt = alt;
     img.loading = 'eager';
-    img.crossOrigin = 'anonymous'; // CORS対応
+    img.crossOrigin = 'anonymous';
+    img.id = imageId;
     
     // 強化されたスタイル設定
     img.style.width = '100%';
@@ -123,27 +134,47 @@ function createImageElement(src, alt, cardIndex, type) {
     img.style.borderRadius = '0';
     
     // データ属性
-    img.dataset.cardIndex = cardIndex;
+    img.dataset.cardNumber = cardNumber;
     img.dataset.imageType = type;
     img.dataset.originalSrc = src;
+    
+    // 🔥 画像状況を初期化
+    imageLoadTracker.imageStatus[imageId] = {
+        cardNumber: cardNumber,
+        type: type,
+        src: src,
+        loaded: false,
+        failed: false,
+        visible: false
+    };
     
     // 読み込み成功イベント
     img.onload = function() {
         imageLoadTracker.loadedImages++;
-        console.log(`✅ 画像読み込み成功: カード${cardIndex + 1} ${type} (${imageLoadTracker.loadedImages}/${imageLoadTracker.totalImages})`);
+        imageLoadTracker.imageStatus[imageId].loaded = true;
         
-        // 画像サイズ情報をログ出力
+        console.log(`✅ 画像読み込み成功: ${imageId} (${imageLoadTracker.loadedImages}/${imageLoadTracker.totalImages})`);
         console.log(`📐 画像サイズ: ${this.naturalWidth}x${this.naturalHeight} → 表示サイズ: ${this.offsetWidth}x${this.offsetHeight}`);
         
         // 画像が見えているかチェック
         const isVisible = this.offsetParent !== null && this.offsetWidth > 0 && this.offsetHeight > 0;
+        imageLoadTracker.imageStatus[imageId].visible = isVisible;
         console.log(`👁️ 画像表示状態: ${isVisible ? '表示中' : '非表示'}`);
+        
+        // 🔥 最初のカードの問題画像が読み込まれた場合は強制表示確認
+        if (cardNumber === 1 && type === 'problem') {
+            setTimeout(function() {
+                forceShowFirstCard();
+            }, 100);
+        }
     };
     
     // 読み込み失敗イベント
     img.onerror = function() {
         imageLoadTracker.failedImages++;
-        console.error(`❌ 画像読み込み失敗: カード${cardIndex + 1} ${type} - ${src}`);
+        imageLoadTracker.imageStatus[imageId].failed = true;
+        
+        console.error(`❌ 画像読み込み失敗: ${imageId} - ${src}`);
         
         // エラー時の代替表示
         this.style.backgroundColor = '#f8f9fa';
@@ -165,18 +196,67 @@ function createImageElement(src, alt, cardIndex, type) {
     return img;
 }
 
-// ========== 修正版カード切り替え（画像表示確認強化） ==========
+// ========== 最初のカード強制表示関数 ==========
+function forceShowFirstCard() {
+    console.log("🎯 最初のカード強制表示チェック");
+    
+    if (prerenderedCards[0]) {
+        const firstCard = prerenderedCards[0];
+        const problemDiv = firstCard.querySelector('.problem-container');
+        const answerDiv = firstCard.querySelector('.answer-container');
+        
+        // カード自体を確実に表示
+        firstCard.style.display = 'flex';
+        firstCard.style.visibility = 'visible';
+        firstCard.style.opacity = '1';
+        
+        if (problemDiv && answerDiv) {
+            // 問題を確実に表示
+            problemDiv.style.display = 'flex';
+            problemDiv.style.visibility = 'visible';
+            problemDiv.style.opacity = '1';
+            
+            // 解答を確実に非表示
+            answerDiv.style.display = 'none';
+            answerDiv.style.visibility = 'hidden';
+            answerDiv.style.opacity = '0';
+            
+            // 問題画像の強制表示
+            const problemImg = problemDiv.querySelector('img');
+            if (problemImg) {
+                problemImg.style.display = 'block';
+                problemImg.style.visibility = 'visible';
+                problemImg.style.opacity = '1';
+                
+                console.log(`🔍 最初のカード画像強制表示: ${problemImg.id}`);
+                
+                // 表示確認
+                setTimeout(function() {
+                    checkImageVisibility(problemImg, 1, 'problem');
+                }, 50);
+            }
+        }
+        
+        console.log("✅ 最初のカード強制表示完了");
+    }
+}
+
+// ========== 修正版カード切り替え（ログ強化） ==========
 function switchToCardInstantly(newIndex) {
     if (newIndex >= cards.length) return false;
+    
+    console.log(`🔄 カード切り替え: ${currentIndex + 1} → ${newIndex + 1}`);
     
     // 現在のカードを完全に非表示
     if (prerenderedCards[currentIndex]) {
         prerenderedCards[currentIndex].style.display = 'none';
+        console.log(`👻 カード${currentIndex + 1}を非表示に設定`);
     }
     
     // 新しいカードを表示
     if (prerenderedCards[newIndex]) {
         prerenderedCards[newIndex].style.display = 'flex';
+        console.log(`👁️ カード${newIndex + 1}を表示に設定`);
         
         // 問題・解答の表示状態を強制リセット
         const problemDiv = prerenderedCards[newIndex].querySelector('.problem-container');
@@ -202,7 +282,7 @@ function switchToCardInstantly(newIndex) {
                 
                 // 画像読み込み状況を確認
                 setTimeout(function() {
-                    checkImageVisibility(problemImg, newIndex, 'problem');
+                    checkImageVisibility(problemImg, newIndex + 1, 'problem');
                 }, 100);
             }
             
@@ -219,22 +299,47 @@ function switchToCardInstantly(newIndex) {
     return true;
 }
 
-// ========== 画像表示状況確認関数 ==========
-function checkImageVisibility(img, cardIndex, type) {
+// ========== 画像表示状況確認関数（詳細ログ強化） ==========
+function checkImageVisibility(img, cardNumber, type) {
+    const imageId = `card${cardNumber}_${type}`;
     const isVisible = img.offsetParent !== null && img.offsetWidth > 0 && img.offsetHeight > 0;
     const isLoaded = img.complete && img.naturalHeight !== 0;
     
-    console.log(`🔍 画像表示確認: カード${cardIndex + 1} ${type}`);
+    console.log(`🔍 画像表示確認: ${imageId}`);
     console.log(`  - 読み込み完了: ${isLoaded}`);
     console.log(`  - 表示状態: ${isVisible}`);
     console.log(`  - 要素サイズ: ${img.offsetWidth}x${img.offsetHeight}`);
     console.log(`  - 自然サイズ: ${img.naturalWidth}x${img.naturalHeight}`);
     console.log(`  - スタイル: display=${img.style.display}, visibility=${img.style.visibility}`);
+    console.log(`  - 親要素表示: ${img.parentElement ? img.parentElement.style.display : 'unknown'}`);
+    
+    // 画像状況を更新
+    if (imageLoadTracker.imageStatus[imageId]) {
+        imageLoadTracker.imageStatus[imageId].visible = isVisible;
+    }
     
     if (!isVisible && isLoaded) {
-        console.warn(`⚠️ 画像は読み込まれているが表示されていません`);
+        console.warn(`⚠️ 画像は読み込まれているが表示されていません: ${imageId}`);
         
-        // 強制表示を試行
+        // 親要素も含めて強制表示を試行
+        const parentContainer = img.closest('.problem-container, .answer-container');
+        const grandParentCard = img.closest('.prerendered-card');
+        
+        if (parentContainer) {
+            parentContainer.style.display = 'flex';
+            parentContainer.style.visibility = 'visible';
+            parentContainer.style.opacity = '1';
+            console.log(`🔧 親コンテナも強制表示: ${imageId}`);
+        }
+        
+        if (grandParentCard) {
+            grandParentCard.style.display = 'flex';
+            grandParentCard.style.visibility = 'visible';
+            grandParentCard.style.opacity = '1';
+            console.log(`🔧 カード全体も強制表示: ${imageId}`);
+        }
+        
+        // 画像自体も強制表示
         img.style.display = 'block !important';
         img.style.visibility = 'visible !important';
         img.style.opacity = '1 !important';
@@ -242,9 +347,9 @@ function checkImageVisibility(img, cardIndex, type) {
         setTimeout(function() {
             const stillNotVisible = img.offsetWidth === 0 || img.offsetHeight === 0;
             if (stillNotVisible) {
-                console.error(`❌ 強制表示も失敗: カード${cardIndex + 1} ${type}`);
+                console.error(`❌ 強制表示も失敗: ${imageId}`);
             } else {
-                console.log(`✅ 強制表示成功: カード${cardIndex + 1} ${type}`);
+                console.log(`✅ 強制表示成功: ${imageId}`);
             }
         }, 50);
     }
@@ -257,7 +362,7 @@ function updateProgressInstantly() {
     }
 }
 
-// ========== 修正版解答切り替え（画像表示確認強化） ==========
+// ========== 修正版解答切り替え（ログ強化） ==========
 function toggleAnswerInstantly() {
     if (!prerenderedCards[currentIndex]) return;
     
@@ -266,6 +371,8 @@ function toggleAnswerInstantly() {
     
     if (problemDiv && answerDiv) {
         showingAnswer = !showingAnswer;
+        
+        console.log(`🔄 解答切り替え: ${showingAnswer ? '問題→解答' : '解答→問題'} (カード${currentIndex + 1})`);
         
         if (showingAnswer) {
             // 解答を表示、問題を非表示
@@ -285,7 +392,7 @@ function toggleAnswerInstantly() {
                 answerImg.style.opacity = '1';
                 
                 setTimeout(function() {
-                    checkImageVisibility(answerImg, currentIndex, 'answer');
+                    checkImageVisibility(answerImg, currentIndex + 1, 'answer');
                 }, 100);
             }
             
@@ -308,7 +415,7 @@ function toggleAnswerInstantly() {
                 problemImg.style.opacity = '1';
                 
                 setTimeout(function() {
-                    checkImageVisibility(problemImg, currentIndex, 'problem');
+                    checkImageVisibility(problemImg, currentIndex + 1, 'problem');
                 }, 100);
             }
             
@@ -425,14 +532,21 @@ function handleCardCompletionSync(cardId, result) {
     });
 }
 
-// ========== デバッグ機能（画像表示強化版） ==========
+// ========== デバッグ機能（詳細ログ強化版） ==========
 function debugStatus() {
-    console.log("=== デバッグ情報（画像表示強化版） ===");
+    console.log("=== デバッグ情報（詳細ログ強化版） ===");
     console.log("カード数:", cards.length);
     console.log("現在のインデックス:", currentIndex);
     console.log("解答表示中:", showingAnswer);
     console.log("プリレンダリングカード数:", prerenderedCards.length);
     console.log("画像読み込み状況:", imageLoadTracker);
+    
+    // 各画像の詳細状況
+    console.log("=== 画像詳細状況 ===");
+    Object.keys(imageLoadTracker.imageStatus).forEach(function(imageId) {
+        const status = imageLoadTracker.imageStatus[imageId];
+        console.log(`${imageId}:`, status);
+    });
     
     // 現在表示中のカードの詳細状態
     if (prerenderedCards[currentIndex]) {
@@ -440,13 +554,23 @@ function debugStatus() {
         const problemDiv = currentCard.querySelector('.problem-container');
         const answerDiv = currentCard.querySelector('.answer-container');
         
-        console.log("現在のカード表示状態:", {
+        console.log("=== 現在のカード表示状態 ===");
+        console.log("カード表示:", {
             card_display: currentCard.style.display,
+            card_visibility: currentCard.style.visibility,
+            card_opacity: currentCard.style.opacity
+        });
+        
+        console.log("問題部分:", {
             problem_display: problemDiv ? problemDiv.style.display : "not found",
             problem_visibility: problemDiv ? problemDiv.style.visibility : "not found",
+            problem_opacity: problemDiv ? problemDiv.style.opacity : "not found"
+        });
+        
+        console.log("解答部分:", {
             answer_display: answerDiv ? answerDiv.style.display : "not found",
-            answer_visibility: answerDiv ? answerDiv.style.visibility : "not found",
-            showingAnswer_flag: showingAnswer
+            answer_visibility: answerDiv ? answerDiv.style.visibility : "not found", 
+            answer_opacity: answerDiv ? answerDiv.style.opacity : "not found"
         });
         
         // 画像要素の詳細確認
@@ -455,6 +579,7 @@ function debugStatus() {
         
         if (problemImg) {
             console.log("問題画像詳細:", {
+                id: problemImg.id,
                 src: problemImg.src,
                 complete: problemImg.complete,
                 naturalWidth: problemImg.naturalWidth,
@@ -472,6 +597,7 @@ function debugStatus() {
         
         if (answerImg) {
             console.log("解答画像詳細:", {
+                id: answerImg.id,
                 src: answerImg.src,
                 complete: answerImg.complete,
                 naturalWidth: answerImg.naturalWidth,
@@ -489,23 +615,44 @@ function debugStatus() {
     }
 }
 
-// ========== 画像修復関数 ==========
+// ========== 画像修復関数（強化版） ==========
 function fixAllImages() {
-    console.log("🛠️ 全画像修復を実行");
+    console.log("🛠️ 全画像修復を実行（強化版）");
     
     const allImages = document.querySelectorAll('#flashcard img');
     let fixedCount = 0;
     
     allImages.forEach(function(img, index) {
-        if (img.offsetWidth === 0 || img.offsetHeight === 0) {
-            console.log(`🔧 画像${index}を修復中...`);
+        const isHidden = img.offsetWidth === 0 || img.offsetHeight === 0 || img.offsetParent === null;
+        
+        if (isHidden) {
+            console.log(`🔧 画像${img.id || index}を修復中...`);
             
+            // 画像自体の修復
             img.style.width = '100%';
             img.style.maxWidth = '100%';
             img.style.height = 'auto';
             img.style.display = 'block';
             img.style.visibility = 'visible';
             img.style.opacity = '1';
+            
+            // 親要素の修復
+            const parentContainer = img.closest('.problem-container, .answer-container');
+            const grandParentCard = img.closest('.prerendered-card');
+            
+            if (parentContainer && parentContainer.style.display === 'none') {
+                console.log(`🔧 親コンテナも修復: ${img.id || index}`);
+                parentContainer.style.display = 'flex';
+                parentContainer.style.visibility = 'visible';
+                parentContainer.style.opacity = '1';
+            }
+            
+            if (grandParentCard && grandParentCard.style.display === 'none') {
+                console.log(`🔧 カード全体も修復: ${img.id || index}`);
+                grandParentCard.style.display = 'flex';
+                grandParentCard.style.visibility = 'visible';
+                grandParentCard.style.opacity = '1';
+            }
             
             fixedCount++;
         }
@@ -517,9 +664,9 @@ function fixAllImages() {
     setTimeout(debugStatus, 500);
 }
 
-// ========== 初期化（画像表示強化版） ==========
+// ========== 初期化（強制表示強化版） ==========
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("🔧 画像表示修正版初期化開始");
+    console.log("🔧 カード表示修正版初期化開始");
     
     if (typeof rawCards === "undefined") {
         console.error("❌ rawCards が定義されていません");
@@ -538,36 +685,19 @@ document.addEventListener('DOMContentLoaded', function() {
     setupInstantEvents();
     setupInstantKeyboard();
     
-    // 初期表示状態を確実に設定（画像表示強化）
+    // 🔥 修正：初期表示状態を段階的に設定
     setTimeout(function() {
-        if (prerenderedCards[0]) {
-            const problemDiv = prerenderedCards[0].querySelector('.problem-container');
-            const answerDiv = prerenderedCards[0].querySelector('.answer-container');
-            
-            if (problemDiv && answerDiv) {
-                problemDiv.style.display = 'flex';
-                problemDiv.style.visibility = 'visible';
-                problemDiv.style.opacity = '1';
-                
-                answerDiv.style.display = 'none';
-                answerDiv.style.visibility = 'hidden';
-                answerDiv.style.opacity = '0';
-                
-                // 初期画像の表示確認
-                const problemImg = problemDiv.querySelector('img');
-                if (problemImg) {
-                    checkImageVisibility(problemImg, 0, 'problem');
-                }
-                
-                console.log("🎯 初期表示状態確認完了: 問題表示、解答非表示");
-            }
-        }
-        
-        // デバッグ情報を表示
-        debugStatus();
-    }, 1000);
+        console.log("🎯 初期表示状態設定開始");
+        forceShowFirstCard();
+    }, 500);
     
-    console.log("🔧 画像表示修正版初期化完了");
+    // さらに遅延してデバッグ情報を表示
+    setTimeout(function() {
+        console.log("📊 初期化完了後のデバッグ情報:");
+        debugStatus();
+    }, 1500);
+    
+    console.log("🔧 カード表示修正版初期化完了");
 });
 
 function setupInstantEvents() {
@@ -619,6 +749,11 @@ function setupInstantKeyboard() {
                 e.preventDefault();
                 fixAllImages();
                 break;
+            case 'd':
+                // デバッグ用：D キーでデバッグ情報表示
+                e.preventDefault();
+                debugStatus();
+                break;
         }
     });
 }
@@ -655,5 +790,6 @@ window.markUnknown = function() {
 // デバッグ用グローバル関数
 window.debugStatus = debugStatus;
 window.fixAllImages = fixAllImages;
+window.forceShowFirstCard = forceShowFirstCard;
 
-console.log("🔧 画像表示修正版読み込み完了");
+console.log("🔧 カード表示修正版読み込み完了");
