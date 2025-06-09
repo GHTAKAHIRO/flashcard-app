@@ -1182,8 +1182,14 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
 
 @app.route('/')
 def home():
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
+    try:
+        if current_user.is_authenticated:
+            return redirect(url_for('dashboard'))
+        else:
+            return redirect(url_for('login'))
+    except Exception as e:
+        app.logger.error(f"Home route error: {e}")
+        return redirect(url_for('login'))
     
 @app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
 @login_required
