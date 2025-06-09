@@ -18,6 +18,7 @@ import time
 import threading
 import queue
 import time
+import psycopg2.pool
 from contextlib import contextmanager
 
 # ========== 設定エリア ==========
@@ -89,6 +90,27 @@ DB_PORT = os.getenv('DB_PORT')
 DB_NAME = os.getenv('DB_NAME')
 DB_USER = os.getenv('DB_USER')
 DB_PASSWORD = os.getenv('DB_PASSWORD')
+db_pool = None
+
+def init_connection_pool():
+    """データベース接続プールを初期化"""
+    global db_pool
+    if db_pool is None:
+        try:
+            db_pool = psycopg2.pool.ThreadedConnectionPool(
+                2,   # 最小接続数
+                10,  # 最大接続数
+                host=DB_HOST,
+                port=DB_PORT,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                connect_timeout=3,
+                options='-c default_transaction_isolation=read_committed'
+            )
+            app.logger.info("🚀 データベース接続プール初期化完了")
+        except Exception as e:
+            app.logger.error(f"接続プール初期化エラー: {e}")
 
 # 🔥 シンプルなインメモリキャッシュ（Redis代替）
 memory_cache = {}
@@ -99,18 +121,39 @@ print("📋 Redis除去版アプリ - 基本設定完了")
 
 # ========== Redis除去版 パート2: データベース接続とインデックス最適化 ==========
 
+@contextmanager
 def get_db_connection():
-    """データベース接続取得（基本版）"""
-    return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD
-    )
+    """プール化された接続を取得（最適化版）"""
+    global db_pool
+    if db_pool is None:
+        init_connection_pool()
+    
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        if conn:
+            conn.autocommit = False
+            yield conn
+        else:
+            # フォールバック：直接接続
+            conn = psycopg2.connect(
+                host=DB_HOST, port=DB_PORT, database=DB_NAME,
+                user=DB_USER, password=DB_PASSWORD
+            )
+            yield conn
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        app.logger.error(f"DB接続エラー: {e}")
+        raise
+    finally:
+        if conn and db_pool:
+            db_pool.putconn(conn)
+        elif conn:
+            conn.close()
 
 def optimize_database_indexes():
-    """🔥 データベースインデックス最適化（トランザクションエラー修正版）"""
+    """🔥 データベースインデックス最適化（修正版）"""
     indexes = [
         "CREATE INDEX IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
         "CREATE INDEX IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
@@ -123,27 +166,22 @@ def optimize_database_indexes():
     
     success_count = 0
     try:
-        # 🔧 修正：CONCURRENTLYを削除し、通常のCREATE INDEXに変更
-        conn = get_db_connection()
-        conn.autocommit = True  # 🔧 追加：オートコミットモードに設定
+        with get_db_connection() as conn:
+            conn.autocommit = True
+            
+            with conn.cursor() as cur:
+                for index_sql in indexes:
+                    try:
+                        cur.execute(index_sql)
+                        success_count += 1
+                    except Exception as e:
+                        if "already exists" not in str(e):
+                            app.logger.error(f"インデックス作成エラー: {e}")
         
-        with conn.cursor() as cur:
-            for index_sql in indexes:
-                try:
-                    cur.execute(index_sql)
-                    success_count += 1
-                except Exception as e:
-                    if "already exists" not in str(e):
-                        app.logger.error(f"インデックス作成エラー: {e}")
-        
-        conn.close()
         app.logger.info(f"📊 データベース最適化完了: {success_count}個のインデックス")
     except Exception as e:
         app.logger.error(f"データベース最適化エラー: {e}")
-        try:
-            conn.close()
-        except:
-            pass
+        
 
 # ========== Redis除去版 パート3: インメモリキャッシュシステム ==========
 
@@ -340,103 +378,103 @@ def get_completed_stages_chunk_aware(user_id, source, page_range, difficulty='')
 
 # ========== Redis除去版 パート6: カード取得関数群 ==========
 
-@simple_cache(expire_time=120)
-def get_study_cards(source, stage, mode, page_range, user_id, difficulty='', chunk_number=None):
-    """統合復習対応版のget_study_cards（キャッシュ付き高速化）"""
+@simple_cache(expire_time=60)
+def get_study_cards_fast(source, stage, mode, page_range, user_id, difficulty='', chunk_number=None):
+    """超高速化されたカード取得"""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                query = '''
-                    SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
+                # 最適化されたクエリ
+                base_query = '''
+                    SELECT id, subject, page_number, problem_number, level, image_problem, image_answer
                     FROM image
                     WHERE source = %s
                 '''
                 params = [source]
 
-                # ページ範囲の処理
-                page_conditions = []
+                # ページ範囲処理（最適化）
                 if page_range:
+                    page_list = []
                     for part in page_range.split(','):
                         part = part.strip()
-                        if '-' in part:
+                        if '-' in part and part.count('-') == 1:
                             try:
                                 start, end = map(int, part.split('-'))
-                                page_conditions.extend([str(i) for i in range(start, end + 1)])
+                                page_list.extend(str(i) for i in range(start, min(end + 1, start + 100)))
                             except ValueError:
-                                pass
+                                page_list.append(part)
                         else:
-                            page_conditions.append(part)
-
-                if page_conditions:
-                    placeholders = ','.join(['%s'] * len(page_conditions))
-                    query += f' AND page_number IN ({placeholders})'
-                    params.extend(page_conditions)
-                else:
-                    query += ' AND false'
+                            page_list.append(part)
+                    
+                    if page_list:
+                        placeholders = ','.join(['%s'] * len(page_list))
+                        base_query += f' AND page_number IN ({placeholders})'
+                        params.extend(page_list)
 
                 # 難易度フィルタ
                 if difficulty:
                     difficulty_list = [d.strip() for d in difficulty.split(',')]
-                    difficulty_placeholders = ','.join(['%s'] * len(difficulty_list))
-                    query += f' AND level IN ({difficulty_placeholders})'
+                    placeholders = ','.join(['%s'] * len(difficulty_list))
+                    base_query += f' AND level IN ({placeholders})'
                     params.extend(difficulty_list)
 
-                # Stage・モード別の条件
-                if mode == 'test':
-                    if stage == 1:
-                        pass  # チャンク分割は後で行う
-                    elif stage == 2:
-                        query += '''
-                            AND id IN (
-                                SELECT card_id FROM (
-                                    SELECT card_id, result,
-                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
-                                    FROM study_log
-                                    WHERE user_id = %s AND stage = 1 AND mode = 'test'
-                                ) AS ranked
-                                WHERE rn = 1 AND result = 'unknown'
-                            )
-                        '''
-                        params.append(user_id)
-                    elif stage == 3:
-                        query += '''
-                            AND id IN (
-                                SELECT card_id FROM (
-                                    SELECT card_id, result,
-                                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
-                                    FROM study_log
-                                    WHERE user_id = %s AND stage = 2 AND mode = 'test'
-                                ) AS ranked
-                                WHERE rn = 1 AND result = 'unknown'
-                            )
-                        '''
-                        params.append(user_id)
+                # ステージ別フィルタ
+                if stage == 2:
+                    base_query += '''
+                        AND id IN (
+                            SELECT DISTINCT card_id FROM study_log
+                            WHERE user_id = %s AND stage = 1 AND mode = 'test' AND result = 'unknown'
+                        )
+                    '''
+                    params.append(user_id)
+                elif stage == 3:
+                    base_query += '''
+                        AND id IN (
+                            SELECT DISTINCT card_id FROM study_log
+                            WHERE user_id = %s AND stage = 2 AND mode = 'test' AND result = 'unknown'
+                        )
+                    '''
+                    params.append(user_id)
 
-                query += ' ORDER BY id DESC'
-                cur.execute(query, params)
+                base_query += ' ORDER BY id LIMIT 1000'
+                
+                cur.execute(base_query, params)
                 records = cur.fetchall()
 
-        cards_dict = [dict(
-            id=r[0], subject=r[1], grade=r[2], source=r[3],
-            page_number=r[4], problem_number=r[5], topic=r[6],
-            level=r[7], format=r[8], image_problem=r[9], image_answer=r[10]
-        ) for r in records]
+                # 辞書化
+                cards = [
+                    {
+                        'id': r[0], 'subject': r[1], 'page_number': r[2],
+                        'problem_number': r[3], 'level': r[4],
+                        'image_problem': r[5], 'image_answer': r[6],
+                        'grade': '', 'source': source, 'topic': '', 'format': ''
+                    }
+                    for r in records
+                ]
 
-        # Stage 1のみチャンク分割処理
-        if stage == 1 and chunk_number and cards_dict:
-            subject = cards_dict[0]['subject']
-            chunks = create_chunks_for_cards(cards_dict, subject)
-            
-            if 1 <= chunk_number <= len(chunks):
-                return chunks[chunk_number - 1]
-            else:
-                return []
-        
-        return cards_dict
-        
+                # Stage 1のチャンク分割
+                if stage == 1 and chunk_number and cards:
+                    chunk_size = get_chunk_size_by_subject(cards[0]['subject'])
+                    start_idx = (chunk_number - 1) * chunk_size
+                    end_idx = start_idx + chunk_size
+                    return cards[start_idx:end_idx]
+
+                return cards
+
     except Exception as e:
-        app.logger.error(f"教材取得エラー: {e}")
-        return None
+        app.logger.error(f"高速カード取得エラー: {e}")
+        return []
+
+def preload_next_chunk_data(user_id, source, stage, page_range, difficulty, current_chunk):
+    """次のチャンクデータを非同期でプリロード"""
+    try:
+        next_chunk = current_chunk + 1
+        threading.Thread(
+            target=lambda: get_study_cards_fast(source, stage, 'test', page_range, user_id, difficulty, next_chunk),
+            daemon=True
+        ).start()
+    except Exception as e:
+        app.logger.debug(f"プリロードエラー: {e}")
 
 @simple_cache(expire_time=120)
 def get_stage2_cards(source, page_range, user_id, difficulty):
@@ -597,7 +635,7 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                     
                     # 各チャンクの完了状況をチェック・更新
                     for chunk_num in range(1, total_chunks + 1):
-                        chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, chunk_num)
+                        chunk_cards = get_study_cards_fast(...)
                         
                         if chunk_cards:
                             chunk_card_ids = [card['id'] for card in chunk_cards]
@@ -655,7 +693,7 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                         return result
                 else:
                     # 新規作成
-                    cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
+                    cards = get_study_cards_fast(source, stage, 'test', page_range, user_id, difficulty)
                     
                     if not cards:
                         return None
@@ -807,7 +845,7 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
 def get_chunk_practice_cards(user_id, source, stage, chunk_number, page_range, difficulty):
     """Stage 1用の指定チャンクの練習問題を取得（最適化版）"""
     try:
-        chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, chunk_number)
+        chunk_cards = get_study_cards_fast(source, stage, 'test', page_range, user_id, difficulty, chunk_number)
         
         if not chunk_cards:
             return []
@@ -959,7 +997,7 @@ def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty
 def create_fallback_stage_info(source, page_range, difficulty, user_id):
     """エラー時のフォールバック：最小限のStage 1情報"""
     try:
-        cards = get_study_cards(source, 1, 'test', page_range, user_id, difficulty)
+        cards = get_study_cards_fast(source, 1, 'test', page_range, user_id, difficulty)
         
         if cards:
             subject = cards[0]['subject']
@@ -1007,7 +1045,7 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
         
         # ステージ別の対象カードを取得
         if stage == 1:
-            target_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty)
+            target_cards = get_study_cards_fast(source, stage, 'test', page_range, user_id, difficulty)
         elif stage == 2:
             # Stage 1完了チェック
             stage1_completed = check_stage_completion(user_id, source, 1, page_range, difficulty)
@@ -1478,7 +1516,7 @@ def study(source):
                     return redirect(url_for('prepare', source=source))
                 
                 session['current_chunk'] = current_chunk
-                cards_dict = get_study_cards(source, stage, mode, page_range, user_id, difficulty, current_chunk)
+                cards_dict = get_study_cards_fast(source, stage, mode, page_range, user_id, difficulty, current_chunk)
         
         # ステージ2・3の処理
         elif stage in [2, 3]:
@@ -1602,7 +1640,7 @@ def log_result():
             
             if source:
                 try:
-                    chunk_cards = get_study_cards(source, stage, 'test', page_range, user_id, difficulty, current_chunk)
+                    chunk_cards = get_study_cards_fast(source, stage, 'test', page_range, user_id, difficulty, current_chunk)
                     
                     if chunk_cards:
                         chunk_card_ids = [card['id'] for card in chunk_cards]
@@ -1706,7 +1744,7 @@ def debug_cards(source):
     
     try:
         # Stage 1のカード取得テスト
-        stage1_cards = get_study_cards(source, 1, 'test', page_range, user_id, difficulty, 1)
+        stage1_cards = get_study_cards_fast(source, 1, 'test', page_range, user_id, difficulty, 1)
         
         # Stage 2のカード取得テスト
         stage2_cards = get_stage2_cards(source, page_range, user_id, difficulty) if stage >= 2 else []
@@ -1783,16 +1821,31 @@ def cleanup_workers():
     except Exception as e:
         app.logger.error(f"クリーンアップエラー: {e}")
 
+# 場所: if __name__ == '__main__': の直前に追加
+import atexit
+
+def cleanup_db_pool():
+    """アプリ終了時のDB接続プール削除"""
+    global db_pool
+    if db_pool:
+        try:
+            db_pool.closeall()
+            app.logger.info("🧹 DB接続プール削除完了")
+        except Exception as e:
+            app.logger.error(f"DB接続プール削除エラー: {e}")
+
+atexit.register(cleanup_db_pool)
+
 atexit.register(cleanup_workers)
 
 if __name__ == '__main__':
-    # データベース最適化を実行
-    optimize_database_indexes()
+    init_connection_pool()  # 追加
+    threading.Thread(target=optimize_database_indexes, daemon=True).start()  # 追加
     
-    print("📈 Redis除去版暗記アプリ最適化完了 - 基本モード")
+    print("⚡ 超高速化版暗記アプリ起動完了")  # 変更
     
     port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, threaded=True)  # threaded=True 追加
 
 @app.route('/images_batch/<source>')
 @login_required
@@ -1808,7 +1861,7 @@ def get_images_batch(source):
         # テストモードのみの処理（練習モードの特殊処理は削除）
         if stage == 1:
             chunk_number = session.get('current_chunk', 1)
-            cards = get_study_cards(source, stage, mode, page_range, user_id, difficulty, chunk_number)
+            cards = get_study_cards_fast(source, stage, mode, page_range, user_id, difficulty, chunk_number)
         else:
             if stage == 2:
                 cards = get_stage2_cards(source, page_range, user_id, difficulty)
