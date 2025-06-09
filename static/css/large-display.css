@@ -135,7 +135,7 @@ body {
     border-radius: 16px !important; /* flashcardと同じ角丸 */
     
     /* 画像のフィット方法 */
-    object-fit: cover !important; /* コンテナ全体をカバー */
+    object-fit: contain !important; /* 画像全体を表示 */
     object-position: center !important;
     
     /* レンダリング最適化 */
