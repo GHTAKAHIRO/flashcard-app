@@ -17,11 +17,18 @@
             {% if current_chunk %}
                 - チャンク{{ current_chunk }}/{{ total_chunks }}
             {% endif %}
-            <span>({{ mode }}モード)</span>
+            <span>
+                {% if mode == 'test' %}
+                    (テスト)
+                {% elif mode == 'practice' or mode == 'chunk_practice' %}
+                    (練習)
+                {% else %}
+                    ({{ mode }})
+                {% endif %}
+            </span>
         </div>
         <div class="counters">
-            <span>〇 <span id="correct-count">0</span></span>
-            <span>× <span id="incorrect-count">0</span></span>
+            <!-- 〇✕カウンターを削除 -->
         </div>
     </div>
     
