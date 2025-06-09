@@ -1,4 +1,4 @@
-/* 🚀 大画面表示版 CSS */
+/* 🚀 フルスクリーン表示版 CSS */
 body {
     background: #f8f9fa;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -8,169 +8,205 @@ body {
 }
 
 .container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 30px;
+    max-width: 100vw; /* 画面幅いっぱい */
+    margin: 0;
+    padding: 10px; /* 最小限のパディング */
+    height: 100vh; /* 画面高さいっぱい */
+    display: flex;
+    flex-direction: column;
 }
 
 .header-info {
     background: linear-gradient(135deg, #007bff, #0056b3);
     color: white;
-    padding: 20px 30px;
+    padding: 15px 20px; /* 縦のパディングを削減 */
     border-radius: 12px;
-    margin-bottom: 30px;
+    margin-bottom: 10px; /* マージンを削減 */
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    flex-shrink: 0; /* 高さ固定 */
 }
 
 .stage-info {
     font-weight: bold;
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .counters {
     display: flex;
-    gap: 20px;
+    gap: 15px;
     font-weight: bold;
 }
 
 .counters span {
     background: rgba(255,255,255,0.2);
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: 6px;
-    font-size: 16px;
+    font-size: 14px;
 }
 
-/* ========== 大画面フラッシュカード ========== */
+.progress-info {
+    text-align: center;
+    color: #6c757d;
+    font-size: 16px;
+    margin-bottom: 10px; /* マージンを削減 */
+    font-weight: 500;
+    flex-shrink: 0; /* 高さ固定 */
+}
+
+/* ========== フルスクリーンフラッシュカード ========== */
 #flashcard {
     background: white;
-    border-radius: 16px;
-    box-shadow: 0 6px 30px rgba(0,0,0,0.1);
-    padding: 40px !important;
-    margin-bottom: 40px;
-    min-height: auto;
-    max-height: none;
+    border-radius: 0 !important; /* 角丸を削除 */
+    box-shadow: none !important; /* 影を削除 */
+    padding: 0 !important; /* パディングを完全削除 */
+    margin: 0 !important; /* マージンを完全削除 */
+    width: 100% !important;
+    height: 100% !important;
+    flex: 1; /* 残りの高さをすべて使用 */
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
+    align-items: stretch; /* 幅いっぱいに */
+    justify-content: stretch; /* 高さいっぱいに */
     cursor: pointer;
-    overflow: visible !important;
+    overflow: hidden !important; /* はみ出しを隠す */
     position: relative;
-    transition: opacity 0.1s ease;
 }
 
-#flashcard:hover {
-    box-shadow: 0 8px 35px rgba(0,0,0,0.15);
-}
-
-/* ========== 大画面プリレンダリングカード ========== */
+/* ========== フルスクリーンプリレンダリングカード ========== */
 .prerendered-card,
 .ultra-robust-card {
-    position: relative !important;
-    top: auto !important;
-    left: auto !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
+    align-items: stretch !important; /* 幅いっぱいに */
+    justify-content: stretch !important; /* 高さいっぱいに */
     padding: 0 !important;
+    margin: 0 !important;
     box-sizing: border-box !important;
-    overflow: visible !important;
+    overflow: hidden !important;
 }
 
-/* ========== 大画面問題・解答コンテナ ========== */
+/* ========== フルスクリーン問題・解答コンテナ ========== */
 .problem-container,
 .answer-container,
 .ultra-problem,
 .ultra-answer {
     display: flex !important;
     flex-direction: column !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
+    align-items: stretch !important; /* 幅いっぱいに */
+    justify-content: stretch !important; /* 高さいっぱいに */
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     text-align: center !important;
     margin: 0 !important;
     padding: 0 !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     position: relative !important;
 }
 
-/* ========== 大画面画像表示（サイズ拡大） ========== */
+/* ========== フルスクリーン画像表示 ========== */
 #flashcard img,
 .prerendered-card img,
 .problem-container img,
 .answer-container img,
 .ultra-image {
-    max-width: 95% !important;
-    width: auto !important;
-    height: auto !important;
-    max-height: 85vh !important;
+    /* フルスクリーン設定 */
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
     
+    /* 表示設定 */
     display: block !important;
-    margin: 0 auto 30px auto !important;
+    margin: 0 !important;
     padding: 0 !important;
     
+    /* 枠線・装飾を削除 */
     border: none !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
-    border-radius: 12px !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     
-    object-fit: contain !important;
+    /* 画像のフィット方法 */
+    object-fit: cover !important; /* 画面全体をカバー */
     object-position: center !important;
+    
+    /* レンダリング最適化 */
     image-rendering: -webkit-optimize-contrast !important;
     image-rendering: optimize-contrast !important;
     
+    /* GPU加速 */
     transform: translateZ(0) !important;
     backface-visibility: hidden !important;
     
+    /* 確実な表示 */
     visibility: visible !important;
     opacity: 1 !important;
+    
+    /* 絶対配置でフルスクリーン */
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1 !important;
 }
 
-/* ========== 大画面テキスト部分 ========== */
+/* ========== テキスト部分（画像の上にオーバーレイ） ========== */
 .prerendered-card p,
 .ultra-text {
-    margin: 0 0 30px 0 !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 2 !important; /* 画像の上に表示 */
+    
+    margin: 0 !important;
     font-weight: bold !important;
     font-size: 24px !important;
     color: #333 !important;
+    text-shadow: 2px 2px 4px rgba(255,255,255,0.8) !important; /* 読みやすくするための影 */
     word-wrap: break-word !important;
-    max-width: 100% !important;
-    padding: 20px 30px !important;
-    line-height: 1.6 !important;
-    background: rgba(248, 249, 250, 0.9) !important;
-    border-radius: 12px !important;
-    position: relative !important;
-    z-index: 1 !important;
+    max-width: 90% !important;
+    padding: 15px 20px !important;
+    line-height: 1.4 !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-radius: 8px !important;
     text-align: center !important;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
 }
 
-/* ========== 大画面コントロール ========== */
+/* ========== フルスクリーンコントロール（固定位置） ========== */
 .controls {
-    background: white;
-    padding: 30px;
-    border-radius: 16px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px) !important; /* 背景ぼかし */
+    padding: 15px !important;
+    border-radius: 0 !important; /* 角丸を削除 */
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.1) !important;
+    z-index: 1000 !important; /* 最前面に表示 */
+    flex-shrink: 0 !important;
 }
 
 .button-row {
     display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
+    gap: 15px;
+    margin-bottom: 10px; /* マージンを削減 */
 }
 
 .btn-custom {
     flex: 1;
-    padding: 20px 25px;
+    padding: 15px 20px; /* パディングを調整 */
     border: none;
-    border-radius: 12px;
-    font-size: 22px;
+    border-radius: 8px;
+    font-size: 18px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.1s ease;
@@ -180,13 +216,13 @@ body {
 }
 
 .btn-custom:active {
-    transform: scale(0.98);
+    transform: scale(0.95);
 }
 
 .btn-answer {
     background: #17a2b8;
     color: white;
-    font-size: 18px;
+    font-size: 16px;
 }
 
 .btn-answer:hover {
@@ -196,7 +232,7 @@ body {
 #knownBtn {
     background: #28a745;
     color: white;
-    font-size: 28px;
+    font-size: 20px;
 }
 
 #knownBtn:hover {
@@ -206,7 +242,7 @@ body {
 #unknownBtn {
     background: #dc3545;
     color: white;
-    font-size: 28px;
+    font-size: 20px;
 }
 
 #unknownBtn:hover {
@@ -216,19 +252,11 @@ body {
 .shortcuts-info {
     text-align: center;
     color: #6c757d;
-    font-size: 16px;
-    margin-top: 20px;
-    padding: 15px;
-    background: #f8f9fa;
-    border-radius: 8px;
-}
-
-.progress-info {
-    text-align: center;
-    color: #6c757d;
-    font-size: 18px;
-    margin-bottom: 15px;
-    font-weight: 500;
+    font-size: 12px; /* フォントサイズを削減 */
+    margin-top: 10px;
+    padding: 8px;
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 6px;
 }
 
 /* プリロード用の非表示画像 */
@@ -244,131 +272,127 @@ body {
 .image-error {
     background-color: #f8f9fa !important;
     border: 2px dashed #dee2e6 !important;
-    min-height: 300px !important;
+    width: 100% !important;
+    height: 100% !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     font-size: 18px !important;
     color: #6c757d !important;
     text-align: center !important;
-    border-radius: 12px !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
 }
 
-/* ========== レスポンシブ対応（大画面優先） ========== */
+/* ========== レスポンシブ対応（フルスクリーン版） ========== */
 @media (max-width: 768px) {
     .container {
-        max-width: 100%;
-        padding: 15px;
+        padding: 5px;
     }
     
-    #flashcard {
-        padding: 20px !important;
-    }
-    
-    .prerendered-card p,
-    .ultra-text {
-        font-size: 18px !important;
-        padding: 15px 20px !important;
-        margin-bottom: 20px !important;
-    }
-    
-    .btn-custom {
-        padding: 15px 20px;
-        font-size: 18px;
-    }
-    
-    #knownBtn, #unknownBtn {
-        font-size: 24px;
+    .header-info {
+        padding: 10px 15px;
+        margin-bottom: 5px;
     }
     
     .stage-info {
-        font-size: 16px;
+        font-size: 14px;
+    }
+    
+    .counters span {
+        padding: 4px 8px;
+        font-size: 12px;
     }
     
     .progress-info {
         font-size: 14px;
+        margin-bottom: 5px;
+    }
+    
+    .prerendered-card p,
+    .ultra-text {
+        font-size: 16px !important;
+        padding: 10px 15px !important;
+        max-width: 85% !important;
+    }
+    
+    .controls {
+        padding: 10px !important;
+    }
+    
+    .btn-custom {
+        padding: 12px 15px;
+        font-size: 16px;
+    }
+    
+    #knownBtn, #unknownBtn {
+        font-size: 18px;
     }
     
     .shortcuts-info {
-        font-size: 14px;
+        font-size: 10px;
+        padding: 6px;
+        margin-top: 8px;
     }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
-    .container {
-        max-width: 1000px;
-        padding: 25px;
-    }
-    
     .prerendered-card p,
     .ultra-text {
-        font-size: 22px !important;
-        padding: 18px 25px !important;
+        font-size: 20px !important;
+        padding: 12px 18px !important;
     }
     
-    #flashcard {
-        padding: 35px !important;
+    .btn-custom {
+        font-size: 17px;
+    }
+    
+    #knownBtn, #unknownBtn {
+        font-size: 19px;
     }
 }
 
 @media (min-width: 1025px) {
-    .container {
-        max-width: 1400px;
-        padding: 30px;
-    }
-    
     .prerendered-card p,
     .ultra-text {
         font-size: 26px !important;
-        padding: 25px 35px !important;
+        padding: 18px 25px !important;
     }
     
-    #flashcard {
-        padding: 45px !important;
+    .btn-custom {
+        font-size: 20px;
+        padding: 18px 25px;
     }
     
-    #flashcard img,
-    .prerendered-card img,
-    .problem-container img,
-    .answer-container img,
-    .ultra-image {
-        max-width: 90% !important;
-        max-height: 80vh !important;
+    #knownBtn, #unknownBtn {
+        font-size: 22px;
     }
 }
 
 /* ========== 超大画面対応 ========== */
 @media (min-width: 1400px) {
-    .container {
-        max-width: 1600px;
-        padding: 40px;
-    }
-    
     .prerendered-card p,
     .ultra-text {
-        font-size: 28px !important;
-        padding: 30px 40px !important;
-    }
-    
-    #flashcard {
-        padding: 50px !important;
+        font-size: 30px !important;
+        padding: 25px 35px !important;
     }
     
     .btn-custom {
-        padding: 25px 30px;
-        font-size: 24px;
+        font-size: 22px;
+        padding: 20px 30px;
     }
     
     #knownBtn, #unknownBtn {
-        font-size: 32px;
-    }
-    
-    .stage-info {
         font-size: 24px;
     }
     
-    .progress-info {
+    .stage-info {
         font-size: 20px;
+    }
+    
+    .progress-info {
+        font-size: 18px;
     }
 }
 
@@ -379,7 +403,6 @@ body {
     background: linear-gradient(90deg, #f0f0f0 25%, transparent 50%, #f0f0f0 75%);
     background-size: 200% 100%;
     animation: loading 1.5s infinite;
-    min-height: 200px;
 }
 
 @keyframes loading {
@@ -407,6 +430,12 @@ body {
 .answer-container {
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
+}
+
+/* ========== 全画面表示時のbodyスタイル ========== */
+html, body {
+    height: 100%;
+    overflow: hidden; /* スクロールを完全に無効化 */
 }
 
 /* ========== デバッグ用スタイル（開発時のみ） ========== */
