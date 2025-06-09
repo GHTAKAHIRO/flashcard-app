@@ -13,23 +13,27 @@
     <!-- ヘッダー情報 -->
     <div class="header-info">
         <div class="stage-info">
-            <strong>ステージ{{ stage }}</strong>
-            {% if current_chunk %}
-                - チャンク{{ current_chunk }}/{{ total_chunks }}
-            {% endif %}
-            <span id="mode-display">
-                {% if mode == 'chunk_practice' or mode == 'practice' %}
-                    (練習)
-                {% elif mode == 'test' %}
-                    (テスト)
-                {% else %}
-                    ({{ mode }}モード)
+            <div class="stage-main">
+                <strong>ステージ{{ stage }}</strong>
+                {% if current_chunk %}
+                    - チャンク{{ current_chunk }}/{{ total_chunks }}
                 {% endif %}
-            </span>
+            </div>
+            <div class="mode-info">
+                <span id="mode-display">
+                    {% if mode == 'chunk_practice' or mode == 'practice' %}
+                        (練習)
+                    {% elif mode == 'test' %}
+                        (テスト)
+                    {% else %}
+                        ({{ mode }}モード)
+                    {% endif %}
+                </span>
+            </div>
         </div>
         <div class="counters">
-            <span>〇 <span id="correct-count">0</span></span>
-            <span>× <span id="incorrect-count">0</span></span>
+            <span class="counter-item">〇 <span id="correct-count">0</span></span>
+            <span class="counter-item">× <span id="incorrect-count">0</span></span>
         </div>
     </div>
     
