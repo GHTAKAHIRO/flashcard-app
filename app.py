@@ -106,7 +106,7 @@ def init_connection_pool():
                 user=DB_USER,
                 password=DB_PASSWORD,
                 connect_timeout=3,
-                options='-c default_transaction_isolation=read_committed'
+                options='-c default_transaction_isolation="read committed"'
             )
             app.logger.info("🚀 データベース接続プール初期化完了")
         except Exception as e:
@@ -1182,14 +1182,9 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
 
 @app.route('/')
 def home():
-    try:
-        if current_user.is_authenticated:
-            return redirect(url_for('dashboard'))
-        else:
-            return redirect(url_for('login'))
-    except Exception as e:
-        app.logger.error(f"Home route error: {e}")
-        return redirect(url_for('login'))
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return render_template('login.html')
     
 @app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
 @login_required
