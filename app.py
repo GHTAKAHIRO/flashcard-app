@@ -1623,11 +1623,10 @@ def get_images_batch(source):
         if stage == 1:
             chunk_number = session.get('current_chunk', 1)
             cards = get_study_cards_fast(source, stage, mode, page_range, user_id, difficulty, chunk_number)
+        elif stage == 2:
+            cards = get_stage2_cards(source, page_range, user_id, difficulty)
         else:
-            if stage == 2:
-                cards = get_stage2_cards(source, page_range, user_id, difficulty)
-            else:
-                cards = get_stage3_cards(source, page_range, user_id, difficulty)
+            cards = get_stage3_cards(source, page_range, user_id, difficulty)
         
         # 最大5枚まで返す
         batch_data = []
