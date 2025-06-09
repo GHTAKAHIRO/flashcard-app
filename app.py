@@ -15,11 +15,10 @@ import json
 import hashlib
 import threading
 import time
-import threading
 import queue
-import time
 import psycopg2.pool
 from contextlib import contextmanager
+import atexit
 
 # ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
@@ -47,6 +46,7 @@ print("🚀 バックエンド高速化システム初期化完了")
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
 # 🚀 非同期ログ処理システム
 log_queue = queue.Queue(maxsize=1000)
 log_worker_active = True
@@ -635,7 +635,7 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
                     
                     # 各チャンクの完了状況をチェック・更新
                     for chunk_num in range(1, total_chunks + 1):
-                        chunk_cards = get_study_cards_fast(...)
+                        chunk_cards = get_study_cards_fast(source, stage, 'test', page_range, user_id, difficulty, chunk_num)
                         
                         if chunk_cards:
                             chunk_card_ids = [card['id'] for card in chunk_cards]
@@ -1184,200 +1184,6 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
 def home():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-    else:
-        return redirect(url_for('login'))
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT id, username, password_hash FROM users WHERE username = %s", (username,))
-                    user = cur.fetchone()
-
-            if user and check_password_hash(user[2], password):
-                login_user(User(user[0], user[1]))
-                return redirect(url_for('dashboard'))
-            else:
-                flash("ログインに失敗しました。")
-        except Exception as e:
-            app.logger.error(f"ログインエラー: {e}")
-            flash("ログイン中にエラーが発生しました")
-
-    return render_template('login.html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = generate_password_hash(request.form['password'])
-
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, password))
-                    conn.commit()
-            return redirect(url_for('login'))
-        except Exception as e:
-            flash(f"登録エラー: {e}")
-
-    return render_template('register.html')
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('SELECT DISTINCT source, subject, grade FROM image ORDER BY source')
-                rows = cur.fetchall()
-                sources = [{"source": r[0], "subject": r[1], "grade": r[2]} for r in rows]
-                
-                user_id = str(current_user.id)
-                cur.execute('SELECT source, page_range, difficulty FROM user_settings WHERE user_id = %s', (user_id,))
-                settings = cur.fetchall()
-                saved_ranges = {}
-                saved_difficulties = {}
-                # 学習履歴チェックを追加
-                settings_locked = {}
-                
-                for setting in settings:
-                    source_name = setting[0]
-                    saved_ranges[source_name] = setting[1] or ''
-                    saved_difficulties[source_name] = setting[2] or ''
-                    # 各教材の設定変更可否をチェック
-                    settings_locked[source_name] = has_study_history(user_id, source_name)
-        
-        return render_template('dashboard.html', 
-                             sources=sources, 
-                             saved_ranges=saved_ranges, 
-                             saved_difficulties=saved_difficulties,
-                             settings_locked=settings_locked)  # ロック状態を渡す
-    except Exception as e:
-        app.logger.error(f"ダッシュボードエラー: {e}")
-        flash("教材一覧の取得に失敗しました")
-        return redirect(url_for('login'))
-
-@app.route('/set_page_range_and_prepare/<source>', methods=['POST'])
-@login_required
-def set_page_range_and_prepare(source):
-    """ダッシュボードからの設定保存＆準備画面遷移（学習開始後は変更不可）"""
-    user_id = str(current_user.id)
-    
-    # 学習履歴があるかチェック
-    if has_study_history(user_id, source):
-        flash("⚠️ 学習開始後は設定変更できません。現在の設定で学習を継続してください。")
-        return redirect(url_for('prepare', source=source))
-    
-    page_range = request.form.get('page_range', '').strip()
-    difficulty_list = request.form.getlist('difficulty')
-    difficulty = ','.join(difficulty_list) if difficulty_list else ''
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('''
-                    INSERT INTO user_settings (user_id, source, page_range, difficulty)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (user_id, source)
-                    DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
-                ''', (user_id, source, page_range, difficulty))
-                conn.commit()
-        
-        # キャッシュクリア（設定変更時）
-        clear_user_cache(user_id, source)
-        
-        flash("✅ 設定を保存しました。")
-    except Exception as e:
-        app.logger.error(f"user_settings保存エラー: {e}")
-        flash("❌ 設定の保存に失敗しました")
-    
-    return redirect(url_for('prepare', source=source))
-
-# ========== Redis除去版 パート11: 学習準備と開始ルート ==========
-
-@app.route('/prepare/<source>')
-@login_required
-def prepare(source):
-    """学習進捗確認画面（設定変更機能は削除）"""
-    user_id = str(current_user.id)
-    
-    try:
-        # 教材の詳細情報を取得（追加）
-        full_material_name = source  # デフォルト値
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute('''
-                        SELECT DISTINCT subject, grade 
-                        FROM image 
-                        WHERE source = %s 
-                        LIMIT 1
-                    ''', (source,))
-                    material_info = cur.fetchone()
-            
-            if material_info:
-                subject, grade = material_info
-                full_material_name = f"{source}（{subject}{grade}）"
-        except Exception as e:
-            app.logger.error(f"教材情報取得エラー: {e}")
-        
-        # 保存済み設定を取得
-        saved_page_range = ''
-        saved_difficulty = ''
-        
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute('''
-                        SELECT page_range, difficulty FROM user_settings
-                        WHERE user_id = %s AND source = %s
-                    ''', (user_id, source))
-                    result = cur.fetchone()
-            
-            if result:
-                saved_page_range = result[0] or ''
-                saved_difficulty = result[1] or ''
-                # セッションにも保存（学習時に使用）
-                session['page_range'] = saved_page_range
-                session['difficulty'] = saved_difficulty
-        except Exception as e:
-            app.logger.error(f"設定取得エラー: {e}")
-
-        # 設定が未完了の場合はダッシュボードにリダイレクト
-        if not saved_page_range:
-            flash("学習設定が必要です。ページ範囲と難易度を設定してください。")
-            return redirect(url_for('dashboard'))
-
-        # 詳細進捗情報を取得
-        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
-        
-        if not stages_info:
-            stages_info = create_fallback_stage_info(source, saved_page_range, saved_difficulty, user_id)
-
-        return render_template(
-            'prepare.html',
-            source=source,
-            full_material_name=full_material_name,
-            stages_info=stages_info,
-            saved_page_range=saved_page_range,
-            saved_difficulty=saved_difficulty
-        )
-        
-    except Exception as e:
-        app.logger.error(f"準備画面エラー: {e}")
-        flash("準備画面でエラーが発生しました")
-        return redirect(url_for('dashboard'))
     
 @app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
 @login_required
@@ -1588,8 +1394,6 @@ def study(source):
         return redirect(url_for('prepare', source=source))
 
 # ========== Redis除去版 パート13: ログ記録とデバッグルート（最終パート） ==========
-
-# ========== 練習モード完了処理の修正（シンプル版） ==========
 
 @app.route('/log_result', methods=['POST'])
 @login_required
@@ -1804,49 +1608,6 @@ def reset_history(source):
 
     return redirect(url_for('dashboard'))
 
-
-# ========== アプリケーション起動 ==========
-
-import atexit
-
-def cleanup_workers():
-    """アプリ終了時のワーカークリーンアップ"""
-    global log_worker_active
-    log_worker_active = False
-    try:
-        log_queue.put(None, timeout=1)  # 終了シグナル
-        if log_thread.is_alive():
-            log_thread.join(timeout=2)
-        app.logger.info("🧹 ワーカークリーンアップ完了")
-    except Exception as e:
-        app.logger.error(f"クリーンアップエラー: {e}")
-
-# 場所: if __name__ == '__main__': の直前に追加
-import atexit
-
-def cleanup_db_pool():
-    """アプリ終了時のDB接続プール削除"""
-    global db_pool
-    if db_pool:
-        try:
-            db_pool.closeall()
-            app.logger.info("🧹 DB接続プール削除完了")
-        except Exception as e:
-            app.logger.error(f"DB接続プール削除エラー: {e}")
-
-atexit.register(cleanup_db_pool)
-
-atexit.register(cleanup_workers)
-
-if __name__ == '__main__':
-    init_connection_pool()  # 追加
-    threading.Thread(target=optimize_database_indexes, daemon=True).start()  # 追加
-    
-    print("⚡ 超高速化版暗記アプリ起動完了")  # 変更
-    
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, threaded=True)  # threaded=True 追加
-
 @app.route('/images_batch/<source>')
 @login_required
 def get_images_batch(source):
@@ -1885,3 +1646,234 @@ def get_images_batch(source):
     except Exception as e:
         app.logger.error(f"バッチ画像取得エラー: {e}")
         return jsonify({'error': 'Batch fetch error'}), 500
+
+# ========== アプリケーション起動とクリーンアップ ==========
+
+def cleanup_workers():
+    """アプリ終了時のワーカークリーンアップ"""
+    global log_worker_active
+    log_worker_active = False
+    try:
+        log_queue.put(None, timeout=1)  # 終了シグナル
+        if log_thread.is_alive():
+            log_thread.join(timeout=2)
+        app.logger.info("🧹 ワーカークリーンアップ完了")
+    except Exception as e:
+        app.logger.error(f"クリーンアップエラー: {e}")
+
+def cleanup_db_pool():
+    """アプリ終了時のDB接続プール削除"""
+    global db_pool
+    if db_pool:
+        try:
+            db_pool.closeall()
+            app.logger.info("🧹 DB接続プール削除完了")
+        except Exception as e:
+            app.logger.error(f"DB接続プール削除エラー: {e}")
+
+# 終了時の処理を登録
+atexit.register(cleanup_workers)
+atexit.register(cleanup_db_pool)
+
+if __name__ == '__main__':
+    init_connection_pool()
+    threading.Thread(target=optimize_database_indexes, daemon=True).start()
+    
+    print("⚡ 超高速化版暗記アプリ起動完了")
+    
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port, threaded=True)
+    else:
+        return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT id, username, password_hash FROM users WHERE username = %s", (username,))
+                    user = cur.fetchone()
+
+            if user and check_password_hash(user[2], password):
+                login_user(User(user[0], user[1]))
+                return redirect(url_for('dashboard'))
+            else:
+                flash("ログインに失敗しました。")
+        except Exception as e:
+            app.logger.error(f"ログインエラー: {e}")
+            flash("ログイン中にエラーが発生しました")
+
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = generate_password_hash(request.form['password'])
+
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, password))
+                    conn.commit()
+            return redirect(url_for('login'))
+        except Exception as e:
+            flash(f"登録エラー: {e}")
+
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT DISTINCT source, subject, grade FROM image ORDER BY source')
+                rows = cur.fetchall()
+                sources = [{"source": r[0], "subject": r[1], "grade": r[2]} for r in rows]
+                
+                user_id = str(current_user.id)
+                cur.execute('SELECT source, page_range, difficulty FROM user_settings WHERE user_id = %s', (user_id,))
+                settings = cur.fetchall()
+                saved_ranges = {}
+                saved_difficulties = {}
+                # 学習履歴チェックを追加
+                settings_locked = {}
+                
+                for setting in settings:
+                    source_name = setting[0]
+                    saved_ranges[source_name] = setting[1] or ''
+                    saved_difficulties[source_name] = setting[2] or ''
+                    # 各教材の設定変更可否をチェック
+                    settings_locked[source_name] = has_study_history(user_id, source_name)
+        
+        return render_template('dashboard.html', 
+                             sources=sources, 
+                             saved_ranges=saved_ranges, 
+                             saved_difficulties=saved_difficulties,
+                             settings_locked=settings_locked)  # ロック状態を渡す
+    except Exception as e:
+        app.logger.error(f"ダッシュボードエラー: {e}")
+        flash("教材一覧の取得に失敗しました")
+        return redirect(url_for('login'))
+
+@app.route('/set_page_range_and_prepare/<source>', methods=['POST'])
+@login_required
+def set_page_range_and_prepare(source):
+    """ダッシュボードからの設定保存＆準備画面遷移（学習開始後は変更不可）"""
+    user_id = str(current_user.id)
+    
+    # 学習履歴があるかチェック
+    if has_study_history(user_id, source):
+        flash("⚠️ 学習開始後は設定変更できません。現在の設定で学習を継続してください。")
+        return redirect(url_for('prepare', source=source))
+    
+    page_range = request.form.get('page_range', '').strip()
+    difficulty_list = request.form.getlist('difficulty')
+    difficulty = ','.join(difficulty_list) if difficulty_list else ''
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    INSERT INTO user_settings (user_id, source, page_range, difficulty)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (user_id, source)
+                    DO UPDATE SET page_range = EXCLUDED.page_range, difficulty = EXCLUDED.difficulty
+                ''', (user_id, source, page_range, difficulty))
+                conn.commit()
+        
+        # キャッシュクリア（設定変更時）
+        clear_user_cache(user_id, source)
+        
+        flash("✅ 設定を保存しました。")
+    except Exception as e:
+        app.logger.error(f"user_settings保存エラー: {e}")
+        flash("❌ 設定の保存に失敗しました")
+    
+    return redirect(url_for('prepare', source=source))
+
+# ========== Redis除去版 パート11: 学習準備と開始ルート ==========
+
+@app.route('/prepare/<source>')
+@login_required
+def prepare(source):
+    """学習進捗確認画面（設定変更機能は削除）"""
+    user_id = str(current_user.id)
+    
+    try:
+        # 教材の詳細情報を取得（追加）
+        full_material_name = source  # デフォルト値
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        SELECT DISTINCT subject, grade 
+                        FROM image 
+                        WHERE source = %s 
+                        LIMIT 1
+                    ''', (source,))
+                    material_info = cur.fetchone()
+            
+            if material_info:
+                subject, grade = material_info
+                full_material_name = f"{source}（{subject}{grade}）"
+        except Exception as e:
+            app.logger.error(f"教材情報取得エラー: {e}")
+        
+        # 保存済み設定を取得
+        saved_page_range = ''
+        saved_difficulty = ''
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        SELECT page_range, difficulty FROM user_settings
+                        WHERE user_id = %s AND source = %s
+                    ''', (user_id, source))
+                    result = cur.fetchone()
+            
+            if result:
+                saved_page_range = result[0] or ''
+                saved_difficulty = result[1] or ''
+                # セッションにも保存（学習時に使用）
+                session['page_range'] = saved_page_range
+                session['difficulty'] = saved_difficulty
+        except Exception as e:
+            app.logger.error(f"設定取得エラー: {e}")
+
+        # 設定が未完了の場合はダッシュボードにリダイレクト
+        if not saved_page_range:
+            flash("学習設定が必要です。ページ範囲と難易度を設定してください。")
+            return redirect(url_for('dashboard'))
+
+        # 詳細進捗情報を取得
+        stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
+        
+        if not stages_info:
+            stages_info = create_fallback_stage_info(source, saved_page_range, saved_difficulty, user_id)
+
+        return render_template(
+            'prepare.html',
+            source=source,
+            full_material_name=full_material_name,
+            stages_info=stages_info,
+            saved_page_range=saved_page_range,
+            saved_difficulty=saved_difficulty
+        )
+        
+    except Exception as e:
+        app.logger.error(f"準備画面エラー: {e}")
+        flash("準備画面でエラーが発生しました")
+        return redirect(url_for('dashboard'))
