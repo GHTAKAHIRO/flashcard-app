@@ -1,4 +1,4 @@
-/* 🚀 フルスクリーン表示版 CSS */
+/* 🚀 コンテナフィット版 CSS */
 body {
     background: #f8f9fa;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -8,10 +8,10 @@ body {
 }
 
 .container {
-    max-width: 100vw; /* 画面幅いっぱい */
-    margin: 0;
-    padding: 10px; /* 最小限のパディング */
-    height: 100vh; /* 画面高さいっぱい */
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    height: 100vh;
     display: flex;
     flex-direction: column;
 }
@@ -19,14 +19,14 @@ body {
 .header-info {
     background: linear-gradient(135deg, #007bff, #0056b3);
     color: white;
-    padding: 15px 20px; /* 縦のパディングを削減 */
+    padding: 15px 20px;
     border-radius: 12px;
-    margin-bottom: 10px; /* マージンを削減 */
+    margin-bottom: 15px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    flex-shrink: 0; /* 高さ固定 */
+    flex-shrink: 0;
 }
 
 .stage-info {
@@ -51,31 +51,30 @@ body {
     text-align: center;
     color: #6c757d;
     font-size: 16px;
-    margin-bottom: 10px; /* マージンを削減 */
+    margin-bottom: 15px;
     font-weight: 500;
-    flex-shrink: 0; /* 高さ固定 */
+    flex-shrink: 0;
 }
 
-/* ========== フルスクリーンフラッシュカード ========== */
+/* ========== flashcardコンテナ（背景枠あり） ========== */
 #flashcard {
     background: white;
-    border-radius: 0 !important; /* 角丸を削除 */
-    box-shadow: none !important; /* 影を削除 */
-    padding: 0 !important; /* パディングを完全削除 */
-    margin: 0 !important; /* マージンを完全削除 */
-    width: 100% !important;
-    height: 100% !important;
+    border-radius: 16px !important; /* 角丸を復活 */
+    box-shadow: 0 6px 30px rgba(0,0,0,0.1) !important; /* 影を復活 */
+    padding: 0 !important; /* パディングは削除 */
+    margin-bottom: 15px;
+    width: 100%;
     flex: 1; /* 残りの高さをすべて使用 */
     display: flex;
     flex-direction: column;
-    align-items: stretch; /* 幅いっぱいに */
-    justify-content: stretch; /* 高さいっぱいに */
+    align-items: stretch;
+    justify-content: stretch;
     cursor: pointer;
-    overflow: hidden !important; /* はみ出しを隠す */
+    overflow: hidden !important;
     position: relative;
 }
 
-/* ========== フルスクリーンプリレンダリングカード ========== */
+/* ========== プリレンダリングカード（コンテナに合わせる） ========== */
 .prerendered-card,
 .ultra-robust-card {
     position: absolute !important;
@@ -85,23 +84,24 @@ body {
     height: 100% !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: stretch !important; /* 幅いっぱいに */
-    justify-content: stretch !important; /* 高さいっぱいに */
+    align-items: stretch !important;
+    justify-content: stretch !important;
     padding: 0 !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
+    border-radius: 16px !important; /* flashcardと同じ角丸 */
 }
 
-/* ========== フルスクリーン問題・解答コンテナ ========== */
+/* ========== 問題・解答コンテナ（flashcard枠に合わせる） ========== */
 .problem-container,
 .answer-container,
 .ultra-problem,
 .ultra-answer {
     display: flex !important;
     flex-direction: column !important;
-    align-items: stretch !important; /* 幅いっぱいに */
-    justify-content: stretch !important; /* 高さいっぱいに */
+    align-items: stretch !important;
+    justify-content: stretch !important;
     width: 100% !important;
     height: 100% !important;
     text-align: center !important;
@@ -109,15 +109,16 @@ body {
     padding: 0 !important;
     overflow: hidden !important;
     position: relative !important;
+    border-radius: 16px !important; /* flashcardと同じ角丸 */
 }
 
-/* ========== フルスクリーン画像表示 ========== */
+/* ========== 画像をflashcard枠に完全フィット ========== */
 #flashcard img,
 .prerendered-card img,
 .problem-container img,
 .answer-container img,
 .ultra-image {
-    /* フルスクリーン設定 */
+    /* flashcard枠に完全フィット */
     width: 100% !important;
     height: 100% !important;
     max-width: none !important;
@@ -128,13 +129,13 @@ body {
     margin: 0 !important;
     padding: 0 !important;
     
-    /* 枠線・装飾を削除 */
+    /* 枠線・装飾をflashcardに合わせる */
     border: none !important;
     box-shadow: none !important;
-    border-radius: 0 !important;
+    border-radius: 16px !important; /* flashcardと同じ角丸 */
     
     /* 画像のフィット方法 */
-    object-fit: cover !important; /* 画面全体をカバー */
+    object-fit: cover !important; /* コンテナ全体をカバー */
     object-position: center !important;
     
     /* レンダリング最適化 */
@@ -149,7 +150,7 @@ body {
     visibility: visible !important;
     opacity: 1 !important;
     
-    /* 絶対配置でフルスクリーン */
+    /* 絶対配置でコンテナにフィット */
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
@@ -167,45 +168,40 @@ body {
     
     margin: 0 !important;
     font-weight: bold !important;
-    font-size: 24px !important;
+    font-size: 20px !important;
     color: #333 !important;
-    text-shadow: 2px 2px 4px rgba(255,255,255,0.8) !important; /* 読みやすくするための影 */
+    text-shadow: 1px 1px 3px rgba(255,255,255,0.8) !important; /* 読みやすくするための影 */
     word-wrap: break-word !important;
-    max-width: 90% !important;
-    padding: 15px 20px !important;
+    max-width: 85% !important;
+    padding: 12px 16px !important;
     line-height: 1.4 !important;
-    background: rgba(255, 255, 255, 0.9) !important;
+    background: rgba(255, 255, 255, 0.92) !important;
     border-radius: 8px !important;
     text-align: center !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+    backdrop-filter: blur(4px) !important; /* 背景ぼかし */
 }
 
-/* ========== フルスクリーンコントロール（固定位置） ========== */
+/* ========== コントロール（通常位置） ========== */
 .controls {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(10px) !important; /* 背景ぼかし */
-    padding: 15px !important;
-    border-radius: 0 !important; /* 角丸を削除 */
-    box-shadow: 0 -4px 15px rgba(0,0,0,0.1) !important;
-    z-index: 1000 !important; /* 最前面に表示 */
-    flex-shrink: 0 !important;
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    flex-shrink: 0;
 }
 
 .button-row {
     display: flex;
     gap: 15px;
-    margin-bottom: 10px; /* マージンを削減 */
+    margin-bottom: 15px;
 }
 
 .btn-custom {
     flex: 1;
-    padding: 15px 20px; /* パディングを調整 */
+    padding: 16px 20px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 18px;
     font-weight: bold;
     cursor: pointer;
@@ -232,7 +228,7 @@ body {
 #knownBtn {
     background: #28a745;
     color: white;
-    font-size: 20px;
+    font-size: 22px;
 }
 
 #knownBtn:hover {
@@ -242,7 +238,7 @@ body {
 #unknownBtn {
     background: #dc3545;
     color: white;
-    font-size: 20px;
+    font-size: 22px;
 }
 
 #unknownBtn:hover {
@@ -252,11 +248,11 @@ body {
 .shortcuts-info {
     text-align: center;
     color: #6c757d;
-    font-size: 12px; /* フォントサイズを削減 */
-    margin-top: 10px;
-    padding: 8px;
-    background: rgba(248, 249, 250, 0.8);
-    border-radius: 6px;
+    font-size: 14px;
+    margin-top: 15px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
 }
 
 /* プリロード用の非表示画像 */
@@ -283,21 +279,22 @@ body {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
+    border-radius: 16px !important;
 }
 
-/* ========== レスポンシブ対応（フルスクリーン版） ========== */
+/* ========== レスポンシブ対応 ========== */
 @media (max-width: 768px) {
     .container {
-        padding: 5px;
+        padding: 10px;
     }
     
     .header-info {
-        padding: 10px 15px;
-        margin-bottom: 5px;
+        padding: 12px 16px;
+        margin-bottom: 10px;
     }
     
     .stage-info {
-        font-size: 14px;
+        font-size: 16px;
     }
     
     .counters span {
@@ -307,84 +304,122 @@ body {
     
     .progress-info {
         font-size: 14px;
-        margin-bottom: 5px;
+        margin-bottom: 10px;
+    }
+    
+    #flashcard {
+        margin-bottom: 10px;
+        border-radius: 12px !important;
+    }
+    
+    .prerendered-card,
+    .ultra-robust-card,
+    .problem-container,
+    .answer-container,
+    .ultra-problem,
+    .ultra-answer {
+        border-radius: 12px !important;
+    }
+    
+    #flashcard img,
+    .prerendered-card img,
+    .problem-container img,
+    .answer-container img,
+    .ultra-image {
+        border-radius: 12px !important;
     }
     
     .prerendered-card p,
     .ultra-text {
         font-size: 16px !important;
-        padding: 10px 15px !important;
-        max-width: 85% !important;
+        padding: 10px 14px !important;
+        max-width: 80% !important;
     }
     
     .controls {
-        padding: 10px !important;
+        padding: 15px;
+        border-radius: 12px;
     }
     
     .btn-custom {
-        padding: 12px 15px;
+        padding: 14px 16px;
         font-size: 16px;
+        border-radius: 8px;
     }
     
     #knownBtn, #unknownBtn {
-        font-size: 18px;
+        font-size: 20px;
     }
     
     .shortcuts-info {
-        font-size: 10px;
-        padding: 6px;
-        margin-top: 8px;
+        font-size: 12px;
+        padding: 8px;
+        margin-top: 12px;
     }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
+    .container {
+        padding: 15px;
+    }
+    
     .prerendered-card p,
     .ultra-text {
-        font-size: 20px !important;
-        padding: 12px 18px !important;
+        font-size: 18px !important;
+        padding: 11px 15px !important;
     }
     
     .btn-custom {
         font-size: 17px;
+        padding: 15px 18px;
     }
     
     #knownBtn, #unknownBtn {
-        font-size: 19px;
+        font-size: 21px;
     }
 }
 
 @media (min-width: 1025px) {
+    .container {
+        padding: 25px;
+    }
+    
     .prerendered-card p,
     .ultra-text {
-        font-size: 26px !important;
-        padding: 18px 25px !important;
+        font-size: 22px !important;
+        padding: 14px 18px !important;
     }
     
     .btn-custom {
-        font-size: 20px;
-        padding: 18px 25px;
+        font-size: 19px;
+        padding: 17px 22px;
     }
     
     #knownBtn, #unknownBtn {
-        font-size: 22px;
+        font-size: 24px;
     }
 }
 
 /* ========== 超大画面対応 ========== */
 @media (min-width: 1400px) {
+    .container {
+        max-width: 1600px;
+        padding: 30px;
+    }
+    
     .prerendered-card p,
     .ultra-text {
-        font-size: 30px !important;
-        padding: 25px 35px !important;
+        font-size: 26px !important;
+        padding: 16px 22px !important;
     }
     
     .btn-custom {
-        font-size: 22px;
-        padding: 20px 30px;
+        font-size: 21px;
+        padding: 19px 25px;
     }
     
     #knownBtn, #unknownBtn {
-        font-size: 24px;
+        font-size: 26px;
     }
     
     .stage-info {
@@ -430,12 +465,6 @@ body {
 .answer-container {
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
-}
-
-/* ========== 全画面表示時のbodyスタイル ========== */
-html, body {
-    height: 100%;
-    overflow: hidden; /* スクロールを完全に無効化 */
 }
 
 /* ========== デバッグ用スタイル（開発時のみ） ========== */
