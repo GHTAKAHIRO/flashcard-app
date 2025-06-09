@@ -17,7 +17,15 @@
             {% if current_chunk %}
                 - チャンク{{ current_chunk }}/{{ total_chunks }}
             {% endif %}
-            <span>({{ mode }}モード)</span>
+            <span id="mode-display">
+                {% if mode == 'chunk_practice' or mode == 'practice' %}
+                    (練習)
+                {% elif mode == 'test' %}
+                    (テスト)
+                {% else %}
+                    ({{ mode }}モード)
+                {% endif %}
+            </span>
         </div>
         <div class="counters">
             <span>〇 <span id="correct-count">0</span></span>
@@ -77,6 +85,30 @@
     window.currentSource = "{{ source }}";
     
     console.log('📊 カードデータ読み込み:', rawCards.length, '問');
+    
+    // 🚀 モード表示を日本語に変換する関数
+    function updateModeDisplay() {
+        const modeElement = document.getElementById('mode-display');
+        if (modeElement) {
+            const currentMode = window.currentMode;
+            let displayText = '';
+            
+            if (currentMode === 'chunk_practice' || currentMode === 'practice') {
+                displayText = '(練習)';
+            } else if (currentMode === 'test') {
+                displayText = '(テスト)';
+            } else {
+                displayText = `(${currentMode}モード)`;
+            }
+            
+            modeElement.textContent = displayText;
+        }
+    }
+    
+    // ページ読み込み時にモード表示を更新
+    document.addEventListener('DOMContentLoaded', function() {
+        updateModeDisplay();
+    });
 </script>
 
 <!-- Bootstrap JS -->
