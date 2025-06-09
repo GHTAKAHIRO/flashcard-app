@@ -1,4 +1,4 @@
-console.log("🔧 完全修正版 main.js が読み込まれました");
+console.log("🔧 アニメーション対応版 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
@@ -16,13 +16,150 @@ let imageLoadTracker = {
     imageStatus: {}
 };
 
+// ========== アニメーション用変数 ==========
+let isAnimating = false;
+let completionAnimationActive = false;
+
+// ========== 完了時アニメーション作成 ==========
+function createCompletionAnimation() {
+    const overlay = document.createElement('div');
+    overlay.id = 'completion-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(135deg, #28a745, #20c997, #17a2b8);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 0;
+        transform: scale(0.8);
+        transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        backdrop-filter: blur(10px);
+    `;
+    
+    const content = document.createElement('div');
+    content.style.cssText = `
+        text-align: center;
+        color: white;
+        transform: translateY(20px);
+        opacity: 0;
+        transition: all 0.6s ease 0.2s;
+    `;
+    
+    const icon = document.createElement('div');
+    icon.innerHTML = '🎉';
+    icon.style.cssText = `
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        animation: bounce 0.6s ease infinite alternate;
+    `;
+    
+    const title = document.createElement('h2');
+    title.textContent = '完了しました！';
+    title.style.cssText = `
+        font-size: 2.5rem;
+        margin: 0 0 1rem 0;
+        font-weight: bold;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    `;
+    
+    const subtitle = document.createElement('p');
+    subtitle.textContent = '次の画面に移動しています...';
+    subtitle.style.cssText = `
+        font-size: 1.2rem;
+        margin: 0;
+        opacity: 0.9;
+    `;
+    
+    const spinner = document.createElement('div');
+    spinner.style.cssText = `
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255,255,255,0.3);
+        border-top: 4px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-top: 1.5rem;
+    `;
+    
+    content.appendChild(icon);
+    content.appendChild(title);
+    content.appendChild(subtitle);
+    content.appendChild(spinner);
+    overlay.appendChild(content);
+    
+    // CSS animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.1); }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(overlay);
+    
+    // アニメーション開始
+    requestAnimationFrame(() => {
+        overlay.style.opacity = '1';
+        overlay.style.transform = 'scale(1)';
+        
+        setTimeout(() => {
+            content.style.opacity = '1';
+            content.style.transform = 'translateY(0)';
+        }, 200);
+    });
+    
+    return overlay;
+}
+
+// ========== ページ遷移アニメーション ==========
+function createPageTransition() {
+    const transition = document.createElement('div');
+    transition.id = 'page-transition';
+    transition.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        z-index: 9998;
+        opacity: 0;
+        transform: translateX(-100%);
+        transition: all 0.3s ease-in-out;
+    `;
+    
+    document.body.appendChild(transition);
+    
+    requestAnimationFrame(() => {
+        transition.style.opacity = '1';
+        transition.style.transform = 'translateX(0)';
+    });
+    
+    return transition;
+}
+
 // ========== 核爆弾級の非表示関数 ==========
 function nuclearHide(element) {
     if (!element) return;
     
     console.log(`💥 核爆弾級非表示: ${element.id || element.className}`);
     
-    // すべての可能な非表示方法を使用
     element.style.setProperty('display', 'none', 'important');
     element.style.setProperty('visibility', 'hidden', 'important');
     element.style.setProperty('opacity', '0', 'important');
@@ -38,12 +175,10 @@ function nuclearHide(element) {
     element.style.setProperty('transform', 'scale(0)', 'important');
     element.style.setProperty('z-index', '-9999', 'important');
     
-    // DOM属性も設定
     element.setAttribute('aria-hidden', 'true');
     element.setAttribute('hidden', 'true');
     element.hidden = true;
     
-    // 子要素の画像も強制非表示
     const images = element.querySelectorAll('img');
     images.forEach(img => {
         img.style.setProperty('display', 'none', 'important');
@@ -57,13 +192,11 @@ function nuclearHide(element) {
     });
 }
 
-// ========== 核爆弾級の表示関数 ==========
 function nuclearShow(element) {
     if (!element) return;
     
     console.log(`✨ 核爆弾級表示: ${element.id || element.className}`);
     
-    // すべての非表示スタイルをクリア
     const propertiesToRemove = [
         'display', 'visibility', 'opacity', 'position', 'left', 'top',
         'width', 'height', 'max-width', 'max-height', 'overflow',
@@ -74,17 +207,14 @@ function nuclearShow(element) {
         element.style.removeProperty(prop);
     });
     
-    // 確実な表示設定
     element.style.setProperty('display', 'flex', 'important');
     element.style.setProperty('visibility', 'visible', 'important');
     element.style.setProperty('opacity', '1', 'important');
     
-    // DOM属性をクリア
     element.removeAttribute('aria-hidden');
     element.removeAttribute('hidden');
     element.hidden = false;
     
-    // 子要素の画像も表示
     const images = element.querySelectorAll('img');
     images.forEach(img => {
         const imagePropertiesToRemove = [
@@ -102,57 +232,6 @@ function nuclearShow(element) {
     });
 }
 
-// ========== 完全DOM削除・再作成システム ==========
-function nukeAndRebuildCard(cardIndex) {
-    console.log(`🚀 カード${cardIndex + 1}を完全再構築`);
-    
-    const flashcard = document.getElementById('flashcard');
-    if (!flashcard || !cards[cardIndex]) return;
-    
-    // 既存のカードを完全削除
-    if (prerenderedCards[cardIndex]) {
-        prerenderedCards[cardIndex].remove();
-    }
-    
-    // 新しいカードを作成
-    const newCard = createUltraRobustCard(cards[cardIndex], cardIndex);
-    
-    // 適切な位置に挿入
-    if (cardIndex === 0) {
-        flashcard.insertBefore(newCard, flashcard.firstChild);
-    } else {
-        const previousCard = prerenderedCards[cardIndex - 1];
-        if (previousCard && previousCard.nextSibling) {
-            flashcard.insertBefore(newCard, previousCard.nextSibling);
-        } else {
-            flashcard.appendChild(newCard);
-        }
-    }
-    
-    // 配列を更新
-    prerenderedCards[cardIndex] = newCard;
-    
-    // 表示状態を設定
-    if (cardIndex === currentIndex) {
-        nuclearShow(newCard);
-        
-        const problemDiv = newCard.querySelector('.problem-container');
-        const answerDiv = newCard.querySelector('.answer-container');
-        
-        if (showingAnswer) {
-            nuclearHide(problemDiv);
-            nuclearShow(answerDiv);
-        } else {
-            nuclearShow(problemDiv);
-            nuclearHide(answerDiv);
-        }
-    } else {
-        nuclearHide(newCard);
-    }
-    
-    console.log(`✅ カード${cardIndex + 1}再構築完了`);
-}
-
 // ========== 超堅牢カード作成 ==========
 function createUltraRobustCard(card, index) {
     const container = document.createElement('div');
@@ -163,13 +242,11 @@ function createUltraRobustCard(card, index) {
     
     const cardNumber = index + 1;
     
-    // 問題部分
     const problemDiv = document.createElement('div');
     problemDiv.className = 'problem-container ultra-problem';
     problemDiv.id = `ultra-problem-${cardNumber}`;
     problemDiv.dataset.section = 'problem';
     
-    // 問題テキスト
     if (card.problem_number && card.topic) {
         const text = document.createElement('p');
         text.textContent = card.problem_number + ": " + card.topic;
@@ -177,20 +254,17 @@ function createUltraRobustCard(card, index) {
         problemDiv.appendChild(text);
     }
     
-    // 問題画像
     if (card.image_problem) {
         const img = createUltraRobustImage(card.image_problem, '問題画像', cardNumber, 'problem');
         problemDiv.appendChild(img);
         imageLoadTracker.totalImages++;
     }
     
-    // 解答部分
     const answerDiv = document.createElement('div');
     answerDiv.className = 'answer-container ultra-answer';
     answerDiv.id = `ultra-answer-${cardNumber}`;
     answerDiv.dataset.section = 'answer';
     
-    // 解答画像
     if (card.image_answer) {
         const answerImg = createUltraRobustImage(card.image_answer, '解答画像', cardNumber, 'answer');
         answerDiv.appendChild(answerImg);
@@ -203,7 +277,6 @@ function createUltraRobustCard(card, index) {
     return container;
 }
 
-// ========== 超堅牢画像作成 ==========
 function createUltraRobustImage(src, alt, cardNumber, type) {
     const img = document.createElement('img');
     
@@ -219,7 +292,6 @@ function createUltraRobustImage(src, alt, cardNumber, type) {
     img.dataset.imageType = type;
     img.dataset.originalSrc = src;
     
-    // 画像状況を初期化
     imageLoadTracker.imageStatus[imageId] = {
         cardNumber: cardNumber,
         type: type,
@@ -235,7 +307,6 @@ function createUltraRobustImage(src, alt, cardNumber, type) {
         
         console.log(`✅ 超堅牢画像読み込み: ${imageId} (${imageLoadTracker.loadedImages}/${imageLoadTracker.totalImages})`);
         
-        // 読み込み後の即座チェック
         setTimeout(() => ultraVerifyImageState(img, cardNumber, type), 50);
     };
     
@@ -249,9 +320,9 @@ function createUltraRobustImage(src, alt, cardNumber, type) {
     return img;
 }
 
-// ========== 事前レンダリング（完全版） ==========
+// ========== 事前レンダリング ==========
 function prerenderAllCards() {
-    console.log("🚀 完全事前レンダリング開始");
+    console.log("🚀 アニメーション対応事前レンダリング開始");
     
     const flashcard = document.getElementById('flashcard');
     if (!flashcard) return;
@@ -266,17 +337,14 @@ function prerenderAllCards() {
         prerenderedCards.push(cardElement);
     });
     
-    console.log("✅ 完全事前レンダリング完了: " + cards.length + "枚");
+    console.log("✅ アニメーション対応事前レンダリング完了: " + cards.length + "枚");
     
-    // 初期状態を強制設定
     setTimeout(() => ultraForceInitialState(), 100);
 }
 
-// ========== 超強力初期状態設定 ==========
 function ultraForceInitialState() {
     console.log("💪 超強力初期状態設定開始");
     
-    // すべてのカードを一旦核爆弾級非表示
     prerenderedCards.forEach((card, index) => {
         nuclearHide(card);
         
@@ -287,7 +355,6 @@ function ultraForceInitialState() {
         nuclearHide(answerDiv);
     });
     
-    // 最初のカードのみ表示
     if (prerenderedCards[0]) {
         const firstCard = prerenderedCards[0];
         const problemDiv = firstCard.querySelector('.problem-container');
@@ -304,18 +371,16 @@ function ultraForceInitialState() {
     showingAnswer = false;
     
     console.log("✅ 超強力初期状態設定完了");
-    
-    // 検証
     setTimeout(() => ultraVerifyAllStates(), 200);
 }
 
-// ========== カード切り替え（完全版） ==========
+// ========== カード切り替え（アニメーション対応） ==========
 function switchToCardInstantly(newIndex) {
     if (newIndex >= cards.length) return false;
+    if (isAnimating) return false;
     
-    console.log(`🔄 完全カード切り替え: ${currentIndex + 1} → ${newIndex + 1}`);
+    console.log(`🔄 アニメーション対応カード切り替え: ${currentIndex + 1} → ${newIndex + 1}`);
     
-    // 全カードを核爆弾級非表示
     prerenderedCards.forEach((card, index) => {
         nuclearHide(card);
         const problemDiv = card.querySelector('.problem-container');
@@ -324,7 +389,6 @@ function switchToCardInstantly(newIndex) {
         nuclearHide(answerDiv);
     });
     
-    // 新しいカードのみ表示
     if (prerenderedCards[newIndex]) {
         const newCard = prerenderedCards[newIndex];
         const problemDiv = newCard.querySelector('.problem-container');
@@ -341,16 +405,14 @@ function switchToCardInstantly(newIndex) {
     showingAnswer = false;
     
     updateProgressInstantly();
-    
-    // 切り替え後検証
     setTimeout(() => ultraVerifyAllStates(), 100);
     
     return true;
 }
 
-// ========== 解答切り替え（完全版） ==========
+// ========== 解答切り替え ==========
 function toggleAnswerInstantly() {
-    if (!prerenderedCards[currentIndex]) return;
+    if (!prerenderedCards[currentIndex] || isAnimating) return;
     
     const currentCard = prerenderedCards[currentIndex];
     const problemDiv = currentCard.querySelector('.problem-container');
@@ -359,7 +421,7 @@ function toggleAnswerInstantly() {
     if (problemDiv && answerDiv) {
         showingAnswer = !showingAnswer;
         
-        console.log(`🔄 完全解答切り替え: ${showingAnswer ? '問題→解答' : '解答→問題'}`);
+        console.log(`🔄 確実な解答切り替え: ${showingAnswer ? '問題→解答' : '解答→問題'}`);
         
         if (showingAnswer) {
             nuclearHide(problemDiv);
@@ -371,12 +433,11 @@ function toggleAnswerInstantly() {
             console.log("📝 問題表示：解答核爆弾級非表示");
         }
         
-        // 切り替え後検証
         setTimeout(() => ultraVerifyAllStates(), 100);
     }
 }
 
-// ========== 超強力状態検証 ==========
+// ========== 状態検証・修正関数 ==========
 function ultraVerifyImageState(img, cardNumber, type) {
     const imageId = img.id;
     const isVisible = img.offsetParent !== null && img.offsetWidth > 0 && img.offsetHeight > 0;
@@ -411,7 +472,6 @@ function ultraVerifyAllStates() {
         console.log(`📊 カード${index + 1}: カード=${cardVisible}, 問題=${problemVisible}, 解答=${answerVisible}`);
         
         if (index === currentIndex) {
-            // 現在のカード
             if (!cardVisible) {
                 console.warn(`⚠️ 現在カードが非表示 → 修正`);
                 nuclearShow(card);
@@ -437,7 +497,6 @@ function ultraVerifyAllStates() {
                 }
             }
         } else {
-            // 他のカード
             if (cardVisible || problemVisible || answerVisible) {
                 console.warn(`⚠️ 非現在カードが表示 → 核爆弾級非表示`);
                 nuclearHide(card);
@@ -457,8 +516,10 @@ function updateProgressInstantly() {
     }
 }
 
-// ========== 瞬間回答処理 ==========
+// ========== 瞬間回答処理（アニメーション対応） ==========
 function handleAnswerInstantly(result) {
+    if (isAnimating || completionAnimationActive) return;
+    
     console.log("⚡ 瞬間回答: " + result + " (カード" + (currentIndex + 1) + "/" + cards.length + ")");
     
     const currentCardId = cards[currentIndex].id;
@@ -469,7 +530,14 @@ function handleAnswerInstantly(result) {
     const success = switchToCardInstantly(currentIndex + 1);
     
     if (!success) {
-        console.log("🏁 全カード完了");
+        console.log("🏁 全カード完了 - アニメーション開始");
+        completionAnimationActive = true;
+        isAnimating = true;
+        
+        // 完了アニメーション表示
+        const overlay = createCompletionAnimation();
+        
+        // 最後のカードのログを送信
         handleCardCompletionSync(currentCardId, result);
         return;
     }
@@ -524,6 +592,7 @@ function sendResultBackground(cardId, result) {
     });
 }
 
+// ========== 完了処理（高速化・アニメーション対応） ==========
 function handleCardCompletionSync(cardId, result) {
     console.log("🔧 カード完了時同期処理:", cardId, result);
     
@@ -541,29 +610,32 @@ function handleCardCompletionSync(cardId, result) {
     }).then(function(data) {
         console.log("✅ 完了時サーバーレスポンス:", data);
         
-        if (data.redirect_to_prepare === true) {
-            setTimeout(function() {
-                window.location.href = '/prepare/' + getCurrentSource();
-            }, 1000);
-        } else {
-            setTimeout(function() {
-                window.location.href = '/prepare/' + getCurrentSource();
-            }, 1000);
-        }
-    }).catch(function(error) {
-        console.error('❌ 完了時ログエラー:', error);
+        // ページ遷移アニメーション開始
+        const transition = createPageTransition();
+        
+        // 短い待機時間で遷移（高速化）
         setTimeout(function() {
             window.location.href = '/prepare/' + getCurrentSource();
-        }, 1000);
+        }, 500); // 1000ms → 500ms に高速化
+        
+    }).catch(function(error) {
+        console.error('❌ 完了時ログエラー:', error);
+        
+        // エラー時も高速遷移
+        setTimeout(function() {
+            window.location.href = '/prepare/' + getCurrentSource();
+        }, 300); // エラー時はさらに高速
     });
 }
 
 // ========== デバッグ機能 ==========
 function debugStatus() {
-    console.log("=== 完全デバッグ情報 ===");
+    console.log("=== アニメーション対応デバッグ情報 ===");
     console.log("カード数:", cards.length);
     console.log("現在のインデックス:", currentIndex);
     console.log("解答表示中:", showingAnswer);
+    console.log("アニメーション中:", isAnimating);
+    console.log("完了アニメーション中:", completionAnimationActive);
     console.log("画像読み込み状況:", imageLoadTracker);
     
     ultraVerifyAllStates();
@@ -574,26 +646,9 @@ function fixAllImages() {
     ultraVerifyAllStates();
 }
 
-// ========== 核爆弾級完全修復 ==========
-function nuclearReset() {
-    console.log("💥 核爆弾級完全修復開始");
-    
-    // 全カードを削除して再作成
-    cards.forEach((card, index) => {
-        nukeAndRebuildCard(index);
-    });
-    
-    // 初期状態を再設定
-    setTimeout(() => {
-        ultraForceInitialState();
-    }, 200);
-    
-    console.log("✅ 核爆弾級完全修復完了");
-}
-
-// ========== 初期化（完全版） ==========
+// ========== 初期化（アニメーション対応） ==========
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("🔧 完全修正版初期化開始");
+    console.log("🔧 アニメーション対応版初期化開始");
     
     if (typeof rawCards === "undefined") {
         console.error("❌ rawCards が定義されていません");
@@ -603,6 +658,8 @@ document.addEventListener('DOMContentLoaded', function() {
     cards = shuffle(rawCards.slice());
     currentIndex = 0;
     showingAnswer = false;
+    isAnimating = false;
+    completionAnimationActive = false;
     isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
     
     console.log("📊 カードデータ: " + cards.length + "枚");
@@ -612,7 +669,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setupInstantEvents();
     setupInstantKeyboard();
     
-    // 段階的検証
     setTimeout(() => {
         console.log("📊 1秒後の状況:");
         ultraVerifyAllStates();
@@ -623,7 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
         debugStatus();
     }, 3000);
     
-    console.log("🔧 完全修正版初期化完了");
+    console.log("🔧 アニメーション対応版初期化完了");
 });
 
 function setupInstantEvents() {
@@ -655,6 +711,8 @@ function setupInstantEvents() {
 
 function setupInstantKeyboard() {
     document.addEventListener('keydown', function(e) {
+        if (isAnimating || completionAnimationActive) return;
+        
         switch(e.key.toLowerCase()) {
             case 'j':
             case 'arrowleft':
@@ -677,11 +735,6 @@ function setupInstantKeyboard() {
             case 'd':
                 e.preventDefault();
                 debugStatus();
-                break;
-            case 'n':
-                // 核爆弾級修復
-                e.preventDefault();
-                nuclearReset();
                 break;
         }
     });
@@ -716,10 +769,8 @@ window.markUnknown = function() {
     handleAnswerInstantly('unknown');
 };
 
-// デバッグ用グローバル関数
 window.debugStatus = debugStatus;
 window.fixAllImages = fixAllImages;
-window.nuclearReset = nuclearReset;
 window.ultraVerifyAllStates = ultraVerifyAllStates;
 
-console.log("🔧 完全修正版読み込み完了");
+console.log("🔧 アニメーション対応版読み込み完了");
