@@ -578,6 +578,12 @@ function triggerButtonFeedback(result) {
 
 // ========== ログ処理 ==========
 function sendResultBackground(cardId, result) {
+    const data = {
+        card_id: cardId,
+        result: result,
+        stage: window.stage,
+        mode: window.currentMode
+    };
     fetch('/log_result', {
         method: 'POST',
         headers: {
@@ -585,12 +591,7 @@ function sendResultBackground(cardId, result) {
             'X-CSRFToken': csrfToken
         },
         credentials: 'include',
-        body: JSON.stringify({
-            card_id: cardId,
-            result: result,
-            stage: window.currentStage,
-            mode: window.currentMode
-        })
+        body: JSON.stringify(data)
     }).catch(function(error) {
         console.error('非同期ログエラー:', error);
     });
@@ -600,6 +601,12 @@ function sendResultBackground(cardId, result) {
 function handleCardCompletionSync(cardId, result) {
     console.log("🔧 カード完了時同期処理:", cardId, result);
     
+    const data = {
+        card_id: cardId,
+        result: result,
+        stage: window.stage,
+        mode: window.currentMode
+    };
     fetch('/log_result', {
         method: 'POST',
         headers: {
@@ -607,12 +614,7 @@ function handleCardCompletionSync(cardId, result) {
             'X-CSRFToken': csrfToken
         },
         credentials: 'include',
-        body: JSON.stringify({
-            card_id: cardId,
-            result: result,
-            stage: window.currentStage,
-            mode: window.currentMode
-        })
+        body: JSON.stringify(data)
     }).then(function(response) {
         return response.json();
     }).then(function(data) {
