@@ -81,27 +81,25 @@
 <!-- JavaScript データ渡し -->
 <script>
     // 🚀 既存のデータ形式を維持
-    const rawCards = {{ cards|tojson }};
-    const stage = {{ stage }};
-    const mode = "{{ mode }}";
-    
-    // 🚀 追加のグローバル変数
-    window.currentStage = {{ stage }};
-    window.currentMode = "{{ mode }}";
-    window.currentSource = "{{ source }}";
-    
+    const rawCards = {{ cards|tojson|safe }};
+    const stageValue = {{ stage|default(1)|tojson|safe }};
+    const modeValue = {{ mode|default('test')|tojson|safe }};
     // 🚀 追加: CSRFトークンをJSに渡す
     const csrfToken = "{{ csrf_token() }}";
-    
+
+    // グローバル変数としてwindowにセット
+    window.currentStage = stageValue;
+    window.currentMode = modeValue;
+    window.currentSource = "{{ source|default('') }}";
+
     console.log('📊 カードデータ読み込み:', rawCards.length, '問');
-    
+
     // 🚀 モード表示を日本語に変換する関数
     function updateModeDisplay() {
         const modeElement = document.getElementById('mode-display');
         if (modeElement) {
             const currentMode = window.currentMode;
             let displayText = '';
-            
             if (currentMode === 'chunk_practice' || currentMode === 'practice') {
                 displayText = '(練習)';
             } else if (currentMode === 'test') {
@@ -109,11 +107,9 @@
             } else {
                 displayText = `(${currentMode}モード)`;
             }
-            
             modeElement.textContent = displayText;
         }
     }
-    
     // ページ読み込み時にモード表示を更新
     document.addEventListener('DOMContentLoaded', function() {
         updateModeDisplay();
