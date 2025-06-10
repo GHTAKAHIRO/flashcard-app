@@ -582,7 +582,7 @@ function sendResultBackground(cardId, result) {
         card_id: cardId,
         result: result,
         stage: window.stage,
-        mode: window.currentMode
+        mode: window.mode
     };
     fetch('/log_result', {
         method: 'POST',
@@ -605,7 +605,7 @@ function handleCardCompletionSync(cardId, result) {
         card_id: cardId,
         result: result,
         stage: window.stage,
-        mode: window.currentMode
+        mode: window.mode
     };
     fetch('/log_result', {
         method: 'POST',

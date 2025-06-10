@@ -92,6 +92,7 @@
     window.currentMode = modeValue;
     window.currentSource = "{{ source|default('') }}";
     window.stage = stageValue;  // stageをグローバル変数として設定
+    window.mode = modeValue;    // modeをグローバル変数として設定
 
     console.log('📊 カードデータ読み込み:', rawCards.length, '問');
 
