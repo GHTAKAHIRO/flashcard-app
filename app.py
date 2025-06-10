@@ -1377,8 +1377,12 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def home():
+    if request.method == 'POST':
+        # POSTリクエストの場合はloginルートにリダイレクト
+        return redirect(url_for('login'))
+    
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     return render_template('login.html')
