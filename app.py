@@ -1944,18 +1944,18 @@ def is_admin():
 @login_required
 def admin():
     if not is_admin():
-        flash('管理者権限が必要です')
+        flash('管理者権限が必要です', 'error')
         return redirect(url_for('dashboard'))
     
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute('SELECT id, username, full_name FROM users ORDER BY id')
-                users = [{'id': row[0], 'username': row[1], 'full_name': row[2]} for row in cur.fetchall()]
+                users = cur.fetchall()
         return render_template('admin.html', users=users)
     except Exception as e:
-        app.logger.error(f"管理画面エラー: {e}")
-        flash('ユーザー一覧の取得に失敗しました')
+        app.logger.error(f"管理画面表示エラー: {e}")
+        flash('ユーザー一覧の取得に失敗しました', 'error')
         return redirect(url_for('dashboard'))
 
 @app.route('/admin/bulk_register', methods=['POST'])
@@ -1965,16 +1965,16 @@ def admin_bulk_register():
         return jsonify({'success': False, 'message': '管理者権限が必要です'}), 403
     
     if 'csv_file' not in request.files:
-        flash('ファイルが選択されていません')
+        flash('CSVファイルが選択されていません', 'error')
         return redirect(url_for('admin'))
     
     file = request.files['csv_file']
     if file.filename == '':
-        flash('ファイルが選択されていません')
+        flash('ファイルが選択されていません', 'error')
         return redirect(url_for('admin'))
     
     if not file.filename.endswith('.csv'):
-        flash('CSVファイルを選択してください')
+        flash('CSVファイルのみアップロード可能です', 'error')
         return redirect(url_for('admin'))
     
     try:
@@ -1984,35 +1984,53 @@ def admin_bulk_register():
         
         success_count = 0
         error_count = 0
+        error_messages = []
         
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 for row in csv_reader:
                     if len(row) != 3:
                         error_count += 1
+                        error_messages.append(f"行 {csv_reader.line_num}: 列数が不正です")
                         continue
                     
                     username, password, full_name = row
+                    
+                    # ユーザー名の重複チェック
+                    cur.execute('SELECT id FROM users WHERE username = %s', (username,))
+                    if cur.fetchone():
+                        error_count += 1
+                        error_messages.append(f"行 {csv_reader.line_num}: ユーザー名 '{username}' は既に使用されています")
+                        continue
+                    
+                    # パスワードのハッシュ化
                     password_hash = generate_password_hash(password)
                     
                     try:
                         cur.execute(
-                            "INSERT INTO users (username, password_hash, full_name) VALUES (%s, %s, %s)",
+                            'INSERT INTO users (username, password_hash, full_name, is_admin) VALUES (%s, %s, %s, false)',
                             (username, password_hash, full_name)
                         )
                         success_count += 1
                     except Exception as e:
-                        app.logger.error(f"ユーザー登録エラー: {e}")
                         error_count += 1
+                        error_messages.append(f"行 {csv_reader.line_num}: 登録エラー - {str(e)}")
                 
                 conn.commit()
         
-        flash(f'登録完了: {success_count}件成功, {error_count}件失敗')
+        if success_count > 0:
+            flash(f'{success_count}人のユーザーを登録しました', 'success')
+        if error_count > 0:
+            flash(f'{error_count}件のエラーが発生しました', 'error')
+            for msg in error_messages:
+                flash(msg, 'error')
+        
+        return redirect(url_for('admin'))
+        
     except Exception as e:
         app.logger.error(f"一括登録エラー: {e}")
-        flash('一括登録中にエラーが発生しました')
-    
-    return redirect(url_for('admin'))
+        flash('一括登録処理中にエラーが発生しました', 'error')
+        return redirect(url_for('admin'))
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 @login_required

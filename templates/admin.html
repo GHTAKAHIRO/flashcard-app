@@ -4,22 +4,37 @@
 <div class="container mt-4">
     <h1>管理画面</h1>
     
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
     <div class="row mt-4">
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header bg-primary text-white">
                     <h5 class="card-title mb-0">ユーザー一括登録</h5>
                 </div>
                 <div class="card-body">
                     <form action="{{ url_for('admin_bulk_register') }}" method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label for="csv_file" class="form-label">CSVファイルを選択</label>
                             <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
                             <div class="form-text">
-                                CSVファイルの形式: ユーザー名,パスワード,氏名
+                                CSVファイルの形式: ユーザー名,パスワード,氏名<br>
+                                例: user1,password123,山田太郎
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">一括登録</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> 一括登録
+                        </button>
                     </form>
                 </div>
             </div>
@@ -27,12 +42,12 @@
 
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header bg-primary text-white">
                     <h5 class="card-title mb-0">ユーザー一覧</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table">
+                        <table class="table table-striped table-hover">
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -48,7 +63,9 @@
                                     <td>{{ user.username }}</td>
                                     <td>{{ user.full_name }}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }})">削除</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }})">
+                                            <i class="fas fa-trash"></i> 削除
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -63,11 +80,12 @@
 
 <script>
 function deleteUser(userId) {
-    if (confirm('このユーザーを削除してもよろしいですか？')) {
+    if (confirm('このユーザーを削除してもよろしいですか？\nこの操作は取り消せません。')) {
         fetch(`/admin/delete_user/${userId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
             }
         })
         .then(response => response.json())
@@ -75,8 +93,11 @@ function deleteUser(userId) {
             if (data.success) {
                 location.reload();
             } else {
-                alert('ユーザーの削除に失敗しました');
+                alert('ユーザーの削除に失敗しました: ' + data.message);
             }
+        })
+        .catch(error => {
+            alert('エラーが発生しました: ' + error);
         });
     }
 }
