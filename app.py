@@ -106,11 +106,26 @@ def init_connection_pool():
                 user=DB_USER,
                 password=DB_PASSWORD,
                 connect_timeout=3,
-                options='-c default_transaction_isolation="read committed"'
+                options='-c default_transaction_isolation=read_committed'  # 🔥 修正: 引用符を削除
             )
             app.logger.info("🚀 データベース接続プール初期化完了")
         except Exception as e:
             app.logger.error(f"接続プール初期化エラー: {e}")
+            # 🔥 追加: フォールバック処理
+            try:
+                db_pool = psycopg2.pool.ThreadedConnectionPool(
+                    2, 10,
+                    host=DB_HOST,
+                    port=DB_PORT,
+                    database=DB_NAME,
+                    user=DB_USER,
+                    password=DB_PASSWORD,
+                    connect_timeout=3
+                    # optionsパラメータなしで再試行
+                )
+                app.logger.info("🚀 データベース接続プール初期化完了（フォールバック）")
+            except Exception as e2:
+                app.logger.error(f"フォールバック接続プール初期化エラー: {e2}")
 
 # 🔥 シンプルなインメモリキャッシュ（Redis代替）
 memory_cache = {}
@@ -130,12 +145,15 @@ def get_db_connection():
     
     conn = None
     try:
-        conn = db_pool.getconn()
+        if db_pool:  # 🔥 追加: プールが存在するかチェック
+            conn = db_pool.getconn()
+        
         if conn:
             conn.autocommit = False
             yield conn
         else:
             # フォールバック：直接接続
+            app.logger.warning("プール接続失敗、直接接続を試行")
             conn = psycopg2.connect(
                 host=DB_HOST, port=DB_PORT, database=DB_NAME,
                 user=DB_USER, password=DB_PASSWORD
@@ -148,7 +166,12 @@ def get_db_connection():
         raise
     finally:
         if conn and db_pool:
-            db_pool.putconn(conn)
+            try:
+                db_pool.putconn(conn)
+            except Exception as e:
+                app.logger.error(f"DB接続返却エラー: {e}")
+                if conn:
+                    conn.close()
         elif conn:
             conn.close()
 
@@ -181,6 +204,134 @@ def optimize_database_indexes():
         app.logger.info(f"📊 データベース最適化完了: {success_count}個のインデックス")
     except Exception as e:
         app.logger.error(f"データベース最適化エラー: {e}")
+        
+
+# ========== Redis除去版 パート3: インメモリキャッシュシステム ==========
+
+def cache_key(*args):
+    """キャッシュキー生成"""
+    key_string = "_".join(str(arg) for arg in args)
+    return hashlib.md5(key_string.encode()).hexdigest()
+
+def simple_cache(expire_time=180):
+    """シンプルキャッシュデコレータ（インメモリ）"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = f"{func.__name__}_{cache_key(*args, *kwargs.values())}"
+            
+            with cache_lock:
+                # キャッシュチェック
+                if key in memory_cache:
+                    timestamp = cache_timestamps.get(key, 0)
+                    if time.time() - timestamp < expire_time:
+                        return memory_cache[key]
+                    else:
+                        # 期限切れキャッシュ削除
+                        del memory_cache[key]
+                        del cache_timestamps[key]
+            
+            # 関数実行
+            result = func(*args, **kwargs)
+            
+            with cache_lock:
+                # キャッシュ保存
+                memory_cache[key] = result
+                cache_timestamps[key] = time.time()
+                
+                # キャッシュサイズ制限（最大1000エントリ）
+                if len(memory_cache) > 1000:
+                    # 古いエントリを削除
+                    oldest_key = min(cache_timestamps.keys(), key=lambda k: cache_timestamps[k])
+                    del memory_cache[oldest_key]
+                    del cache_timestamps[oldest_key]
+            
+            return result
+        return wrapper
+    return decorator
+
+def clear_user_cache(user_id, source=None):
+    """ユーザーキャッシュクリア"""
+    with cache_lock:
+        try:
+            pattern = str(user_id)
+            if source:
+                pattern = f"{user_id}_{source}"
+            
+            keys_to_delete = []
+            for key in memory_cache.keys():
+                if pattern in key:
+                    keys_to_delete.append(key)
+            
+            for key in keys_to_delete:
+                del memory_cache[key]
+                if key in cache_timestamps:
+                    del cache_timestamps[key]
+            
+            if keys_to_delete:
+                app.logger.info(f"🗑️ キャッシュクリア: {len(keys_to_delete)}件")
+        except Exception as e:
+            app.logger.error(f"キャッシュクリアエラー: {e}")
+
+# ========== Redis除去版 パート4: 基本ユーティリティ関数 ==========
+
+def get_chunk_size_by_subject(subject):
+    """科目別チャンクサイズを返す"""
+    chunk_sizes = {
+        '英語': 2,  # テスト用に小さく
+        '数学': 2,  # テスト用に小さく
+        '理科': 3,  # テスト用に小さく
+        '社会': 3,  # テスト用に小さく
+        '国語': 3   # テスト用に小さく
+    }
+    return chunk_sizes.get(subject, 2)
+
+def create_chunks_for_cards(cards, subject):
+    """カードリストをチャンクに分割"""
+    chunk_size = get_chunk_size_by_subject(subject)
+    chunks = []
+    
+    for i in range(0, len(cards), chunk_size):
+        chunk = cards[i:i + chunk_size]
+        chunks.append(chunk)
+    
+    return chunks
+
+def parse_page_range(page_range_str):
+    """ページ範囲文字列を解析"""
+    pages = set()
+    for part in page_range_str.split(','):
+        if '-' in part:
+            start, end = part.split('-')
+            pages.update(str(i) for i in range(int(start), int(end) + 1))
+        else:
+            pages.add(part.strip())
+    return list(pages)
+
+# ========== User関連（Flask-Login用） ==========
+
+class User(UserMixin):
+    def __init__(self, id, username):
+        self.id = id
+        self.username = username
+
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, username FROM users WHERE id = %s", (user_id,))
+                user = cur.fetchone()
+                if user:
+                    return User(*user)
+    except Exception as e:
+        app.logger.error(f"ユーザー読み込みエラー: {e}")
+    return None
+
+# ========== キャッシュバスター追加 ==========
+@app.context_processor
+def inject_timestamp():
+    return {'timestamp': int(time.time())}
         
 
 # ========== Redis除去版 パート3: インメモリキャッシュシステム ==========
