@@ -107,6 +107,7 @@
         </div>
         
         <form method="POST" action="{{ url_for('set_page_range_and_prepare', source=s.source) }}" class="page-range-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="page-range-section">
                 <label for="page_range_{{ loop.index }}"><strong>📖 学習するページ範囲:</strong></label>
                 <input type="text" 
@@ -152,6 +153,7 @@
         
         <!-- 履歴削除用の独立したフォーム -->
         <form id="deleteForm-{{ s.source }}" method="POST" action="{{ url_for('reset_history', source=s.source) }}" style="display: none;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         </form>
     </div>
     {% endfor %}

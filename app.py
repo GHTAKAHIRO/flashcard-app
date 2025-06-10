@@ -108,7 +108,7 @@ def init_connection_pool():
                 user=DB_USER,
                 password=DB_PASSWORD,
                 connect_timeout=3,
-                options='-c default_transaction_isolation=read committed'  # 修正: スペースを追加
+                options='-c default_transaction_isolation=read\ committed'  # 修正: エスケープされたスペース
             )
             app.logger.info("🚀 データベース接続プール初期化完了")
         except Exception as e:
