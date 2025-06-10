@@ -580,7 +580,11 @@ function triggerButtonFeedback(result) {
 function sendResultBackground(cardId, result) {
     fetch('/log_result', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        credentials: 'include',
         body: JSON.stringify({
             card_id: cardId,
             result: result,
@@ -598,7 +602,11 @@ function handleCardCompletionSync(cardId, result) {
     
     fetch('/log_result', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        credentials: 'include',
         body: JSON.stringify({
             card_id: cardId,
             result: result,

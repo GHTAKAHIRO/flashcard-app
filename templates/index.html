@@ -90,6 +90,9 @@
     window.currentMode = "{{ mode }}";
     window.currentSource = "{{ source }}";
     
+    // 🚀 追加: CSRFトークンをJSに渡す
+    const csrfToken = "{{ csrf_token() }}";
+    
     console.log('📊 カードデータ読み込み:', rawCards.length, '問');
     
     // 🚀 モード表示を日本語に変換する関数
