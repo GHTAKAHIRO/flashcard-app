@@ -360,18 +360,36 @@ def check_stage_completion(user_id, source, stage, page_range, difficulty):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # まず、そのステージの全チャンク数を取得
                 cur.execute('''
-                    SELECT completed FROM chunk_progress 
-                    WHERE user_id = %s AND source = %s AND stage = %s AND completed = true
-                ''', (user_id, source, stage))
-                completed_chunks = cur.fetchall()
+                    SELECT total_chunks FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s AND stage = %s AND page_range = %s AND difficulty = %s
+                    LIMIT 1
+                ''', (user_id, source, stage, page_range, difficulty))
+                result = cur.fetchone()
                 
-                if completed_chunks:
-                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}完了済み")
-                    return True
-                else:
-                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}未完了")
+                if not result:
+                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}のチャンク情報が見つかりません")
                     return False
+                
+                total_chunks = result[0]
+                
+                # 完了済みチャンク数を取得
+                cur.execute('''
+                    SELECT COUNT(*) FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s AND stage = %s 
+                    AND page_range = %s AND difficulty = %s AND completed = true
+                ''', (user_id, source, stage, page_range, difficulty))
+                completed_chunks = cur.fetchone()[0]
+                
+                is_completed = completed_chunks == total_chunks
+                
+                if is_completed:
+                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}完了済み ({completed_chunks}/{total_chunks}チャンク)")
+                else:
+                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}未完了 ({completed_chunks}/{total_chunks}チャンク)")
+                
+                return is_completed
                     
     except Exception as e:
         app.logger.error(f"[STAGE_CHECK] Stage{stage}チェックエラー: {e}")
