@@ -588,8 +588,8 @@ function sendResultBackground(cardId, result) {
         body: JSON.stringify({
             card_id: cardId,
             result: result,
-            stage: stage,
-            mode: mode
+            stage: window.currentStage,
+            mode: window.currentMode
         })
     }).catch(function(error) {
         console.error('非同期ログエラー:', error);
@@ -610,8 +610,8 @@ function handleCardCompletionSync(cardId, result) {
         body: JSON.stringify({
             card_id: cardId,
             result: result,
-            stage: stage,
-            mode: mode
+            stage: window.currentStage,
+            mode: window.currentMode
         })
     }).then(function(response) {
         return response.json();
