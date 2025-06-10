@@ -20,6 +20,8 @@ import psycopg2.pool
 from contextlib import contextmanager
 import atexit
 from flask_wtf.csrf import CSRFProtect
+import io
+import csv
 
 # ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
@@ -95,38 +97,30 @@ DB_PASSWORD = os.getenv('DB_PASSWORD')
 db_pool = None
 
 def init_connection_pool():
-    """データベース接続プールを初期化"""
+    """データベース接続プールの初期化（最適化版）"""
     global db_pool
-    if db_pool is None:
-        try:
-            db_pool = psycopg2.pool.ThreadedConnectionPool(
-                2,   # 最小接続数
-                10,  # 最大接続数
-                host=DB_HOST,
-                port=DB_PORT,
-                database=DB_NAME,
-                user=DB_USER,
-                password=DB_PASSWORD,
-                connect_timeout=3,
-                options='-c default_transaction_isolation=read\ committed'  # 修正: エスケープされたスペース
-            )
-            app.logger.info("🚀 データベース接続プール初期化完了")
-        except Exception as e:
-            app.logger.error(f"接続プール初期化エラー: {e}")
-            # フォールバック処理
-            try:
-                db_pool = psycopg2.pool.ThreadedConnectionPool(
-                    2, 10,
-                    host=DB_HOST,
-                    port=DB_PORT,
-                    database=DB_NAME,
-                    user=DB_USER,
-                    password=DB_PASSWORD,
-                    connect_timeout=3
-                )
-                app.logger.info("🚀 データベース接続プール初期化完了（フォールバック）")
-            except Exception as e2:
-                app.logger.error(f"フォールバック接続プール初期化エラー: {e2}")
+    try:
+        # 本番環境では最小限の接続数に
+        if os.environ.get('RENDER'):
+            min_conn = 1
+            max_conn = 3
+        else:
+            min_conn = 2
+            max_conn = 10
+
+        db_pool = psycopg2.pool.SimpleConnectionPool(
+            min_conn,
+            max_conn,
+            host=os.environ.get('DB_HOST'),
+            port=os.environ.get('DB_PORT'),
+            dbname=os.environ.get('DB_NAME'),
+            user=os.environ.get('DB_USER'),
+            password=os.environ.get('DB_PASSWORD')
+        )
+        app.logger.info("🚀 データベース接続プール初期化完了")
+    except Exception as e:
+        app.logger.error(f"接続プール初期化エラー: {e}")
+        raise
 
 # 🔥 シンプルなインメモリキャッシュ（Redis代替）
 memory_cache = {}
@@ -1934,10 +1928,102 @@ def cleanup_db_pool():
 atexit.register(cleanup_workers)
 atexit.register(cleanup_db_pool)
 
+def is_admin():
+    return current_user.is_authenticated and current_user.is_admin
+
+@app.route('/admin')
+@login_required
+def admin():
+    if not is_admin():
+        flash('管理者権限が必要です')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT id, username, full_name FROM users ORDER BY id')
+                users = [{'id': row[0], 'username': row[1], 'full_name': row[2]} for row in cur.fetchall()]
+        return render_template('admin.html', users=users)
+    except Exception as e:
+        app.logger.error(f"管理画面エラー: {e}")
+        flash('ユーザー一覧の取得に失敗しました')
+        return redirect(url_for('dashboard'))
+
+@app.route('/admin/bulk_register', methods=['POST'])
+@login_required
+def admin_bulk_register():
+    if not is_admin():
+        return jsonify({'success': False, 'message': '管理者権限が必要です'}), 403
+    
+    if 'csv_file' not in request.files:
+        flash('ファイルが選択されていません')
+        return redirect(url_for('admin'))
+    
+    file = request.files['csv_file']
+    if file.filename == '':
+        flash('ファイルが選択されていません')
+        return redirect(url_for('admin'))
+    
+    if not file.filename.endswith('.csv'):
+        flash('CSVファイルを選択してください')
+        return redirect(url_for('admin'))
+    
+    try:
+        # CSVファイルを読み込む
+        stream = io.StringIO(file.stream.read().decode("UTF-8"), newline=None)
+        csv_reader = csv.reader(stream)
+        
+        success_count = 0
+        error_count = 0
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for row in csv_reader:
+                    if len(row) != 3:
+                        error_count += 1
+                        continue
+                    
+                    username, password, full_name = row
+                    password_hash = generate_password_hash(password)
+                    
+                    try:
+                        cur.execute(
+                            "INSERT INTO users (username, password_hash, full_name) VALUES (%s, %s, %s)",
+                            (username, password_hash, full_name)
+                        )
+                        success_count += 1
+                    except Exception as e:
+                        app.logger.error(f"ユーザー登録エラー: {e}")
+                        error_count += 1
+                
+                conn.commit()
+        
+        flash(f'登録完了: {success_count}件成功, {error_count}件失敗')
+    except Exception as e:
+        app.logger.error(f"一括登録エラー: {e}")
+        flash('一括登録中にエラーが発生しました')
+    
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+def admin_delete_user(user_id):
+    if not is_admin():
+        return jsonify({'success': False, 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('DELETE FROM users WHERE id = %s', (user_id,))
+                conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"ユーザー削除エラー: {e}")
+        return jsonify({'success': False, 'message': 'ユーザーの削除に失敗しました'})
+
 if __name__ == '__main__':
-    # 本番環境では初期化を最小限に
+    # 本番環境では最小限の初期化
     if os.environ.get('RENDER'):
-        # 本番環境用の最小初期化
         init_connection_pool()
         port = int(os.environ.get('PORT', 10000))
         host = '0.0.0.0'
