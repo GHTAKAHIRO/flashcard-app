@@ -306,16 +306,19 @@ def parse_page_range(page_range_str):
 # ========== User関連（Flask-Login用） ==========
 
 class User(UserMixin):
-    def __init__(self, id, username):
+    def __init__(self, id, username, password_hash, full_name, is_admin):
         self.id = id
         self.username = username
+        self.password_hash = password_hash
+        self.full_name = full_name
+        self.is_admin = is_admin
 
 @login_manager.user_loader
 def load_user(user_id):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, username FROM users WHERE id = %s", (user_id,))
+                cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE id = %s", (user_id,))
                 user = cur.fetchone()
                 if user:
                     return User(*user)
@@ -1226,11 +1229,14 @@ def login():
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT id, username, password_hash FROM users WHERE username = %s", (username,))
+                    cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = %s", (username,))
                     user = cur.fetchone()
 
             if user and check_password_hash(user[2], password):
-                login_user(User(user[0], user[1]))
+                login_user(User(user[0], user[1], user[2], user[3], user[4]))
+                next_page = request.args.get('next')
+                if next_page:
+                    return redirect(next_page)
                 return redirect(url_for('dashboard'))
             else:
                 flash("ログインに失敗しました。")
@@ -1273,11 +1279,14 @@ def home():
             try:
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
-                        cur.execute("SELECT id, username, password_hash FROM users WHERE username = %s", (username,))
+                        cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = %s", (username,))
                         user = cur.fetchone()
 
                 if user and check_password_hash(user[2], password):
-                    login_user(User(user[0], user[1]))
+                    login_user(User(user[0], user[1], user[2], user[3], user[4]))
+                    next_page = request.args.get('next')
+                    if next_page:
+                        return redirect(next_page)
                     return redirect(url_for('dashboard'))
                 else:
                     flash("ログインに失敗しました。")
