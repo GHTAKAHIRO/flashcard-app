@@ -1940,5 +1940,8 @@ if __name__ == '__main__':
     
     print("⚡ 超高速化版暗記アプリ起動完了")
     
+    # Render用のポート設定
     port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, threaded=True)
+    # 本番環境では0.0.0.0にバインド
+    host = '0.0.0.0'
+    app.run(host=host, port=port, threaded=True)
