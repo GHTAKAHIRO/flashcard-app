@@ -1935,13 +1935,17 @@ atexit.register(cleanup_workers)
 atexit.register(cleanup_db_pool)
 
 if __name__ == '__main__':
-    init_connection_pool()
-    threading.Thread(target=optimize_database_indexes, daemon=True).start()
-    
-    print("⚡ 超高速化版暗記アプリ起動完了")
-    
-    # Render用のポート設定
-    port = int(os.environ.get('PORT', 10000))
-    # 本番環境では0.0.0.0にバインド
-    host = '0.0.0.0'
-    app.run(host=host, port=port, threaded=True)
+    # 本番環境では初期化を最小限に
+    if os.environ.get('RENDER'):
+        # 本番環境用の最小初期化
+        init_connection_pool()
+        port = int(os.environ.get('PORT', 10000))
+        host = '0.0.0.0'
+        app.run(host=host, port=port, threaded=True)
+    else:
+        # 開発環境用の完全初期化
+        init_connection_pool()
+        threading.Thread(target=optimize_database_indexes, daemon=True).start()
+        print("⚡ 超高速化版暗記アプリ起動完了")
+        port = int(os.environ.get('PORT', 10000))
+        app.run(host='0.0.0.0', port=port, threaded=True)
