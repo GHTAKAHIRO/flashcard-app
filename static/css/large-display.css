@@ -91,6 +91,7 @@ body {
     cursor: pointer;
     overflow: hidden !important;
     position: relative;
+    min-height: 300px;
 }
 
 /* ========== プリレンダリングカード（コンテナに合わせる） ========== */
@@ -101,6 +102,7 @@ body {
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
+    min-height: 300px !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
@@ -123,6 +125,7 @@ body {
     justify-content: stretch !important;
     width: 100% !important;
     height: 100% !important;
+    min-height: 300px !important;
     text-align: center !important;
     margin: 0 !important;
     padding: 0 !important;
