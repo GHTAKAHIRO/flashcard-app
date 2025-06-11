@@ -1,6 +1,6 @@
 if (window.location.pathname.startsWith('/admin')) {
-  // admin画面ではmain.jsの処理をスキップ
-  console.log('main.js: admin画面のため処理をスキップ');
+  // admin画面ではmain.jsの処理をスキップ（フラッシュカード機能は不要）
+  console.log('main.js: 管理画面のため、フラッシュカード機能をスキップします');
 } else {
 // ここから下に従来のmain.jsの処理が続く
 
