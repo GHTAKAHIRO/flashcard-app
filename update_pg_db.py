@@ -71,6 +71,40 @@ def update_database():
                 print("last_loginカラムは既に存在します")
                 conn.rollback()
         
+        # study_logテーブルの作成
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS study_log (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                source VARCHAR(255),
+                stage INTEGER,
+                card_id INTEGER,
+                result VARCHAR(50),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        
+        # system_settingsテーブルの作成
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_settings (
+                id SERIAL PRIMARY KEY,
+                chunk_size INTEGER DEFAULT 10,
+                session_timeout INTEGER DEFAULT 120,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        
+        # デフォルト設定の挿入（テーブルが空の場合のみ）
+        cursor.execute("""
+            INSERT INTO system_settings (chunk_size, session_timeout)
+            SELECT 10, 120
+            WHERE NOT EXISTS (SELECT 1 FROM system_settings);
+        """)
+        conn.commit()
+        
         # 管理者ユーザーの作成
         password_hash = generate_password_hash('admin123')
         cursor.execute("""

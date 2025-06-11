@@ -2221,12 +2221,67 @@ def admin_delete_user(user_id):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # ユーザーの存在確認
+                cur.execute('SELECT id FROM users WHERE id = %s', (user_id,))
+                if not cur.fetchone():
+                    return jsonify({'success': False, 'message': 'ユーザーが見つかりません'}), 404
+                
+                # ユーザーの削除
                 cur.execute('DELETE FROM users WHERE id = %s', (user_id,))
                 conn.commit()
+        
         return jsonify({'success': True})
     except Exception as e:
         app.logger.error(f"ユーザー削除エラー: {e}")
-        return jsonify({'success': False, 'message': 'ユーザーの削除に失敗しました'})
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/admin/edit_user/<int:user_id>', methods=['POST'])
+@login_required
+def admin_edit_user(user_id):
+    if not is_admin():
+        return jsonify({'success': False, 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        full_name = data.get('full_name')
+        password = data.get('password')
+        
+        if not username or not full_name:
+            return jsonify({'success': False, 'message': 'ユーザー名と氏名は必須です'}), 400
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # ユーザーの存在確認
+                cur.execute('SELECT id FROM users WHERE id = %s', (user_id,))
+                if not cur.fetchone():
+                    return jsonify({'success': False, 'message': 'ユーザーが見つかりません'}), 404
+                
+                # ユーザー名の重複チェック
+                cur.execute('SELECT id FROM users WHERE username = %s AND id != %s', (username, user_id))
+                if cur.fetchone():
+                    return jsonify({'success': False, 'message': 'このユーザー名は既に使用されています'}), 400
+                
+                # ユーザー情報の更新
+                if password:
+                    password_hash = generate_password_hash(password)
+                    cur.execute('''
+                        UPDATE users 
+                        SET username = %s, full_name = %s, password_hash = %s
+                        WHERE id = %s
+                    ''', (username, full_name, password_hash, user_id))
+                else:
+                    cur.execute('''
+                        UPDATE users 
+                        SET username = %s, full_name = %s
+                        WHERE id = %s
+                    ''', (username, full_name, user_id))
+                conn.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"ユーザー編集エラー: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     # 本番環境では最小限の初期化

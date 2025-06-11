@@ -281,6 +281,39 @@
     </div>
 </div>
 
+<!-- ユーザー編集モーダル -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">ユーザー編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="mb-3">
+                        <label class="form-label">ユーザー名</label>
+                        <input type="text" class="form-control" id="editUsername" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">氏名</label>
+                        <input type="text" class="form-control" id="editFullName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">パスワード（変更する場合のみ入力）</label>
+                        <input type="password" class="form-control" id="editPassword">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveUserEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // ユーザー削除機能
 function deleteUser(userId) {
@@ -404,5 +437,56 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// ユーザー編集
+function editUser(userId) {
+    fetch(`/admin/user/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('editUserId').value = data.id;
+            document.getElementById('editUsername').value = data.username;
+            document.getElementById('editFullName').value = data.full_name;
+            document.getElementById('editPassword').value = '';
+            const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+            modal.show();
+        });
+}
+
+// ユーザー編集の保存
+function saveUserEdit() {
+    const userId = document.getElementById('editUserId').value;
+    const username = document.getElementById('editUsername').value;
+    const fullName = document.getElementById('editFullName').value;
+    const password = document.getElementById('editPassword').value;
+    
+    const data = {
+        username: username,
+        full_name: fullName
+    };
+    
+    if (password) {
+        data.password = password;
+    }
+    
+    fetch(`/admin/edit_user/${userId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('ユーザーの編集に失敗しました: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('エラーが発生しました: ' + error);
+    });
+}
 </script>
 {% endblock %} 
