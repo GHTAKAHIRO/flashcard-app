@@ -353,6 +353,9 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // CSRFトークンをグローバル変数として設定
+        const csrfToken = "{{ csrf_token() }}";
+
         // ユーザー削除機能
         function deleteUser(userId) {
             if (confirm('このユーザーを削除してもよろしいですか？\nこの操作は取り消せません。')) {
@@ -360,7 +363,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token() }}'
+                        'X-CSRFToken': csrfToken
                     }
                 })
                 .then(response => response.json())
@@ -437,7 +440,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token() }}'
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify(Object.fromEntries(formData))
             })
@@ -510,7 +513,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token() }}'
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify(data)
             })
