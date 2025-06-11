@@ -730,12 +730,12 @@ function setupInstantKeyboard() {
         if (isAnimating || completionAnimationActive) return;
         
         switch(e.key.toLowerCase()) {
-            case 'j':
+            case 'f':
             case 'arrowleft':
                 e.preventDefault();
                 handleAnswerInstantly('known');
                 break;
-            case 'f':
+            case 'j':
             case 'arrowright':
                 e.preventDefault();
                 handleAnswerInstantly('unknown');

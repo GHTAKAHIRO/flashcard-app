@@ -8,7 +8,7 @@ body {
 }
 
 .container {
-    max-width: 700px !important;
+    max-width: 900px !important;
     margin-left: auto !important;
     margin-right: auto !important;
     width: 100% !important;
@@ -79,7 +79,7 @@ body {
     padding: 0 !important;
     margin-bottom: 15px;
     width: 100% !important;
-    max-width: 700px !important;
+    max-width: 900px !important;
     margin-left: auto !important;
     margin-right: auto !important;
     flex: 1;
@@ -222,6 +222,7 @@ body {
     transform: translateZ(0);
     -webkit-tap-highlight-color: transparent;
     user-select: none;
+    height: 56px; /* 解答を見るボタンと同じ高さに統一（必要に応じて調整） */
 }
 
 .btn-custom:active {
