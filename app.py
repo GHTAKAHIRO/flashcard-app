@@ -1234,11 +1234,14 @@ def login():
 
             if user and check_password_hash(user[2], password):
                 login_user(User(user[0], user[1], user[2], user[3], user[4]))
+<<<<<<< HEAD
                 # 最終ログイン時刻を更新
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
                         cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s", (user[0],))
                         conn.commit()
+=======
+>>>>>>> 3fc7184cb43e3380ef26bd9b87abda6e23b31d55
                 # 管理者の場合は管理者画面にリダイレクト
                 if user[4]:  # is_adminがTrueの場合
                     return redirect(url_for('admin'))
@@ -1293,11 +1296,14 @@ def home():
 
                 if user and check_password_hash(user[2], password):
                     login_user(User(user[0], user[1], user[2], user[3], user[4]))
+<<<<<<< HEAD
                     # 最終ログイン時刻を更新
                     with get_db_connection() as conn:
                         with conn.cursor() as cur:
                             cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s", (user[0],))
                             conn.commit()
+=======
+>>>>>>> 3fc7184cb43e3380ef26bd9b87abda6e23b31d55
                     # 管理者の場合は管理者画面にリダイレクト
                     if user[4]:  # is_adminがTrueの場合
                         return redirect(url_for('admin'))
