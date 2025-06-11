@@ -1234,6 +1234,10 @@ def login():
 
             if user and check_password_hash(user[2], password):
                 login_user(User(user[0], user[1], user[2], user[3], user[4]))
+                # 管理者の場合は管理者画面にリダイレクト
+                if user[4]:  # is_adminがTrueの場合
+                    return redirect(url_for('admin'))
+                # 通常ユーザーの場合はnextパラメータまたはダッシュボードにリダイレクト
                 next_page = request.args.get('next')
                 if next_page:
                     return redirect(next_page)
@@ -1284,6 +1288,10 @@ def home():
 
                 if user and check_password_hash(user[2], password):
                     login_user(User(user[0], user[1], user[2], user[3], user[4]))
+                    # 管理者の場合は管理者画面にリダイレクト
+                    if user[4]:  # is_adminがTrueの場合
+                        return redirect(url_for('admin'))
+                    # 通常ユーザーの場合はnextパラメータまたはダッシュボードにリダイレクト
                     next_page = request.args.get('next')
                     if next_page:
                         return redirect(next_page)
@@ -1295,6 +1303,9 @@ def home():
                 flash("ログイン中にエラーが発生しました")
     
     if current_user.is_authenticated:
+        # 管理者の場合は管理者画面にリダイレクト
+        if current_user.is_admin:
+            return redirect(url_for('admin'))
         return redirect(url_for('dashboard'))
     return render_template('login.html')
 
@@ -1945,18 +1956,185 @@ def is_admin():
 def admin():
     if not is_admin():
         flash('管理者権限が必要です', 'error')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('home'))
+    
+    # ユーザー一覧を取得
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('''
+                SELECT id, username, full_name, last_login
+                FROM users
+                ORDER BY id
+            ''')
+            users = cur.fetchall()
+            
+            # 統計情報を取得
+            cur.execute('''
+                SELECT COUNT(*) as total_users,
+                       COUNT(CASE WHEN last_login > NOW() - INTERVAL '7 days' THEN 1 END) as active_users
+                FROM users
+            ''')
+            stats = cur.fetchone()
+            
+            # ステージごとの進捗を取得
+            cur.execute('''
+                SELECT 
+                    stage,
+                    ROUND(AVG(CASE WHEN result = 'correct' THEN 100 ELSE 0 END), 1) as avg_correct_rate,
+                    ROUND(COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM users), 1) as completion_rate
+                FROM study_log
+                GROUP BY stage
+                ORDER BY stage
+            ''')
+            stage_progress = cur.fetchall()
+            
+            # アクティブユーザーの推移を取得（過去30日分）
+            cur.execute('''
+                SELECT 
+                    DATE(last_login) as date,
+                    COUNT(DISTINCT user_id) as active_users
+                FROM study_log
+                WHERE last_login > NOW() - INTERVAL '30 days'
+                GROUP BY DATE(last_login)
+                ORDER BY date
+            ''')
+            active_users_data = cur.fetchall()
+            
+            # システム設定を取得
+            cur.execute('SELECT * FROM system_settings')
+            settings = cur.fetchone() or {'chunk_size': 10, 'session_timeout': 120}
+            
+            # 学習ソース一覧を取得
+            cur.execute('SELECT DISTINCT source FROM image ORDER BY source')
+            sources = [row['source'] for row in cur.fetchall()]
+            
+            # 学習ログを取得
+            cur.execute('''
+                SELECT 
+                    sl.timestamp,
+                    u.username,
+                    sl.source,
+                    sl.stage,
+                    sl.result
+                FROM study_log sl
+                JOIN users u ON sl.user_id = u.id
+                ORDER BY sl.timestamp DESC
+                LIMIT 100
+            ''')
+            study_logs = cur.fetchall()
+    
+    return render_template('admin.html',
+                         users=users,
+                         stats={
+                             'total_users': stats['total_users'],
+                             'active_users': stats['active_users'],
+                             'stage_progress': stage_progress,
+                             'dates': [str(row['date']) for row in active_users_data],
+                             'active_users_data': [row['active_users'] for row in active_users_data]
+                         },
+                         settings=settings,
+                         sources=sources,
+                         study_logs=study_logs)
+
+@app.route('/admin/user/<int:user_id>')
+@login_required
+def admin_user_details(user_id):
+    if not is_admin():
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # ユーザー情報を取得
+            cur.execute('''
+                SELECT id, username, full_name, last_login
+                FROM users
+                WHERE id = %s
+            ''', (user_id,))
+            user = cur.fetchone()
+            
+            if not user:
+                return jsonify({'error': 'ユーザーが見つかりません'}), 404
+            
+            # 学習進捗を計算
+            cur.execute('''
+                SELECT 
+                    COUNT(DISTINCT CASE WHEN result = 'correct' THEN card_id END) * 100.0 / 
+                    (SELECT COUNT(*) FROM image) as progress
+                FROM study_log
+                WHERE user_id = %s
+            ''', (user_id,))
+            progress = cur.fetchone()['progress'] or 0
+            
+            user['progress'] = round(progress, 1)
+            
+            return jsonify(user)
+
+@app.route('/admin/logs')
+@login_required
+def admin_logs():
+    if not is_admin():
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    user_id = request.args.get('user_id')
+    source = request.args.get('source')
+    date = request.args.get('date')
+    
+    query = '''
+        SELECT 
+            sl.timestamp,
+            u.username,
+            sl.source,
+            sl.stage,
+            sl.result
+        FROM study_log sl
+        JOIN users u ON sl.user_id = u.id
+        WHERE 1=1
+    '''
+    params = []
+    
+    if user_id:
+        query += ' AND sl.user_id = %s'
+        params.append(user_id)
+    if source:
+        query += ' AND sl.source = %s'
+        params.append(source)
+    if date:
+        query += ' AND DATE(sl.timestamp) = %s'
+        params.append(date)
+    
+    query += ' ORDER BY sl.timestamp DESC LIMIT 100'
+    
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            logs = cur.fetchall()
+    
+    return jsonify({'logs': logs})
+
+@app.route('/admin/settings', methods=['POST'])
+@login_required
+def admin_settings():
+    if not is_admin():
+        return jsonify({'error': '管理者権限が必要です'}), 403
     
     try:
+        settings = request.get_json()
+        
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT id, username, full_name FROM users ORDER BY id')
-                users = cur.fetchall()
-        return render_template('admin.html', users=users)
+                # システム設定を更新
+                cur.execute('''
+                    INSERT INTO system_settings (chunk_size, session_timeout)
+                    VALUES (%s, %s)
+                    ON CONFLICT (id) DO UPDATE
+                    SET chunk_size = EXCLUDED.chunk_size,
+                        session_timeout = EXCLUDED.session_timeout
+                ''', (settings['chunk_size'], settings['session_timeout']))
+                conn.commit()
+        
+        return jsonify({'success': True})
     except Exception as e:
-        app.logger.error(f"管理画面表示エラー: {e}")
-        flash('ユーザー一覧の取得に失敗しました', 'error')
-        return redirect(url_for('dashboard'))
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/admin/bulk_register', methods=['POST'])
 @login_required

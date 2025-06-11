@@ -19,7 +19,8 @@ def recreate_database():
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             full_name TEXT,
-            is_admin BOOLEAN DEFAULT 0
+            is_admin BOOLEAN DEFAULT 0,
+            last_login DATETIME
         )
         ''')
         
@@ -50,6 +51,23 @@ def recreate_database():
             result TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
+        ''')
+        
+        # システム設定テーブルの作成
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS system_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            chunk_size INTEGER DEFAULT 10,
+            session_timeout INTEGER DEFAULT 120,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # デフォルトのシステム設定を挿入
+        cursor.execute('''
+        INSERT INTO system_settings (id, chunk_size, session_timeout)
+        VALUES (1, 10, 120)
         ''')
         
         conn.commit()
