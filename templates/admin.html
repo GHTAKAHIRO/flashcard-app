@@ -488,5 +488,17 @@ function saveUserEdit() {
         alert('エラーが発生しました: ' + error);
     });
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Bootstrapのタブを手動で初期化
+  var triggerTabList = [].slice.call(document.querySelectorAll('#adminTabs button'));
+  triggerTabList.forEach(function (triggerEl) {
+    triggerEl.addEventListener('click', function (event) {
+      event.preventDefault();
+      var tabTrigger = new bootstrap.Tab(triggerEl);
+      tabTrigger.show();
+    });
+  });
+});
 </script>
 {% endblock %} 
