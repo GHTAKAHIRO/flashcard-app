@@ -37,7 +37,8 @@ def update_database():
                     username VARCHAR(255) UNIQUE NOT NULL,
                     password_hash VARCHAR(255) NOT NULL,
                     full_name VARCHAR(255),
-                    is_admin BOOLEAN DEFAULT FALSE
+                    is_admin BOOLEAN DEFAULT FALSE,
+                    last_login TIMESTAMP
                 );
             """)
         else:
@@ -51,6 +52,11 @@ def update_database():
                 cursor.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;")
             except psycopg2.Error:
                 print("is_adminカラムは既に存在します")
+            
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN last_login TIMESTAMP;")
+            except psycopg2.Error:
+                print("last_loginカラムは既に存在します")
         
         # 管理者ユーザーの作成
         password_hash = generate_password_hash('admin123')
