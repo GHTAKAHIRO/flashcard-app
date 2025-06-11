@@ -1967,77 +1967,73 @@ def admin():
     if not is_admin():
         flash('管理者権限が必要です', 'error')
         return redirect(url_for('home'))
-    
-    # ユーザー一覧を取得
-    with get_db_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute('''
-                SELECT id, username, full_name, last_login
-                FROM users
-                ORDER BY id
-            ''')
-            users = cur.fetchall()
-            
-            # 統計情報を取得
-            cur.execute('''
-                SELECT COUNT(*) as total_users,
-                       COUNT(CASE WHEN last_login > NOW() - INTERVAL '7 days' THEN 1 END) as active_users
-                FROM users
-            ''')
-            stats = cur.fetchone()
-            
-            # ステージごとの進捗を取得
-            cur.execute('''
-                SELECT 
-                    stage,
-                    ROUND(AVG(CASE WHEN result = 'correct' THEN 100 ELSE 0 END), 1) as avg_correct_rate,
-                    ROUND(COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM users), 1) as completion_rate
-                FROM study_log
-                GROUP BY stage
-                ORDER BY stage
-            ''')
-            stage_progress = cur.fetchall()
-            
-            # アクティブユーザーの推移を取得（過去30日分）
-            cur.execute('''
-                SELECT 
-                    DATE(last_login) as date,
-                    COUNT(DISTINCT id) as active_users
-                FROM users
-                WHERE last_login > NOW() - INTERVAL '30 days'
-                GROUP BY DATE(last_login)
-                ORDER BY date
-            ''')
-            active_users_data = cur.fetchall()
-            
-            # システム設定を取得
-            cur.execute('SELECT * FROM system_settings')
-            settings = cur.fetchone() or {'chunk_size': 10, 'session_timeout': 120}
-            
-            # 学習ソース一覧を取得
-            cur.execute('SELECT DISTINCT source FROM image ORDER BY source')
-            sources = [row['source'] for row in cur.fetchall()]
-            
-            # 学習ログを取得
-            cur.execute('''
-                SELECT 
-                    sl.timestamp,
-                    u.username,
-                    sl.source,
-                    sl.stage,
-                    sl.result
-                FROM study_log sl
-                JOIN users u ON sl.user_id = u.id
-                ORDER BY sl.timestamp DESC
-                LIMIT 100
-            ''')
-            study_logs = cur.fetchall()
-    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT id, username, full_name, last_login
+                    FROM users
+                    ORDER BY id
+                ''')
+                users = cur.fetchall()
+                cur.execute('''
+                    SELECT COUNT(*) as total_users,
+                           COUNT(CASE WHEN last_login > NOW() - INTERVAL '7 days' THEN 1 END) as active_users
+                    FROM users
+                ''')
+                stats = cur.fetchone() or {'total_users': 0, 'active_users': 0}
+                cur.execute('''
+                    SELECT 
+                        stage,
+                        ROUND(AVG(CASE WHEN result = 'correct' THEN 100 ELSE 0 END), 1) as avg_correct_rate,
+                        ROUND(COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM users), 1) as completion_rate
+                    FROM study_log
+                    GROUP BY stage
+                    ORDER BY stage
+                ''')
+                stage_progress = cur.fetchall() or []
+                cur.execute('''
+                    SELECT 
+                        DATE(last_login) as date,
+                        COUNT(DISTINCT id) as active_users
+                    FROM users
+                    WHERE last_login > NOW() - INTERVAL '30 days'
+                    GROUP BY DATE(last_login)
+                    ORDER BY date
+                ''')
+                active_users_data = cur.fetchall() or []
+                cur.execute('SELECT * FROM system_settings')
+                settings = cur.fetchone() or {'chunk_size': 10, 'session_timeout': 120}
+                cur.execute('SELECT DISTINCT source FROM image ORDER BY source')
+                sources = [row['source'] for row in cur.fetchall()] if cur.rowcount else []
+                cur.execute('''
+                    SELECT 
+                        sl.timestamp,
+                        u.username,
+                        sl.source,
+                        sl.stage,
+                        sl.result
+                    FROM study_log sl
+                    JOIN users u ON sl.user_id = u.id
+                    ORDER BY sl.timestamp DESC
+                    LIMIT 100
+                ''')
+                study_logs = cur.fetchall() or []
+    except Exception as e:
+        app.logger.error(f"管理画面データ取得エラー: {e}")
+        flash("管理画面データの取得に失敗しました", "error")
+        users = []
+        stats = {'total_users': 0, 'active_users': 0, 'stage_progress': [], 'dates': [], 'active_users_data': []}
+        stage_progress = []
+        active_users_data = []
+        settings = {'chunk_size': 10, 'session_timeout': 120}
+        sources = []
+        study_logs = []
     return render_template('admin.html',
                          users=users,
                          stats={
-                             'total_users': stats['total_users'],
-                             'active_users': stats['active_users'],
+                             'total_users': stats.get('total_users', 0),
+                             'active_users': stats.get('active_users', 0),
                              'stage_progress': stage_progress,
                              'dates': [str(row['date']) for row in active_users_data],
                              'active_users_data': [row['active_users'] for row in active_users_data]
