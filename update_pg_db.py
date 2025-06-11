@@ -41,22 +41,35 @@ def update_database():
                     last_login TIMESTAMP
                 );
             """)
+            conn.commit()
         else:
-            # 既存のテーブルにカラムを追加
+            # 既存のテーブルにカラムを追加（各カラムを個別のトランザクションで実行）
             try:
                 cursor.execute("ALTER TABLE users ADD COLUMN full_name VARCHAR(255);")
-            except psycopg2.Error:
+                conn.commit()
+            except psycopg2.Error as e:
+                if "already exists" not in str(e):
+                    raise
                 print("full_nameカラムは既に存在します")
+                conn.rollback()
             
             try:
                 cursor.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;")
-            except psycopg2.Error:
+                conn.commit()
+            except psycopg2.Error as e:
+                if "already exists" not in str(e):
+                    raise
                 print("is_adminカラムは既に存在します")
+                conn.rollback()
             
             try:
                 cursor.execute("ALTER TABLE users ADD COLUMN last_login TIMESTAMP;")
-            except psycopg2.Error:
+                conn.commit()
+            except psycopg2.Error as e:
+                if "already exists" not in str(e):
+                    raise
                 print("last_loginカラムは既に存在します")
+                conn.rollback()
         
         # 管理者ユーザーの作成
         password_hash = generate_password_hash('admin123')
@@ -78,6 +91,8 @@ def update_database():
         
     except Exception as e:
         print(f"エラーが発生しました: {e}")
+        if 'conn' in locals():
+            conn.rollback()
     finally:
         if 'conn' in locals():
             conn.close()
