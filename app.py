@@ -2002,8 +2002,8 @@ def admin():
             cur.execute('''
                 SELECT 
                     DATE(last_login) as date,
-                    COUNT(DISTINCT user_id) as active_users
-                FROM study_log
+                    COUNT(DISTINCT id) as active_users
+                FROM users
                 WHERE last_login > NOW() - INTERVAL '30 days'
                 GROUP BY DATE(last_login)
                 ORDER BY date
