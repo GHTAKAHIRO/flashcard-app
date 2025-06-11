@@ -2150,7 +2150,8 @@ def admin_settings():
 @login_required
 def admin_bulk_register():
     if not is_admin():
-        return jsonify({'success': False, 'message': '管理者権限が必要です'}), 403
+        flash('管理者権限が必要です', 'error')
+        return redirect(url_for('admin'))
     
     if 'csv_file' not in request.files:
         flash('CSVファイルが選択されていません', 'error')
@@ -2166,7 +2167,8 @@ def admin_bulk_register():
         return redirect(url_for('admin'))
     
     try:
-        # CSVファイルを読み込む
+        import io, csv
+        from werkzeug.security import generate_password_hash
         stream = io.StringIO(file.stream.read().decode("UTF-8"), newline=None)
         csv_reader = csv.reader(stream)
         
@@ -2179,21 +2181,15 @@ def admin_bulk_register():
                 for row in csv_reader:
                     if len(row) != 3:
                         error_count += 1
-                        error_messages.append(f"行 {csv_reader.line_num}: 列数が不正です")
+                        error_messages.append(f"行 {csv_reader.line_num}: 列数が不正です（3列必要）")
                         continue
-                    
                     username, password, full_name = row
-                    
-                    # ユーザー名の重複チェック
                     cur.execute('SELECT id FROM users WHERE username = %s', (username,))
                     if cur.fetchone():
                         error_count += 1
                         error_messages.append(f"行 {csv_reader.line_num}: ユーザー名 '{username}' は既に使用されています")
                         continue
-                    
-                    # パスワードのハッシュ化
                     password_hash = generate_password_hash(password)
-                    
                     try:
                         cur.execute(
                             'INSERT INTO users (username, password_hash, full_name, is_admin) VALUES (%s, %s, %s, false)',
@@ -2203,18 +2199,14 @@ def admin_bulk_register():
                     except Exception as e:
                         error_count += 1
                         error_messages.append(f"行 {csv_reader.line_num}: 登録エラー - {str(e)}")
-                
                 conn.commit()
-        
         if success_count > 0:
             flash(f'{success_count}人のユーザーを登録しました', 'success')
         if error_count > 0:
             flash(f'{error_count}件のエラーが発生しました', 'error')
             for msg in error_messages:
                 flash(msg, 'error')
-        
         return redirect(url_for('admin'))
-        
     except Exception as e:
         app.logger.error(f"一括登録エラー: {e}")
         flash('一括登録処理中にエラーが発生しました', 'error')
