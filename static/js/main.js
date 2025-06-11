@@ -1,3 +1,9 @@
+if (window.location.pathname.startsWith('/admin')) {
+  // admin画面ではmain.jsの処理をスキップ
+  console.log('main.js: admin画面のため処理をスキップ');
+} else {
+// ここから下に従来のmain.jsの処理が続く
+
 console.log("🔧 アニメーション対応版 main.js が読み込まれました");
 
 // ========== 瞬間応答用変数 ==========
@@ -784,3 +790,4 @@ window.fixAllImages = fixAllImages;
 window.ultraVerifyAllStates = ultraVerifyAllStates;
 
 console.log("🔧 アニメーション対応版読み込み完了");
+}
