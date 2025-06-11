@@ -9,16 +9,10 @@
     {# <link rel="stylesheet" href="{{ url_for('static', filename='css/large-display.css') }}"> #}
 </head>
 <body>
-    <pre>
-users: {{ users }}
-stats: {{ stats }}
-settings: {{ settings }}
-sources: {{ sources }}
-study_logs: {{ study_logs }}
-    </pre>
     <!-- ヘッダー -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <div class="container">
+        <div class="container d-flex justify-content-between align-items-center">
+            <span class="navbar-brand mb-0 h1">管理画面</span>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="{{ url_for('logout') }}">ログアウト</a>
             </div>
