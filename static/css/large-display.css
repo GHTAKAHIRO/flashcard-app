@@ -7,6 +7,7 @@ body {
     padding: 0;
 }
 
+/*
 .container {
     max-width: 1400px;
     margin: 0 auto;
@@ -15,6 +16,7 @@ body {
     display: flex;
     flex-direction: column;
 }
+*/
 
 .header-info {
     background: linear-gradient(135deg, #007bff, #0056b3);
