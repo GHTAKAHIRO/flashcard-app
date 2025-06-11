@@ -2279,6 +2279,28 @@ def admin_edit_user(user_id):
         app.logger.error(f"ユーザー編集エラー: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/admin/users_csv')
+@login_required
+def admin_users_csv():
+    if not is_admin():
+        return "Forbidden", 403
+    import csv
+    from io import StringIO
+    si = StringIO()
+    cw = csv.writer(si)
+    cw.writerow(['ユーザー名', 'パスワード', '氏名'])
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT username, full_name FROM users ORDER BY id")
+            for username, full_name in cur.fetchall():
+                cw.writerow([username, '', full_name or ''])
+    output = si.getvalue()
+    return app.response_class(
+        output,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=users_format.csv'}
+    )
+
 if __name__ == '__main__':
     # 本番環境では最小限の初期化
     if os.environ.get('RENDER'):
