@@ -472,6 +472,12 @@
         </div>
     </div>
 
+    {% if is_mastered %}
+    <div class="alert alert-success text-center mt-4">
+        <h3>🎉 {{ full_material_name }} マスターおめでとう！🎉</h3>
+    </div>
+    {% endif %}
+
     <div class="container">
         <!-- ステージ一覧 -->
         {% for stage_info in stages_info %}

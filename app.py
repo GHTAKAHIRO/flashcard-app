@@ -1014,7 +1014,7 @@ def get_chunk_practice_cards_universal(user_id, source, stage, chunk_number, pag
         return []
 
 def is_stage_perfect(user_id, source, stage, page_range, difficulty):
-    """指定ステージが全問正解か判定"""
+    """指定ステージが全問正解か判定（testの最新結果が全てknownの場合のみTrue）"""
     cards = []
     if stage == 1:
         cards = get_study_cards_fast(source, 1, 'test', page_range, user_id, difficulty)
@@ -1028,12 +1028,17 @@ def is_stage_perfect(user_id, source, stage, page_range, difficulty):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute('''
-                SELECT COUNT(DISTINCT card_id)
-                FROM study_log
-                WHERE user_id = %s AND stage = %s AND mode = 'test' AND card_id = ANY(%s) AND result = 'known'
+                SELECT card_id, result
+                FROM (
+                    SELECT card_id, result,
+                           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) AS rn
+                    FROM study_log
+                    WHERE user_id = %s AND stage = %s AND mode = 'test' AND card_id = ANY(%s)
+                ) AS ranked
+                WHERE rn = 1
             ''', (user_id, stage, card_ids))
-            known_count = cur.fetchone()[0]
-    return known_count == len(card_ids)
+            latest_results = dict(cur.fetchall())
+    return all(latest_results.get(cid) == 'known' for cid in card_ids)
 
 def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty):
     """全ステージの詳細進捗情報を取得（全問正解なら次ステージを表示しない）"""
@@ -1481,19 +1486,28 @@ def prepare(source):
         if not stages_info:
             stages_info = create_fallback_stage_info(source, saved_page_range, saved_difficulty, user_id)
 
+        is_mastered = is_all_stages_perfect(user_id, source, saved_page_range, saved_difficulty)
         return render_template(
             'prepare.html',
             source=source,
             full_material_name=full_material_name,
             stages_info=stages_info,
             saved_page_range=saved_page_range,
-            saved_difficulty=saved_difficulty
+            saved_difficulty=saved_difficulty,
+            is_mastered=is_mastered
         )
         
     except Exception as e:
         app.logger.error(f"準備画面エラー: {e}")
         flash("準備画面でエラーが発生しました")
         return redirect(url_for('dashboard'))
+
+def is_all_stages_perfect(user_id, source, page_range, difficulty):
+    return (
+        is_stage_perfect(user_id, source, 1, page_range, difficulty) and
+        is_stage_perfect(user_id, source, 2, page_range, difficulty) and
+        is_stage_perfect(user_id, source, 3, page_range, difficulty)
+    )
 
 @app.route('/start_chunk/<source>/<int:stage>/<int:chunk_number>/<mode>')
 @login_required
