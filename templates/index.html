@@ -21,7 +21,7 @@
             </div>
             <div class="mode-info">
                 <span id="mode-display">
-                    {% if mode == 'chunk_practice' or mode == 'practice' %}
+                    {% if mode == 'practice' %}
                         (練習)
                     {% elif mode == 'test' %}
                         (テスト)
@@ -100,7 +100,7 @@
         if (modeElement) {
             const currentMode = window.currentMode;
             let displayText = '';
-            if (currentMode === 'chunk_practice' || currentMode === 'practice') {
+            if (currentMode === 'practice') {
                 displayText = '(練習)';
             } else if (currentMode === 'test') {
                 displayText = '(テスト)';

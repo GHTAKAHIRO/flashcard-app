@@ -676,7 +676,7 @@ document.addEventListener('DOMContentLoaded', function() {
     showingAnswer = false;
     isAnimating = false;
     completionAnimationActive = false;
-    isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'chunk_practice');
+    isPracticeMode = typeof mode !== 'undefined' && (mode === 'practice' || mode === 'practice');
     
     console.log("📊 カードデータ: " + cards.length + "枚");
     console.log("🎯 初期表示状態: 問題表示");
