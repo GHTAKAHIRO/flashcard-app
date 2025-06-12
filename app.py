@@ -1013,25 +1013,48 @@ def get_chunk_practice_cards_universal(user_id, source, stage, chunk_number, pag
         app.logger.error(f"練習問題取得エラー: {e}")
         return []
 
+def is_stage_perfect(user_id, source, stage, page_range, difficulty):
+    """指定ステージが全問正解か判定"""
+    cards = []
+    if stage == 1:
+        cards = get_study_cards_fast(source, 1, 'test', page_range, user_id, difficulty)
+    elif stage == 2:
+        cards = get_stage2_cards(source, page_range, user_id, difficulty)
+    elif stage == 3:
+        cards = get_stage3_cards(source, page_range, user_id, difficulty)
+    if not cards:
+        return False
+    card_ids = [card['id'] for card in cards]
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                SELECT COUNT(DISTINCT card_id)
+                FROM study_log
+                WHERE user_id = %s AND stage = %s AND mode = 'test' AND card_id = ANY(%s) AND result = 'known'
+            ''', (user_id, stage, card_ids))
+            known_count = cur.fetchone()[0]
+    return known_count == len(card_ids)
+
 def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty):
-    """全ステージの詳細進捗情報を取得（ステージ2以降も必ず表示されるよう修正）"""
+    """全ステージの詳細進捗情報を取得（全問正解なら次ステージを表示しない）"""
     stages_info = []
     try:
-        for stage in range(1, 4):
-            stage_info = get_stage_detailed_progress(user_id, source, stage, page_range, difficulty)
-            if stage_info:
-                stages_info.append(stage_info)
-            else:
-                # ロック中や未到達の場合もダミーで表示
-                stages_info.append({
-                    'stage': stage,
-                    'stage_name': f'ステージ {stage}',
-                    'total_cards': 0,
-                    'total_chunks': 0,
-                    'chunks_progress': [],
-                    'stage_completed': False,
-                    'can_start': False
-                })
+        # ステージ1
+        stage1_info = get_stage_detailed_progress(user_id, source, 1, page_range, difficulty)
+        if stage1_info:
+            stages_info.append(stage1_info)
+            if is_stage_perfect(user_id, source, 1, page_range, difficulty):
+                return stages_info
+        # ステージ2
+        stage2_info = get_stage_detailed_progress(user_id, source, 2, page_range, difficulty)
+        if stage2_info:
+            stages_info.append(stage2_info)
+            if is_stage_perfect(user_id, source, 2, page_range, difficulty):
+                return stages_info
+        # ステージ3
+        stage3_info = get_stage_detailed_progress(user_id, source, 3, page_range, difficulty)
+        if stage3_info:
+            stages_info.append(stage3_info)
         return stages_info
     except Exception as e:
         app.logger.error(f"詳細進捗エラー: {e}")
