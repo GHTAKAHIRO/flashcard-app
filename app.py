@@ -371,11 +371,14 @@ def check_stage_completion(user_id, source, stage, page_range, difficulty):
                 
                 total_chunks = result[0]
                 
-                # 完了済みチャンク数を取得
+                # 完了済みチャンク数を取得（テストと練習の両方が完了しているチャンクのみ）
                 cur.execute('''
                     SELECT COUNT(*) FROM chunk_progress 
                     WHERE user_id = %s AND source = %s AND stage = %s 
-                    AND page_range = %s AND difficulty = %s AND completed = true
+                    AND page_range = %s AND difficulty = %s 
+                    AND completed = true 
+                    AND test_completed = true 
+                    AND (practice_completed = true OR practice_needed = false)
                 ''', (user_id, source, stage, page_range, difficulty))
                 completed_chunks = cur.fetchone()[0]
                 
@@ -1107,6 +1110,13 @@ def create_fallback_stage_info(source, page_range, difficulty, user_id):
 def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
     """指定ステージの詳細進捗を取得（練習表示改善版）"""
     try:
+        # Stage 2の前提条件チェック
+        if stage == 2:
+            stage1_completed = check_stage_completion(user_id, source, 1, page_range, difficulty)
+            if not stage1_completed:
+                app.logger.warning(f"[STAGE_PROGRESS] Stage1未完了のためStage2は表示しない")
+                return None
+        
         # Stage 3の前提条件チェック
         if stage == 3:
             stage2_completed = check_stage_completion(user_id, source, 2, page_range, difficulty)
@@ -1118,11 +1128,6 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
         if stage == 1:
             target_cards = get_study_cards_fast(source, stage, 'test', page_range, user_id, difficulty)
         elif stage == 2:
-            # Stage 1完了チェック
-            stage1_completed = check_stage_completion(user_id, source, 1, page_range, difficulty)
-            if not stage1_completed:
-                app.logger.warning(f"[STAGE_PROGRESS] Stage1未完了のためStage2は表示しない")
-                return None
             target_cards = get_stage2_cards(source, page_range, user_id, difficulty)
         elif stage == 3:
             target_cards = get_stage3_cards(source, page_range, user_id, difficulty)
