@@ -370,13 +370,27 @@ def check_stage_completion(user_id, source, stage, page_range, difficulty):
                     return False
                 
                 total_chunks = result[0]
+                app.logger.debug(f"[STAGE_CHECK] Stage{stage}の全チャンク数: {total_chunks}")
+                
+                # 各チャンクの状態を詳細に取得
+                cur.execute('''
+                    SELECT chunk_number, test_completed, practice_completed, practice_needed
+                    FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s AND stage = %s 
+                    AND page_range = %s AND difficulty = %s
+                    ORDER BY chunk_number
+                ''', (user_id, source, stage, page_range, difficulty))
+                chunks_status = cur.fetchall()
+                
+                app.logger.debug(f"[STAGE_CHECK] Stage{stage}のチャンク状態:")
+                for chunk in chunks_status:
+                    app.logger.debug(f"  チャンク{chunk[0]}: test_completed={chunk[1]}, practice_completed={chunk[2]}, practice_needed={chunk[3]}")
                 
                 # 完了済みチャンク数を取得（テストと練習の両方が完了しているチャンクのみ）
                 cur.execute('''
                     SELECT COUNT(*) FROM chunk_progress 
                     WHERE user_id = %s AND source = %s AND stage = %s 
                     AND page_range = %s AND difficulty = %s 
-                    AND completed = true 
                     AND test_completed = true 
                     AND (practice_completed = true OR practice_needed = false)
                 ''', (user_id, source, stage, page_range, difficulty))
@@ -1727,592 +1741,3644 @@ def study(source):
 @app.route('/log_result', methods=['POST'])
 @login_required
 def log_result():
-    """シンプル化されたログ記録（練習モードは常にprepare画面に戻る）"""
-    data = request.get_json()
-    card_id = data.get('card_id')
-    result = data.get('result')
-    stage = data.get('stage')
-    mode = data.get('mode')
-    user_id = str(current_user.id)
-
-    session_mode = session.get('mode', mode)
-    log_mode = 'chunk_practice' if session_mode == 'chunk_practice' else mode
-
-    # 即座にレスポンスを返す準備
-    response_data = {'status': 'ok'}
-    
     try:
-        # ログを非同期キューに追加（ノンブロッキング）
-        log_queue.put((user_id, card_id, result, stage, log_mode), block=False)
-        
-        # キャッシュクリアも非同期で実行
-        threading.Thread(
-            target=clear_user_cache, 
-            args=(user_id, session.get('current_source')), 
-            daemon=True
-        ).start()
-        
-        # 🚀 練習モードは常にprepare画面に戻る（シンプル化）
-        if session_mode in ['practice', 'chunk_practice']:
-            response_data.update({
-                'practice_completed': True,
-                'message': "✅ 練習ラウンド完了！",
-                'redirect_to_prepare': True
-            })
-            app.logger.info(f"🎯 練習モード完了: Stage{stage} → prepare画面へ")
-            return jsonify(response_data)
-        
-        # 以下はテストモードの処理（既存のまま）
+        data = request.get_json()
+        card_id = data.get('card_id')
+        result = data.get('result')
+        stage = session.get('stage', 1)
+        session_mode = session.get('mode', 'test')
         source = session.get('current_source')
         page_range = session.get('page_range', '').strip()
         difficulty = session.get('difficulty', '').strip()
-        
-        # ステージ1のチャンクテスト完了時
-        if stage == 1 and session_mode == 'test':
-            current_chunk = session.get('current_chunk', 1)
-            
-            if source:
-                try:
-                    chunk_cards = get_study_cards_fast(source, stage, 'test', page_range, user_id, difficulty, current_chunk)
-                    
-                    if chunk_cards:
-                        chunk_card_ids = [card['id'] for card in chunk_cards]
-                        
-                        with get_db_connection() as conn:
-                            with conn.cursor() as cur:
-                                cur.execute('''
-                                    SELECT COUNT(DISTINCT card_id)
-                                    FROM study_log
-                                    WHERE user_id = %s AND stage = %s AND mode = 'test' AND card_id = ANY(%s)
-                                ''', (user_id, stage, chunk_card_ids))
-                                tested_count = cur.fetchone()[0]
-                    
-                        # テスト完了時は常にprepare画面に戻る
-                        if tested_count >= len(chunk_card_ids):
-                            practice_cards = get_chunk_practice_cards(user_id, source, stage, current_chunk, page_range, difficulty)
-                            
-                            if practice_cards:
-                                response_data.update({
-                                    'chunk_test_completed': True,
-                                    'has_wrong_answers': True,
-                                    'completed_chunk': current_chunk,
-                                    'practice_cards_count': len(practice_cards),
-                                    'message': f"🎉 チャンク{current_chunk}テスト完了！間違えた問題を練習してください。",
-                                    'redirect_to_prepare': True
-                                })
-                            else:
-                                response_data.update({
-                                    'chunk_test_completed': True,
-                                    'has_wrong_answers': False,
-                                    'completed_chunk': current_chunk,
-                                    'message': f"🌟 チャンク{current_chunk}完了！全問正解です。",
-                                    'redirect_to_prepare': True
-                                })
-                            
-                except Exception as e:
-                    app.logger.error(f"チャンク完了チェックエラー: {e}")
-        
-        # ステージ2・3のテストモード完了チェック
-        elif stage in [2, 3] and session_mode == 'test':
-            if source:
-                try:
-                    if stage == 2:
-                        target_cards = get_stage2_cards(source, page_range, user_id, difficulty)
-                    else:
-                        target_cards = get_stage3_cards(source, page_range, user_id, difficulty)
-                    
-                    if target_cards:
-                        target_card_ids = [card['id'] for card in target_cards]
-                        
-                        with get_db_connection() as conn:
-                            with conn.cursor() as cur:
-                                cur.execute('''
-                                    SELECT COUNT(DISTINCT card_id)
-                                    FROM study_log
-                                    WHERE user_id = %s AND stage = %s AND mode = 'test' AND card_id = ANY(%s)
-                                ''', (user_id, stage, target_card_ids))
-                                tested_count = cur.fetchone()[0]
-                    
-                        if tested_count >= len(target_card_ids):
-                            practice_cards = get_chunk_practice_cards_universal(user_id, source, stage, 1, page_range, difficulty)
-                            
-                            if practice_cards:
-                                response_data.update({
-                                    'stage_test_completed': True,
-                                    'has_wrong_answers': True,
-                                    'completed_stage': stage,
-                                    'practice_cards_count': len(practice_cards),
-                                    'message': f"🎉 ステージ{stage}テスト完了！間違えた問題を練習してください。",
-                                    'redirect_to_prepare': True
-                                })
-                            else:
-                                response_data.update({
-                                    'stage_test_completed': True,
-                                    'has_wrong_answers': False,
-                                    'completed_stage': stage,
-                                    'message': f"🌟 ステージ{stage}完了！全問正解です。",
-                                    'redirect_to_prepare': True
-                                })
-                        
-                except Exception as e:
-                    app.logger.error(f"ステージ{stage}テスト完了チェックエラー: {e}")
-        
-        return jsonify(response_data)
-        
-    except queue.Full:
-        app.logger.error("ログキューが満杯です")
-        return jsonify({'status': 'error', 'message': 'システムが混雑しています'}), 503
-    except Exception as e:
-        app.logger.error(f"高速ログエラー: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-@app.route('/debug_cards/<source>')
-@login_required
-def debug_cards(source):
-    """デバッグ用: カード取得状況を確認"""
-    user_id = str(current_user.id)
-    page_range = session.get('page_range', '').strip()
-    difficulty = session.get('difficulty', '').strip()
-    stage = session.get('stage', 1)
-    
-    try:
-        # Stage 1のカード取得テスト
-        stage1_cards = get_study_cards_fast(source, 1, 'test', page_range, user_id, difficulty, 1)
-        
-        # Stage 2のカード取得テスト
-        stage2_cards = get_stage2_cards(source, page_range, user_id, difficulty) if stage >= 2 else []
-        
-        # Stage 3のカード取得テスト  
-        stage3_cards = get_stage3_cards(source, page_range, user_id, difficulty) if stage >= 3 else []
-        
-        debug_info = {
-            'source': source,
-            'page_range': page_range,
-            'difficulty': difficulty,
-            'stage': stage,
-            'user_id': user_id,
-            'stage1_cards_count': len(stage1_cards) if stage1_cards else 0,
-            'stage2_cards_count': len(stage2_cards) if stage2_cards else 0,
-            'stage3_cards_count': len(stage3_cards) if stage3_cards else 0,
-            'stage1_cards': stage1_cards[:3] if stage1_cards else [],  # 最初の3件
-            'stage2_cards': stage2_cards[:3] if stage2_cards else [],
-            'stage3_cards': stage3_cards[:3] if stage3_cards else []
-        }
-        
-        return f"<pre>{str(debug_info)}</pre>"
-        
-    except Exception as e:
-        return f"<pre>エラー: {str(e)}</pre>"
-
-@app.route('/reset_history/<source>', methods=['POST'])
-@login_required
-def reset_history(source):
-    """学習履歴リセット（最適化版）"""
-    user_id = str(current_user.id)
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('''
-                    DELETE FROM study_log
-                    WHERE user_id = %s AND card_id IN (
-                        SELECT id FROM image WHERE source = %s
-                    )
-                ''', (user_id, source))
-                
-                cur.execute('''
-                    DELETE FROM chunk_progress
-                    WHERE user_id = %s AND source = %s
-                ''', (user_id, source))
-                
-                conn.commit()
-        
-        # キャッシュクリア（履歴リセット時）
-        clear_user_cache(user_id, source)
-        
-        flash(f"{source} の学習履歴を削除しました。")
-    except Exception as e:
-        app.logger.error(f"履歴削除エラー: {e}")
-        flash("履歴の削除に失敗しました。")
-
-    return redirect(url_for('dashboard'))
-
-@app.route('/images_batch/<source>')
-@login_required
-def get_images_batch(source):
-    """画像バッチ取得（練習モード特殊処理を削除してシンプル化）"""
-    try:
         user_id = str(current_user.id)
-        page_range = session.get('page_range', '').strip()
-        difficulty = session.get('difficulty', '').strip()
-        stage = session.get('stage', 1)
-        mode = session.get('mode', 'test')
         
-        # テストモードのみの処理（練習モードの特殊処理は削除）
-        if stage == 1:
-            chunk_number = session.get('current_chunk', 1)
-            cards = get_study_cards_fast(source, stage, mode, page_range, user_id, difficulty, chunk_number)
-        elif stage == 2:
-            cards = get_stage2_cards(source, page_range, user_id, difficulty)
-        else:
-            cards = get_stage3_cards(source, page_range, user_id, difficulty)
-        
-        # 最大5枚まで返す
-        batch_data = []
-        for card in (cards or [])[:5]:
-            batch_data.append({
-                'id': card['id'],
-                'image_problem': card['image_problem'],
-                'image_answer': card['image_answer'],
-                'page_number': card['page_number'],
-                'problem_number': card['problem_number'],
-                'level': card['level']
-            })
-        
-        return jsonify({'cards': batch_data})
-        
-    except Exception as e:
-        app.logger.error(f"バッチ画像取得エラー: {e}")
-        return jsonify({'error': 'Batch fetch error'}), 500
-
-# ========== アプリケーション起動とクリーンアップ ==========
-
-def cleanup_workers():
-    """アプリ終了時のワーカークリーンアップ"""
-    global log_worker_active
-    log_worker_active = False
-    try:
-        log_queue.put(None, timeout=1)  # 終了シグナル
-        if log_thread.is_alive():
-            log_thread.join(timeout=2)
-        app.logger.info("🧹 ワーカークリーンアップ完了")
-    except Exception as e:
-        app.logger.error(f"クリーンアップエラー: {e}")
-
-def cleanup_db_pool():
-    """アプリ終了時のDB接続プール削除"""
-    global db_pool
-    if db_pool:
-        try:
-            db_pool.closeall()
-            app.logger.info("🧹 DB接続プール削除完了")
-        except Exception as e:
-            app.logger.error(f"DB接続プール削除エラー: {e}")
-
-# 終了時の処理を登録
-atexit.register(cleanup_workers)
-atexit.register(cleanup_db_pool)
-
-def is_admin():
-    return current_user.is_authenticated and current_user.is_admin
-
-@app.route('/admin')
-@login_required
-def admin():
-    if not is_admin():
-        flash('管理者権限が必要です', 'error')
-        return redirect(url_for('home'))
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute('''
-                    SELECT id, username, full_name, last_login
-                    FROM users
-                    ORDER BY id
-                ''')
-                users = cur.fetchall()
-                cur.execute('''
-                    SELECT COUNT(*) as total_users,
-                           COUNT(CASE WHEN last_login > NOW() - INTERVAL '7 days' THEN 1 END) as active_users
-                    FROM users
-                ''')
-                stats = cur.fetchone() or {'total_users': 0, 'active_users': 0}
-                cur.execute('''
-                    SELECT 
-                        stage,
-                        ROUND(AVG(CASE WHEN result = 'correct' THEN 100 ELSE 0 END), 1) as avg_correct_rate,
-                        ROUND(COUNT(DISTINCT user_id) * 100.0 / (SELECT COUNT(*) FROM users), 1) as completion_rate
-                    FROM study_log
-                    GROUP BY stage
-                    ORDER BY stage
-                ''')
-                stage_progress = cur.fetchall() or []
-                cur.execute('''
-                    SELECT 
-                        DATE(last_login) as date,
-                        COUNT(DISTINCT id) as active_users
-                    FROM users
-                    WHERE last_login > NOW() - INTERVAL '30 days'
-                    GROUP BY DATE(last_login)
-                    ORDER BY date
-                ''')
-                active_users_data = cur.fetchall() or []
-                cur.execute('SELECT * FROM system_settings')
-                settings = cur.fetchone() or {'chunk_size': 10, 'session_timeout': 120}
-                cur.execute('SELECT DISTINCT source FROM image ORDER BY source')
-                sources = [row['source'] for row in cur.fetchall()] if cur.rowcount else []
-                cur.execute('''
-                    SELECT 
-                        sl.timestamp,
-                        u.username,
-                        sl.source,
-                        sl.stage,
-                        sl.result
-                    FROM study_log sl
-                    JOIN users u ON sl.user_id = u.id
-                    ORDER BY sl.timestamp DESC
-                    LIMIT 100
-                ''')
-                study_logs = cur.fetchall() or []
-    except Exception as e:
-        app.logger.error(f"管理画面データ取得エラー: {e}")
-        flash("管理画面データの取得に失敗しました", "error")
-        users = []
-        stats = {'total_users': 0, 'active_users': 0, 'stage_progress': [], 'dates': [], 'active_users_data': []}
-        stage_progress = []
-        active_users_data = []
-        settings = {'chunk_size': 10, 'session_timeout': 120}
-        sources = []
-        study_logs = []
-    return render_template('admin.html',
-                         users=users,
-                         stats={
-                             'total_users': stats.get('total_users', 0),
-                             'active_users': stats.get('active_users', 0),
-                             'stage_progress': stage_progress,
-                             'dates': [str(row['date']) for row in active_users_data],
-                             'active_users_data': [row['active_users'] for row in active_users_data]
-                         },
-                         settings=settings,
-                         sources=sources,
-                         study_logs=study_logs)
-
-@app.route('/admin/user/<int:user_id>')
-@login_required
-def admin_user_details(user_id):
-    if not is_admin():
-        return jsonify({'error': '管理者権限が必要です'}), 403
-    
-    with get_db_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # ユーザー情報を取得
-            cur.execute('''
-                SELECT id, username, full_name, last_login
-                FROM users
-                WHERE id = %s
-            ''', (user_id,))
-            user = cur.fetchone()
-            
-            if not user:
-                return jsonify({'error': 'ユーザーが見つかりません'}), 404
-            
-            # 学習進捗を計算
-            cur.execute('''
-                SELECT 
-                    COUNT(DISTINCT CASE WHEN result = 'correct' THEN card_id END) * 100.0 / 
-                    (SELECT COUNT(*) FROM image) as progress
-                FROM study_log
-                WHERE user_id = %s
-            ''', (user_id,))
-            progress = cur.fetchone()['progress'] or 0
-            
-            user['progress'] = round(progress, 1)
-            
-            return jsonify(user)
-
-@app.route('/admin/logs')
-@login_required
-def admin_logs():
-    if not is_admin():
-        return jsonify({'error': '管理者権限が必要です'}), 403
-    
-    user_id = request.args.get('user_id')
-    source = request.args.get('source')
-    date = request.args.get('date')
-    
-    query = '''
-        SELECT 
-            sl.timestamp,
-            u.username,
-            sl.source,
-            sl.stage,
-            sl.result
-        FROM study_log sl
-        JOIN users u ON sl.user_id = u.id
-        WHERE 1=1
-    '''
-    params = []
-    
-    if user_id:
-        query += ' AND sl.user_id = %s'
-        params.append(user_id)
-    if source:
-        query += ' AND sl.source = %s'
-        params.append(source)
-    if date:
-        query += ' AND DATE(sl.timestamp) = %s'
-        params.append(date)
-    
-    query += ' ORDER BY sl.timestamp DESC LIMIT 100'
-    
-    with get_db_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(query, params)
-            logs = cur.fetchall()
-    
-    return jsonify({'logs': logs})
-
-@app.route('/admin/settings', methods=['POST'])
-@login_required
-def admin_settings():
-    if not is_admin():
-        return jsonify({'error': '管理者権限が必要です'}), 403
-    
-    try:
-        settings = request.get_json()
-        
+        # ログを記録
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # システム設定を更新
                 cur.execute('''
-                    INSERT INTO system_settings (chunk_size, session_timeout)
-                    VALUES (%s, %s)
-                    ON CONFLICT (id) DO UPDATE
-                    SET chunk_size = EXCLUDED.chunk_size,
-                        session_timeout = EXCLUDED.session_timeout
-                ''', (settings['chunk_size'], settings['session_timeout']))
-                conn.commit()
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/admin/bulk_register', methods=['POST'])
-@login_required
-def admin_bulk_register():
-    if not is_admin():
-        flash('管理者権限が必要です', 'error')
-        return redirect(url_for('admin'))
-    
-    if 'csv_file' not in request.files:
-        flash('CSVファイルが選択されていません', 'error')
-        return redirect(url_for('admin'))
-    
-    file = request.files['csv_file']
-    if file.filename == '':
-        flash('ファイルが選択されていません', 'error')
-        return redirect(url_for('admin'))
-    
-    if not file.filename.endswith('.csv'):
-        flash('CSVファイルのみアップロード可能です', 'error')
-        return redirect(url_for('admin'))
-    
-    try:
-        import io, csv
-        from werkzeug.security import generate_password_hash
-        stream = io.StringIO(file.stream.read().decode("UTF-8"), newline=None)
-        csv_reader = csv.reader(stream)
-        
-        success_count = 0
-        error_count = 0
-        error_messages = []
-        
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                for row in csv_reader:
-                    if len(row) != 3:
-                        error_count += 1
-                        error_messages.append(f"行 {csv_reader.line_num}: 列数が不正です（3列必要）")
-                        continue
-                    username, password, full_name = row
-                    cur.execute('SELECT id FROM users WHERE username = %s', (username,))
-                    if cur.fetchone():
-                        error_count += 1
-                        error_messages.append(f"行 {csv_reader.line_num}: ユーザー名 '{username}' は既に使用されています")
-                        continue
-                    password_hash = generate_password_hash(password)
-                    try:
-                        cur.execute(
-                            'INSERT INTO users (username, password_hash, full_name, is_admin) VALUES (%s, %s, %s, false)',
-                            (username, password_hash, full_name)
-                        )
-                        success_count += 1
-                    except Exception as e:
-                        error_count += 1
-                        error_messages.append(f"行 {csv_reader.line_num}: 登録エラー - {str(e)}")
-                conn.commit()
-        if success_count > 0:
-            flash(f'{success_count}人のユーザーを登録しました', 'success')
-        if error_count > 0:
-            flash(f'{error_count}件のエラーが発生しました', 'error')
-            for msg in error_messages:
-                flash(msg, 'error')
-        return redirect(url_for('admin'))
-    except Exception as e:
-        app.logger.error(f"一括登録エラー: {e}")
-        flash('一括登録処理中にエラーが発生しました', 'error')
-        return redirect(url_for('admin'))
-
-@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
-@login_required
-def admin_delete_user(user_id):
-    if not is_admin():
-        return jsonify({'success': False, 'message': '管理者権限が必要です'}), 403
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # ユーザーの存在確認
-                cur.execute('SELECT id FROM users WHERE id = %s', (user_id,))
-                if not cur.fetchone():
-                    return jsonify({'success': False, 'message': 'ユーザーが見つかりません'}), 404
+                    INSERT INTO study_log (user_id, card_id, stage, mode, result)
+                    VALUES (%s, %s, %s, %s, %s)
+                ''', (user_id, card_id, stage, session_mode, result))
                 
-                # ユーザーの削除
-                cur.execute('DELETE FROM users WHERE id = %s', (user_id,))
-                conn.commit()
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        app.logger.error(f"ユーザー削除エラー: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/admin/edit_user/<int:user_id>', methods=['POST'])
-@login_required
-def admin_edit_user(user_id):
-    if not is_admin():
-        return jsonify({'success': False, 'message': '管理者権限が必要です'}), 403
-    
-    try:
-        data = request.get_json()
-        username = data.get('username')
-        full_name = data.get('full_name')
-        password = data.get('password')
-        
-        if not username or not full_name:
-            return jsonify({'success': False, 'message': 'ユーザー名と氏名は必須です'}), 400
-        
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # ユーザーの存在確認
-                cur.execute('SELECT id FROM users WHERE id = %s', (user_id,))
-                if not cur.fetchone():
-                    return jsonify({'success': False, 'message': 'ユーザーが見つかりません'}), 404
-                
-                # ユーザー名の重複チェック
-                cur.execute('SELECT id FROM users WHERE username = %s AND id != %s', (username, user_id))
-                if cur.fetchone():
-                    return jsonify({'success': False, 'message': 'このユーザー名は既に使用されています'}), 400
-                
-                # ユーザー情報の更新
-                if password:
-                    password_hash = generate_password_hash(password)
-                    cur.execute('''
-                        UPDATE users 
-                        SET username = %s, full_name = %s, password_hash = %s
-                        WHERE id = %s
-                    ''', (username, full_name, password_hash, user_id))
-                else:
-                    cur.execute('''
+                # チャンクの完了状態を更新
+                if stage == 1:
+                    current_chunk = session.get('current_chunk', 1)
+                    practicing_chunk = session.get('practicing_chunk')
+                    
+                    # テストモードの場合
+                    if session_mode == 'test':
+                        # チャンク内の全カードのテスト結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'test'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, current_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # テスト完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET test_completed = %s,
+                                completed = CASE 
+                                    WHEN %s = true AND (practice_completed = true OR practice_needed = false)
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, current_chunk))
+                        
+                        # 練習が必要かどうかを更新
+                        if known_cards < total_cards:
+                            cur.execute('''
+                                UPDATE chunk_progress
+                                SET practice_needed = true
+                                WHERE user_id = %s AND source = %s AND stage = %s 
+                                AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                            ''', (user_id, source, stage, page_range, difficulty, current_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'chunk_practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'chunk_practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
+                        ''', (known_cards == total_cards, known_cards == total_cards,
+                              user_id, source, stage, page_range, difficulty, practicing_chunk))
+                    
+                    # 練習モードの場合
+                    elif session_mode == 'practice' and not practicing_chunk:
+                        # チャンク内の全カードの練習結果を確認
+                        cur.execute('''
+                            WITH chunk_cards AS (
+                                SELECT c.id
+                                FROM cards c
+                                JOIN chunk_progress cp ON c.chunk_number = cp.chunk_number
+                                WHERE cp.user_id = %s AND cp.source = %s AND cp.stage = %s 
+                                AND cp.page_range = %s AND cp.difficulty = %s AND cp.chunk_number = %s
+                            ),
+                            latest_results AS (
+                                SELECT card_id, result,
+                                    ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY id DESC) as rn
+                                FROM study_log
+                                WHERE user_id = %s AND stage = %s AND mode = 'practice'
+                                AND card_id IN (SELECT id FROM chunk_cards)
+                            )
+                            SELECT COUNT(*) as total_cards,
+                                   COUNT(CASE WHEN result = 'known' THEN 1 END) as known_cards
+                            FROM latest_results
+                            WHERE rn = 1
+                        ''', (user_id, source, stage, page_range, difficulty, practicing_chunk,
+                              user_id, stage))
+                        
+                        total_cards, known_cards = cur.fetchone()
+                        
+                        # 練習完了状態を更新
+                        cur.execute('''
+                            UPDATE chunk_progress
+                            SET practice_completed = %s,
+                                completed = CASE 
+                                    WHEN test_completed = true AND %s = true
+                                    THEN true
+                                    ELSE false
+                                END
+                            WHERE user_id = %s AND source = %s AND stage = %s 
+                            AND page_range = %s AND difficulty = %s AND chunk_number = %s
                         UPDATE users 
                         SET username = %s, full_name = %s
                         WHERE id = %s
