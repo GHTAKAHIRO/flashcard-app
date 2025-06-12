@@ -1014,22 +1014,25 @@ def get_chunk_practice_cards_universal(user_id, source, stage, chunk_number, pag
         return []
 
 def get_detailed_progress_for_all_stages(user_id, source, page_range, difficulty):
-    """全ステージの詳細進捗情報を取得（最適化版）"""
+    """全ステージの詳細進捗情報を取得（ステージ2以降も必ず表示されるよう修正）"""
     stages_info = []
-    
     try:
         for stage in range(1, 4):
             stage_info = get_stage_detailed_progress(user_id, source, stage, page_range, difficulty)
-            
             if stage_info:
                 stages_info.append(stage_info)
-                if not stage_info.get('stage_completed', False):
-                    break
             else:
-                break
-                
+                # ロック中や未到達の場合もダミーで表示
+                stages_info.append({
+                    'stage': stage,
+                    'stage_name': f'ステージ {stage}',
+                    'total_cards': 0,
+                    'total_chunks': 0,
+                    'chunks_progress': [],
+                    'stage_completed': False,
+                    'can_start': False
+                })
         return stages_info
-        
     except Exception as e:
         app.logger.error(f"詳細進捗エラー: {e}")
         return []
