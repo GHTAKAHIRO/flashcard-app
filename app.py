@@ -1474,7 +1474,7 @@ def reset_history(source):
             with conn.cursor() as cur:
                 # Delete all study history for the user and source
                 cur.execute("""
-                    DELETE FROM study_history 
+                    DELETE FROM study_log 
                     WHERE user_id = %s AND source = %s
                 """, (current_user.id, source))
                 
