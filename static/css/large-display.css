@@ -95,11 +95,8 @@ body {
 /* ========== プリレンダリングカード（コンテナに合わせる） ========== */
 .prerendered-card,
 .ultra-robust-card {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
+    position: relative !important;
     width: 100% !important;
-    height: 100% !important;
     min-height: 300px !important;
     display: flex !important;
     flex-direction: column !important;
@@ -122,7 +119,6 @@ body {
     align-items: stretch !important;
     justify-content: stretch !important;
     width: 100% !important;
-    height: 100% !important;
     min-height: 300px !important;
     text-align: center !important;
     margin: 0 !important;
@@ -139,10 +135,10 @@ body {
 .answer-container img,
 .ultra-image {
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
     max-width: 100% !important;
     max-height: 100% !important;
-    object-fit: cover !important;
+    object-fit: contain !important;
     object-position: center !important;
     display: block !important;
     margin: 0 !important;
@@ -156,10 +152,6 @@ body {
     backface-visibility: hidden !important;
     visibility: visible !important;
     opacity: 1 !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    z-index: 1 !important;
 }
 
 /* ========== テキスト部分（画像の上にオーバーレイ） ========== */
