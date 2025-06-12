@@ -1522,7 +1522,19 @@ def set_page_range_and_prepare(source):
 def reset_history(source):
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:                
+            with conn.cursor() as cur:
+                # Delete all study history for the user and source
+                cur.execute("""
+                    DELETE FROM study_history 
+                    WHERE user_id = %s AND source = %s
+                """, (current_user.id, source))
+                
+                # Delete all chunk progress for the user and source
+                cur.execute("""
+                    DELETE FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s
+                """, (current_user.id, source))
+                
                 # Clear any cached data for this user and source
                 clear_user_cache(current_user.id, source)
                 
@@ -4701,6 +4713,18 @@ def reset_history(source):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Delete all study history for the user and source
+                cur.execute("""
+                    DELETE FROM study_history 
+                    WHERE user_id = %s AND source = %s
+                """, (current_user.id, source))
+                
+                # Delete all chunk progress for the user and source
+                cur.execute("""
+                    DELETE FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s
+                """, (current_user.id, source))
+                
                 # Clear any cached data for this user and source
                 clear_user_cache(current_user.id, source)
                 
@@ -11521,6 +11545,18 @@ def reset_history(source):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Delete all study history for the user and source
+                cur.execute("""
+                    DELETE FROM study_history 
+                    WHERE user_id = %s AND source = %s
+                """, (current_user.id, source))
+                
+                # Delete all chunk progress for the user and source
+                cur.execute("""
+                    DELETE FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s
+                """, (current_user.id, source))
+                
                 # Clear any cached data for this user and source
                 clear_user_cache(current_user.id, source)
                 
@@ -13148,6 +13184,18 @@ def reset_history(source):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Delete all study history for the user and source
+                cur.execute("""
+                    DELETE FROM study_history 
+                    WHERE user_id = %s AND source = %s
+                """, (current_user.id, source))
+                
+                # Delete all chunk progress for the user and source
+                cur.execute("""
+                    DELETE FROM chunk_progress 
+                    WHERE user_id = %s AND source = %s
+                """, (current_user.id, source))
+                
                 # Clear any cached data for this user and source
                 clear_user_cache(current_user.id, source)
                 
