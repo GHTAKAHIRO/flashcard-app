@@ -664,19 +664,11 @@
         // ボタンクリック時の確認とフィードバック
         document.querySelectorAll('.btn').forEach(button => {
             button.addEventListener('click', function(e) {
-                if (this.textContent.includes('テスト開始') || this.textContent.includes('練習開始')) {
-                    const confirmation = confirm('学習を開始しますか？');
-                    if (!confirmation) {
-                        e.preventDefault();
-                        return;
-                    }
-                    
-                    // クリックエフェクト
-                    this.style.transform = 'scale(0.95)';
-                    setTimeout(() => {
-                        this.style.transform = '';
-                    }, 150);
-                }
+                // クリックエフェクト
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = '';
+                }, 150);
             });
         });
 
