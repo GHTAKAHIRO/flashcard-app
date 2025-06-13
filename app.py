@@ -1671,22 +1671,22 @@ def study(source):
         page_range = session.get('page_range', '').strip()
         difficulty = session.get('difficulty', '').strip()
         current_chunk = session.get('current_chunk')
-        
+
         if not all([stage, mode, current_chunk]):
             app.logger.error("必要なセッション情報が不足しています")
             flash("学習情報が正しく設定されていません。準備画面からやり直してください。")
-                return redirect(url_for('prepare', source=source))
-            
+            return redirect(url_for('prepare', source=source))
+
         # チャンク進捗の取得
         chunk_progress = get_or_create_chunk_progress_universal(
             current_user.id, source, stage, page_range, difficulty
         )
-        
-            if not chunk_progress:
+
+        if not chunk_progress:
             app.logger.error("チャンク進捗の取得に失敗しました")
             flash("学習情報の取得に失敗しました。準備画面からやり直してください。")
-                return redirect(url_for('prepare', source=source))
-            
+            return redirect(url_for('prepare', source=source))
+
         # テストモードの場合
         if mode == 'test':
             # カードの取得
@@ -1694,12 +1694,12 @@ def study(source):
                 source, stage, mode, page_range,
                 str(current_user.id), difficulty, current_chunk
             )
-            
+
             if not cards:
                 app.logger.error("テストカードの取得に失敗しました")
                 flash("問題の取得に失敗しました。準備画面からやり直してください。")
-                    return redirect(url_for('prepare', source=source))
-                
+                return redirect(url_for('prepare', source=source))
+
             app.logger.info(f"テスト開始: {len(cards)}問")
             return render_template(
                 'study.html',
@@ -1710,35 +1710,35 @@ def study(source):
                 current_chunk=current_chunk,
                 chunk_progress=chunk_progress
             )
-        
+
         # 練習モードの場合
         elif mode in ['practice', 'chunk_practice']:
             cards = get_chunk_practice_cards_universal(
                 current_user.id, source, stage, current_chunk,
                 page_range, difficulty
             )
-            
+
             if not cards:
                 app.logger.error("練習カードの取得に失敗しました")
                 flash("問題の取得に失敗しました。準備画面からやり直してください。")
-                    return redirect(url_for('prepare', source=source))
-                
+                return redirect(url_for('prepare', source=source))
+
             app.logger.info(f"練習開始: {len(cards)}問")
             return render_template(
                 'study.html',
                 cards=cards,
                 source=source,
                 stage=stage,
-                                        mode=mode,
-                                        current_chunk=current_chunk,
+                mode=mode,
+                current_chunk=current_chunk,
                 chunk_progress=chunk_progress
             )
-        
+
         else:
             app.logger.error(f"不正なモード: {mode}")
             flash("不正な学習モードです。準備画面からやり直してください。")
-        return redirect(url_for('prepare', source=source))
-        
+            return redirect(url_for('prepare', source=source))
+
     except Exception as e:
         app.logger.error(f"学習画面表示エラー: {e}")
         flash("エラーが発生しました。準備画面からやり直してください。")
