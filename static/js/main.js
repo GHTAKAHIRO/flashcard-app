@@ -589,6 +589,7 @@ function sendResultBackground(cardId, result) {
         is_correct: (result === 'known'),
         chunk_id: window.currentChunk || 1
     };
+    console.log("送信データ (sendResultBackground):", data);
     fetch('/log_result', {
         method: 'POST',
         headers: {
@@ -604,13 +605,12 @@ function sendResultBackground(cardId, result) {
 
 // ========== 完了処理（高速化・アニメーション対応） ==========
 function handleCardCompletionSync(cardId, result) {
-    console.log("🔧 カード完了時同期処理:", cardId, result);
-    
     const data = {
         word_id: cardId,
         is_correct: (result === 'known'),
         chunk_id: window.currentChunk || 1
     };
+    console.log("送信データ (handleCardCompletionSync):", data);
     fetch('/log_result', {
         method: 'POST',
         headers: {
