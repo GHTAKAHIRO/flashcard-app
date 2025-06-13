@@ -1786,13 +1786,23 @@ def log_result():
         study_data['word_history'] = word_history
         session['study_data'] = study_data
 
-        # データベースに結果を記録
-        with get_db() as db:
-            db.execute(
-                'INSERT INTO study_logs (word_id, chunk_id, is_correct, study_date) VALUES (?, ?, ?, datetime("now"))',
-                (word_id, chunk_id, is_correct)
-            )
-            db.commit()
+        # データベースに結果を記録（study_logテーブルに統一）
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    '''
+                    INSERT INTO study_log (user_id, card_id, result, stage, mode)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ''',
+                    (
+                        str(current_user.id),
+                        word_id,
+                        'known' if is_correct else 'unknown',
+                        session.get('stage', 1),
+                        session.get('mode', 'test')
+                    )
+                )
+                conn.commit()
 
         return jsonify({'success': True})
 
