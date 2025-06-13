@@ -585,10 +585,9 @@ function triggerButtonFeedback(result) {
 // ========== ログ処理 ==========
 function sendResultBackground(cardId, result) {
     const data = {
-        card_id: cardId,
-        result: result,
-        stage: window.stage,
-        mode: window.mode
+        word_id: cardId,
+        is_correct: (result === 'known'),
+        chunk_id: window.currentChunk || 1
     };
     fetch('/log_result', {
         method: 'POST',
@@ -608,10 +607,9 @@ function handleCardCompletionSync(cardId, result) {
     console.log("🔧 カード完了時同期処理:", cardId, result);
     
     const data = {
-        card_id: cardId,
-        result: result,
-        stage: window.stage,
-        mode: window.mode
+        word_id: cardId,
+        is_correct: (result === 'known'),
+        chunk_id: window.currentChunk || 1
     };
     fetch('/log_result', {
         method: 'POST',
