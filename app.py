@@ -1786,19 +1786,20 @@ def log_result():
         study_data['word_history'] = word_history
         session['study_data'] = study_data
 
-        # データベースに結果を記録（study_logテーブルに統一）
+        # データベースに結果を記録（study_logテーブルに統一、source_を追加）
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     '''
-                    INSERT INTO study_log (user_id, card_id, result, stage, mode)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO study_log (user_id, source_, stage, card_id, result, mode)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     ''',
                     (
                         str(current_user.id),
+                        session.get('current_source'),
+                        session.get('stage', 1),
                         word_id,
                         'known' if is_correct else 'unknown',
-                        session.get('stage', 1),
                         session.get('mode', 'test')
                     )
                 )
@@ -1807,7 +1808,9 @@ def log_result():
         return jsonify({'success': True})
 
     except Exception as e:
+        import traceback
         print(f"Error in log_result: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
