@@ -1236,6 +1236,7 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
                         remaining_practice_cards = len(remaining_wrong_cards)
                         practice_completed = remaining_practice_cards == 0
                     
+                    # チャンク完了判定を厳密化：テスト完了かつ練習完了の場合のみTrue
                     chunk_completed = test_completed and practice_completed
                     
                     if not chunk_completed:
