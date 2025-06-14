@@ -1747,21 +1747,38 @@ def study(source):
 
 # ========== Redis除去版 パート13: ログ記録とデバッグルート（最終パート） ==========
 
+
 @app.route('/log_result', methods=['POST'])
 def log_result():
     try:
+        import sys
+        import traceback
         data = request.get_json()
+        print('log_result data:', data, file=sys.stderr)
+        print('session:', dict(session), file=sys.stderr)
+        print('current_user.is_authenticated:', getattr(current_user, 'is_authenticated', None), file=sys.stderr)
+
         if not data:
+            print('No data provided', file=sys.stderr)
             return jsonify({'error': 'No data provided'}), 400
 
         # 必要なデータの存在確認
         required_fields = ['word_id', 'is_correct', 'chunk_id']
         if not all(field in data for field in required_fields):
+            print('Missing required fields', file=sys.stderr)
             return jsonify({'error': 'Missing required fields'}), 400
 
         word_id = data['word_id']
         is_correct = data['is_correct']
         chunk_id = data['chunk_id']
+
+        # セッション・ユーザーの必須情報チェック
+        if not getattr(current_user, 'is_authenticated', False):
+            print('User not authenticated', file=sys.stderr)
+            return 'User not authenticated', 401
+        if not session.get('current_source') or not session.get('stage'):
+            print('Session missing current_source or stage', file=sys.stderr)
+            return 'Session missing current_source or stage', 400
 
         # セッションから学習データを取得・なければ初期化
         study_data = session.get('study_data')
@@ -1810,10 +1827,12 @@ def log_result():
         return jsonify({'success': True})
 
     except Exception as e:
+        import sys
         import traceback
-        print(f"Error in log_result: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+        print(f"Error in log_result: {str(e)}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+        # 500エラー時はJSONで返す
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
