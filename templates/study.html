@@ -92,6 +92,11 @@
     window.stage = stageValue;  // stageをグローバル変数として設定
     window.mode = modeValue;    // modeをグローバル変数として設定
     window.currentChunk = {{ current_chunk|default(1)|tojson|safe }};
+    window.currentSource = "{{ source|default('') }}";
+    console.log("window.currentChunk:", window.currentChunk);
+    console.log("window.stage:", window.stage);
+    console.log("window.mode:", window.mode);
+    console.log("window.currentSource:", window.currentSource);
 
     console.log('📊 カードデータ読み込み:', rawCards.length, '問');
 
