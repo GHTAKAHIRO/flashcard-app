@@ -1787,12 +1787,12 @@ def log_result():
         study_data['word_history'] = word_history
         session['study_data'] = study_data
 
-        # データベースに結果を記録（study_logテーブルに統一、source_を追加）
+        # データベースに結果を記録（study_logテーブルに統一、sourceカラム名修正）
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     '''
-                    INSERT INTO study_log (user_id, source_, stage, card_id, result, mode)
+                    INSERT INTO study_log (user_id, source, stage, card_id, result, mode)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     ''',
                     (
