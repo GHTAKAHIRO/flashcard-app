@@ -1762,10 +1762,11 @@ def log_result():
         is_correct = data['is_correct']
         chunk_id = data['chunk_id']
 
-        # セッションから学習データを取得
-        study_data = session.get('study_data', {})
+        # セッションから学習データを取得・なければ初期化
+        study_data = session.get('study_data')
         if not study_data:
-            return jsonify({'error': 'No study data in session'}), 400
+            study_data = {'word_history': {}}
+            session['study_data'] = study_data
 
         # 単語の学習履歴を更新
         word_history = study_data.get('word_history', {})
