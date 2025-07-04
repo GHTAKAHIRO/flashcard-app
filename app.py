@@ -1489,6 +1489,9 @@ def set_page_range_and_prepare(source):
     difficulty_list = request.form.getlist('difficulty')
     difficulty = ','.join(difficulty_list) if difficulty_list else ''
     
+    # デバッグ用ログ出力
+    app.logger.info(f"[DEBUG] page_range: '{page_range}', difficulty: '{difficulty}'")
+    
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
