@@ -161,7 +161,23 @@
     <script>
         function deleteHistory(source) {
             if (confirm(source + ' の学習履歴をすべて削除します。よろしいですか？')) {
-                document.getElementById('deleteForm-' + source).submit();
+                // CSRFトークンを取得
+                const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+                
+                // フォームを作成して送信
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/reset_history/' + source;
+                
+                // CSRFトークンを追加
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+                
+                document.body.appendChild(form);
+                form.submit();
             }
         }
         

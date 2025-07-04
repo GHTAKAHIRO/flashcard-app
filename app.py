@@ -1514,27 +1514,80 @@ def set_page_range_and_prepare(source):
 @login_required
 def reset_history(source):
     try:
+        app.logger.info(f"履歴リセット開始: user_id={current_user.id}, source={source}")
+        
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Delete all study history for the user and source
-                cur.execute("""
-                    DELETE FROM study_log 
-                    WHERE user_id = %s AND source = %s
-                """, (current_user.id, source))
+                # まず、study_logテーブルの構造を確認
+                try:
+                    cur.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'study_log'
+                    """)
+                    columns = [row[0] for row in cur.fetchall()]
+                    app.logger.info(f"study_logテーブルのカラム: {columns}")
+                    
+                    # sourceカラムが存在するかチェック
+                    if 'source' in columns:
+                        # Delete all study history for the user and source
+                        cur.execute("""
+                            DELETE FROM study_log 
+                            WHERE user_id = %s AND source = %s
+                        """, (current_user.id, source))
+                        deleted_study_logs = cur.rowcount
+                        app.logger.info(f"削除されたstudy_logレコード数: {deleted_study_logs}")
+                    else:
+                        app.logger.warning("study_logテーブルにsourceカラムが存在しません")
+                        # sourceカラムがない場合は、card_idを通じてcardsテーブルからsourceを取得して削除
+                        try:
+                            cur.execute("""
+                                DELETE FROM study_log 
+                                WHERE user_id = %s AND card_id IN (
+                                    SELECT id FROM cards WHERE source = %s
+                                )
+                            """, (current_user.id, source))
+                            deleted_study_logs = cur.rowcount
+                            app.logger.info(f"cardsテーブル経由で削除されたstudy_logレコード数: {deleted_study_logs}")
+                        except Exception as e:
+                            app.logger.error(f"cardsテーブル経由での削除エラー: {e}")
+                            deleted_study_logs = 0
+                        
+                except Exception as e:
+                    app.logger.error(f"study_logテーブル構造確認エラー: {e}")
+                    deleted_study_logs = 0
                 
                 # Delete all chunk progress for the user and source
                 cur.execute("""
                     DELETE FROM chunk_progress 
                     WHERE user_id = %s AND source = %s
                 """, (current_user.id, source))
+                deleted_chunk_progress = cur.rowcount
+                app.logger.info(f"削除されたchunk_progressレコード数: {deleted_chunk_progress}")
+                
+                # Delete user settings for the source
+                try:
+                    cur.execute("""
+                        DELETE FROM user_settings 
+                        WHERE user_id = %s AND source = %s
+                    """, (current_user.id, source))
+                    deleted_user_settings = cur.rowcount
+                    app.logger.info(f"削除されたuser_settingsレコード数: {deleted_user_settings}")
+                except Exception as e:
+                    app.logger.error(f"user_settings削除エラー: {e}")
+                    deleted_user_settings = 0
                 
                 # Clear any cached data for this user and source
                 clear_user_cache(current_user.id, source)
                 
                 flash(f'{source}の学習履歴をリセットしました。', 'success')
+                app.logger.info(f"履歴リセット完了: study_log={deleted_study_logs}, chunk_progress={deleted_chunk_progress}, user_settings={deleted_user_settings}")
+                
     except Exception as e:
         flash('履歴のリセット中にエラーが発生しました。', 'error')
         app.logger.error(f"履歴リセットエラー: {str(e)}")
+        import traceback
+        app.logger.error(f"詳細エラー: {traceback.format_exc()}")
     
     return redirect(url_for('dashboard'))
 
