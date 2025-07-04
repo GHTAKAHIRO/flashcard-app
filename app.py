@@ -1582,6 +1582,7 @@ def reset_history(source):
                 
                 flash(f'{source}の学習履歴をリセットしました。', 'success')
                 app.logger.info(f"履歴リセット完了: study_log={deleted_study_logs}, chunk_progress={deleted_chunk_progress}, user_settings={deleted_user_settings}")
+                conn.commit()  # ここでコミット
                 
     except Exception as e:
         flash('履歴のリセット中にエラーが発生しました。', 'error')
