@@ -1570,7 +1570,7 @@ def reset_history(source):
                     cur.execute("""
                         DELETE FROM user_settings 
                         WHERE user_id = %s AND source = %s
-                    """, (current_user.id, source))
+                    """, (str(current_user.id), source))
                     deleted_user_settings = cur.rowcount
                     app.logger.info(f"削除されたuser_settingsレコード数: {deleted_user_settings}")
                 except Exception as e:
