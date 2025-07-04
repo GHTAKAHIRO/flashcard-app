@@ -571,12 +571,12 @@
                         <!-- 2行目：アクションボタン -->
                         <div class="d-flex gap-2 justify-content-end">
                             <!-- テストボタン -->
-                            {% if chunk.can_start_test and not chunk.completed %}
+                            {% if chunk.can_start_test and not chunk.test_completed %}
                                 <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='test') }}" 
                                    class="btn btn-primary-mini">
                                     <i class="fas fa-play"></i> テスト開始
                                 </a>
-                            {% elif chunk.completed %}
+                            {% elif chunk.test_completed %}
                                 <button class="btn btn-disabled-mini" disabled>
                                     <i class="fas fa-check"></i> テスト完了
                                 </button>
