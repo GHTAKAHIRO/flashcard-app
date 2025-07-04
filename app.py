@@ -357,23 +357,23 @@ def check_stage_completion(user_id, source, stage, page_range, difficulty):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # まず、そのステージの全チャンク数を取得
-                cur.execute('''
-                    SELECT total_chunks FROM chunk_progress 
-                    WHERE user_id = %s AND source = %s AND stage = %s AND page_range = %s AND difficulty = %s
-                    LIMIT 1
-                ''', (user_id, source, stage, page_range, difficulty))
-                result = cur.fetchone()
-                
-                if not result:
-                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}のチャンク情報が見つかりません")
-                    return False
-                
-                total_chunks = result[0]
-                app.logger.debug(f"[STAGE_CHECK] Stage{stage}の全チャンク数: {total_chunks}")
-                
                 # ステージ1の場合、特別な条件を適用
                 if stage == 1:
+                    # まず、そのステージの全チャンク数を取得
+                    cur.execute('''
+                        SELECT total_chunks FROM chunk_progress 
+                        WHERE user_id = %s AND source = %s AND stage = %s AND page_range = %s AND difficulty = %s
+                        LIMIT 1
+                    ''', (user_id, source, stage, page_range, difficulty))
+                    result = cur.fetchone()
+                    
+                    if not result:
+                        app.logger.debug(f"[STAGE_CHECK] Stage{stage}のチャンク情報が見つかりません")
+                        return False
+                    
+                    total_chunks = result[0]
+                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}の全チャンク数: {total_chunks}")
+                    
                     # 最後のチャンクのテスト結果を取得
                     cur.execute('''
                         SELECT cp.chunk_number, cp.test_completed, cp.practice_completed,
@@ -406,24 +406,50 @@ def check_stage_completion(user_id, source, stage, page_range, difficulty):
                     
                     return False
                 
-                # ステージ2以降は従来の条件を適用
-                cur.execute('''
-                    SELECT COUNT(*) FROM chunk_progress 
-                                WHERE user_id = %s AND source = %s AND stage = %s 
-                    AND page_range = %s AND difficulty = %s 
-                    AND test_completed = true 
-                    AND (practice_completed = true OR practice_needed = false)
-                ''', (user_id, source, stage, page_range, difficulty))
-                completed_chunks = cur.fetchone()[0]
+                # ステージ2・3の場合、Universal進捗管理を使用
+                elif stage in [2, 3]:
+                    chunk_progress = get_or_create_chunk_progress_universal(user_id, source, stage, page_range, difficulty)
+                    if chunk_progress and chunk_progress.get('all_completed'):
+                        app.logger.debug(f"[STAGE_CHECK] Stage{stage}完了済み (Universal進捗)")
+                        return True
+                    else:
+                        app.logger.debug(f"[STAGE_CHECK] Stage{stage}未完了 (Universal進捗)")
+                        return False
                 
-                is_completed = completed_chunks == total_chunks
-                
-                if is_completed:
-                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}完了済み ({completed_chunks}/{total_chunks}チャンク)")
+                # その他のステージは従来の条件を適用
                 else:
-                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}未完了 ({completed_chunks}/{total_chunks}チャンク)")
-                
-                return is_completed
+                    # まず、そのステージの全チャンク数を取得
+                    cur.execute('''
+                        SELECT total_chunks FROM chunk_progress 
+                        WHERE user_id = %s AND source = %s AND stage = %s AND page_range = %s AND difficulty = %s
+                        LIMIT 1
+                    ''', (user_id, source, stage, page_range, difficulty))
+                    result = cur.fetchone()
+                    
+                    if not result:
+                        app.logger.debug(f"[STAGE_CHECK] Stage{stage}のチャンク情報が見つかりません")
+                        return False
+                    
+                    total_chunks = result[0]
+                    app.logger.debug(f"[STAGE_CHECK] Stage{stage}の全チャンク数: {total_chunks}")
+                    
+                    cur.execute('''
+                        SELECT COUNT(*) FROM chunk_progress 
+                                    WHERE user_id = %s AND source = %s AND stage = %s 
+                        AND page_range = %s AND difficulty = %s 
+                        AND test_completed = true 
+                        AND (practice_completed = true OR practice_needed = false)
+                    ''', (user_id, source, stage, page_range, difficulty))
+                    completed_chunks = cur.fetchone()[0]
+                    
+                    is_completed = completed_chunks == total_chunks
+                    
+                    if is_completed:
+                        app.logger.debug(f"[STAGE_CHECK] Stage{stage}完了済み ({completed_chunks}/{total_chunks}チャンク)")
+                    else:
+                        app.logger.debug(f"[STAGE_CHECK] Stage{stage}未完了 ({completed_chunks}/{total_chunks}チャンク)")
+                    
+                    return is_completed
                     
     except Exception as e:
         app.logger.error(f"[STAGE_CHECK] Stage{stage}チェックエラー: {e}")
@@ -626,6 +652,12 @@ def get_stage2_cards(source, page_range, user_id, difficulty):
 def get_stage3_cards(source, page_range, user_id, difficulty):
     """Stage 3: Stage 2の×問題を全て取得（キャッシュ付き）"""
     try:
+        # ステージ2の完了チェックを追加
+        stage2_completed = check_stage_completion(user_id, source, 2, page_range, difficulty)
+        if not stage2_completed:
+            app.logger.debug(f"[STAGE3_CARDS] Stage2未完了のためStage3カードは取得しない")
+            return []
+        
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 query = '''
@@ -681,6 +713,7 @@ def get_stage3_cards(source, page_range, user_id, difficulty):
                 cur.execute(query, params)
                 records = cur.fetchall()
 
+                app.logger.debug(f"[STAGE3_CARDS] {len(records)}件のカードを取得")
                 return [dict(
                     id=r[0], subject=r[1], grade=r[2], source=r[3],
                     page_number=r[4], problem_number=r[5], topic=r[6],
@@ -1174,16 +1207,26 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
         
         subject = target_cards[0]['subject']
         
-        if stage == 1:
-            chunks = create_chunks_for_cards(target_cards, subject)
-            total_chunks = len(chunks)
-        else:
+        # ステージ2・3の場合はUniversal進捗管理を使用
+        if stage in [2, 3]:
+            chunk_progress = get_or_create_chunk_progress_universal(user_id, source, stage, page_range, difficulty)
+            if not chunk_progress:
+                app.logger.debug(f"[STAGE_PROGRESS] Stage{stage}: Universal進捗取得失敗")
+                return None
+            
+            # ステージ2・3は1チャンクとして扱う
             chunks = [target_cards]
             total_chunks = 1
+            stage_completed = chunk_progress.get('all_completed', False)
+            
+        else:
+            # ステージ1の場合は従来の処理
+            chunks = create_chunks_for_cards(target_cards, subject)
+            total_chunks = len(chunks)
+            stage_completed = True
         
         # 各チャンクの進捗を取得
         chunks_progress = []
-        stage_completed = True
         
         with get_db_connection() as conn:
             with conn.cursor() as cur:
