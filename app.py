@@ -1644,9 +1644,9 @@ def prepare(source):
             app.logger.error(f"設定取得エラー: {e}")
 
         # 設定が未完了の場合はダッシュボードにリダイレクト
-        if not saved_page_range:
-            flash("学習設定が必要です。ページ範囲と難易度を設定してください。")
-            return redirect(url_for('dashboard'))
+        # if not saved_page_range:
+        #     flash("学習設定が必要です。ページ範囲と難易度を設定してください。")
+        #     return redirect(url_for('dashboard'))
 
         # 詳細進捗情報を取得
         stages_info = get_detailed_progress_for_all_stages(user_id, source, saved_page_range, saved_difficulty)
