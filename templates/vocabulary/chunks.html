@@ -566,31 +566,28 @@
                     <div class="col-12 col-md-6 col-lg-4">
                         <div class="chunk-card {% if chunk.is_passed %}passed{% endif %}">
                             <div class="card-body text-center">
-                                <div class="chunk-number {% if chunk.is_completed %}completed{% endif %} {% if chunk.is_passed %}passed{% endif %}">
-                                    {{ chunk.chunk_number }}
+                                <div class="d-flex justify-content-center align-items-center gap-3 flex-row" style="min-height: 60px;">
+                                    <div class="chunk-number {% if chunk.is_completed %}completed{% endif %} {% if chunk.is_passed %}passed{% endif %}" style="margin-bottom: 0; font-size: 2rem;">
+                                        {{ chunk.chunk_number | int | to_kanji_circle }}
+                                    </div>
+                                    {% if chunk.is_passed %}
+                                    <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number, mode='review') }}" class="btn review-btn mb-0">
+                                        <i class="fas fa-redo me-2"></i>復習する
+                                    </a>
+                                    {% else %}
+                                    <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number) }}" class="btn start-btn mb-0">
+                                        <i class="fas fa-play me-2"></i>学習開始
+                                    </a>
+                                    {% endif %}
                                 </div>
-                                <h5 class="card-title">{{ chunk.title }}</h5>
-                                
                                 {% if chunk.is_passed %}
-                                <div class="completion-badge passed">
+                                <div class="completion-badge passed mt-2">
                                     <i class="fas fa-star me-1"></i>合格済み
                                 </div>
                                 {% elif chunk.is_completed %}
-                                <div class="completion-badge">
+                                <div class="completion-badge mt-2">
                                     <i class="fas fa-check me-1"></i>完了
                                 </div>
-                                {% endif %}
-
-
-
-                                {% if chunk.is_passed %}
-                                <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number, mode='review') }}" class="btn review-btn">
-                                    <i class="fas fa-redo me-2"></i>復習する
-                                </a>
-                                {% else %}
-                                <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number) }}" class="btn start-btn">
-                                    <i class="fas fa-play me-2"></i>学習開始
-                                </a>
                                 {% endif %}
                             </div>
                         </div>
