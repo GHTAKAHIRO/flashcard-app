@@ -2114,12 +2114,14 @@ def vocabulary_result(source):
         unknown_words = [r for r in results if r['result'] == 'unknown']
         known_count = len([r for r in results if r['result'] == 'known'])
         unknown_count = len(unknown_words)
+        all_words = results  # 全問題の結果
         
         # セッションをクリア
         session.pop('vocabulary_session', None)
         
         return render_template('vocabulary/result.html',
                              unknown_words=unknown_words,
+                             all_words=all_words,
                              known_count=known_count,
                              unknown_count=unknown_count,
                              total_count=len(results),
@@ -2205,73 +2207,7 @@ def vocabulary_upload():
         app.logger.error(f"英単語アップロードエラー: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/vocabulary/review/<source>')
-@login_required
-def vocabulary_review(source):
-    """英単語問題一覧画面"""
-    try:
-        # 最新のテストセッションの結果を取得
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 最新のセッションIDを取得
-                cur.execute('''
-                    SELECT session_id, MAX(study_date) as latest_date
-                    FROM vocabulary_study_log 
-                    WHERE user_id = %s AND source = %s
-                    GROUP BY session_id
-                    ORDER BY latest_date DESC
-                    LIMIT 1
-                ''', (str(current_user.id), source))
-                latest_session = cur.fetchone()
-                
-                if not latest_session:
-                    flash("学習履歴が見つかりません")
-                    return redirect(url_for('vocabulary_home'))
-                
-                # 最新セッションの結果を取得
-                cur.execute('''
-                    SELECT vw.word, vw.meaning, vsl.result, vsl.study_date
-                    FROM vocabulary_study_log vsl
-                    JOIN vocabulary_words vw ON vsl.word_id = vw.id
-                    WHERE vsl.user_id = %s AND vsl.source = %s AND vsl.session_id = %s
-                    ORDER BY vsl.study_date ASC
-                ''', (str(current_user.id), source, latest_session['session_id']))
-                study_logs = cur.fetchall()
-        
-        if not study_logs:
-            flash("学習履歴が見つかりません")
-            return redirect(url_for('vocabulary_home'))
-        
-        # 結果を整理
-        words = []
-        correct_count = 0
-        incorrect_count = 0
-        
-        for log in study_logs:
-            words.append({
-                'word': log['word'],
-                'meaning': log['meaning'],
-                'result': log['result']
-            })
-            
-            if log['result'] == 'known':
-                correct_count += 1
-            else:
-                incorrect_count += 1
-        
-        total_count = len(words)
-        
-        return render_template('vocabulary/review.html',
-                             words=words,
-                             correct_count=correct_count,
-                             incorrect_count=incorrect_count,
-                             total_count=total_count,
-                             source=source)
-        
-    except Exception as e:
-        app.logger.error(f"英単語問題一覧画面エラー: {e}")
-        flash("エラーが発生しました")
-        return redirect(url_for('vocabulary_home'))
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
