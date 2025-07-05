@@ -1941,17 +1941,31 @@ def log_result():
 def vocabulary_home():
     """英単語学習のホーム画面"""
     try:
-        # ユーザーの学習履歴を取得
+        # ユーザーの学習履歴を取得（vocabulary_study_logテーブルから）
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute('''
                     SELECT DISTINCT source, COUNT(*) as total_words,
                            COUNT(CASE WHEN result = 'known' THEN 1 END) as known_words
-                    FROM study_log 
-                    WHERE user_id = %s AND source LIKE 'vocabulary_%%'
+                    FROM vocabulary_study_log 
+                    WHERE user_id = %s
                     GROUP BY source
                 ''', (str(current_user.id),))
                 vocabulary_sources = cur.fetchall()
+        
+        # 各セットの総単語数も取得
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT source, COUNT(*) as total_available
+                    FROM vocabulary_words 
+                    GROUP BY source
+                ''')
+                total_available = {row['source']: row['total_available'] for row in cur.fetchall()}
+        
+        # 結果をマージ
+        for source in vocabulary_sources:
+            source['total_available'] = total_available.get(source['source'], 0)
         
         return render_template('vocabulary/home.html', vocabulary_sources=vocabulary_sources)
     except Exception as e:
