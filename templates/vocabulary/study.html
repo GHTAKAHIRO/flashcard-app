@@ -216,10 +216,7 @@
                     <i class="fas fa-clock me-2"></i>1秒後に自動で答えが表示されます
                 </div>
 
-                <!-- 発音機能ヘルプ -->
-                <div class="auto-show-notice" style="background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%); margin-bottom: 1rem;">
-                    <i class="fas fa-volume-up me-2"></i>問題表示と同時に自動発音されます。音声ボタンをクリックまたは「P」キーで再発音
-                </div>
+
 
                 <!-- 単語カード -->
                 <div class="word-card">
@@ -228,7 +225,7 @@
                     <!-- 問題（英語） -->
                     <div class="word-text" id="word-text">
                         {{ word.word }}
-                        <button class="pronunciation-btn" id="pronunciation-btn" onclick="pronounceWord(false)" title="発音を聞く">
+                        <button class="pronunciation-btn" id="pronunciation-btn" onclick="pronounceWord()" title="発音を聞く">
                             <i class="fas fa-volume-up"></i>
                         </button>
                     </div>
@@ -259,10 +256,6 @@
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
             startTimer();
-            // 問題表示と同時に自動発音
-            setTimeout(function() {
-                pronounceWord(true); // 自動発音フラグをtrueに設定
-            }, 500); // 0.5秒後に発音（ページ読み込み完了を待つ）
         });
 
         // タイマー開始
@@ -348,7 +341,7 @@
         let speechSynthesis = window.speechSynthesis;
         let currentUtterance = null;
 
-        function pronounceWord(isAutoPlay = false) {
+        function pronounceWord() {
             const wordElement = document.getElementById('word-text');
             const word = wordElement.textContent.trim();
             const pronunciationBtn = document.getElementById('pronunciation-btn');
@@ -365,31 +358,25 @@
             currentUtterance.pitch = 1.0;
             currentUtterance.volume = 1.0;
             
-            // 自動発音でない場合のみボタンの状態を変更
-            if (!isAutoPlay) {
-                pronunciationBtn.classList.add('playing');
-                pronunciationBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-            }
+            // ボタンの状態を変更
+            pronunciationBtn.classList.add('playing');
+            pronunciationBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
             
             // 発音開始
             speechSynthesis.speak(currentUtterance);
             
             // 発音終了時の処理
             currentUtterance.onend = function() {
-                if (!isAutoPlay) {
-                    pronunciationBtn.classList.remove('playing');
-                    pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                }
+                pronunciationBtn.classList.remove('playing');
+                pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
                 currentUtterance = null;
             };
             
             // エラー時の処理
             currentUtterance.onerror = function() {
-                if (!isAutoPlay) {
-                    pronunciationBtn.classList.remove('playing');
-                    pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                    alert('発音に失敗しました。ブラウザの音声機能を確認してください。');
-                }
+                pronunciationBtn.classList.remove('playing');
+                pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                alert('発音に失敗しました。ブラウザの音声機能を確認してください。');
                 currentUtterance = null;
             };
         }
@@ -404,7 +391,7 @@
                 answer('unknown');
             } else if (event.key === 'p' || event.key === 'P') {
                 // Pキーで発音
-                pronounceWord(false); // 手動発音フラグをfalseに設定
+                pronounceWord();
             }
         });
     </script>
