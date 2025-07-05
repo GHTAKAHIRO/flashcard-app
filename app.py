@@ -1973,12 +1973,104 @@ def vocabulary_home():
         flash("エラーが発生しました")
         return redirect(url_for('dashboard'))
 
-@app.route('/vocabulary/start/<source>')
+@app.route('/vocabulary/chapters/<source>')
 @login_required
-def vocabulary_start(source):
+def vocabulary_chapters(source):
+    """英単語章選択画面"""
+    try:
+        # ソースタイトルの設定
+        source_titles = {
+            'basic': '基本英単語帳',
+            'toeic': 'TOEIC単語帳',
+            'university': '大学受験単語帳'
+        }
+        source_title = source_titles.get(source, source)
+        
+        # 章データを取得（仮の実装 - 後でデータベースから取得）
+        chapters = [
+            {
+                'id': 1,
+                'title': 'Chapter 1: 基本単語',
+                'description': '日常生活でよく使われる基本単語',
+                'total_words': 100,
+                'chunk_count': 5
+            },
+            {
+                'id': 2,
+                'title': 'Chapter 2: 動詞',
+                'description': '重要な動詞の学習',
+                'total_words': 80,
+                'chunk_count': 4
+            },
+            {
+                'id': 3,
+                'title': 'Chapter 3: 形容詞',
+                'description': '形容詞の学習',
+                'total_words': 60,
+                'chunk_count': 3
+            }
+        ]
+        
+        return render_template('vocabulary/chapters.html',
+                             source=source,
+                             source_title=source_title,
+                             chapters=chapters)
+        
+    except Exception as e:
+        app.logger.error(f"英単語章選択エラー: {e}")
+        flash("エラーが発生しました")
+        return redirect(url_for('vocabulary_home'))
+
+@app.route('/vocabulary/chunks/<source>/<int:chapter_id>')
+@login_required
+def vocabulary_chunks(source, chapter_id):
+    """英単語チャンク選択画面"""
+    try:
+        # ソースタイトルの設定
+        source_titles = {
+            'basic': '基本英単語帳',
+            'toeic': 'TOEIC単語帳',
+            'university': '大学受験単語帳'
+        }
+        source_title = source_titles.get(source, source)
+        
+        # 章タイトルの設定（仮の実装）
+        chapter_titles = {
+            1: 'Chapter 1: 基本単語',
+            2: 'Chapter 2: 動詞',
+            3: 'Chapter 3: 形容詞'
+        }
+        chapter_title = chapter_titles.get(chapter_id, f'Chapter {chapter_id}')
+        
+        # チャンクデータを取得（仮の実装 - 後でデータベースから取得）
+        chunks = []
+        chunk_count = 5 if chapter_id == 1 else 4 if chapter_id == 2 else 3
+        
+        for i in range(1, chunk_count + 1):
+            chunks.append({
+                'chunk_number': i,
+                'word_count': 20,
+                'completion_rate': 0  # 後で学習履歴から計算
+            })
+        
+        return render_template('vocabulary/chunks.html',
+                             source=source,
+                             source_title=source_title,
+                             chapter_id=chapter_id,
+                             chapter_title=chapter_title,
+                             chunks=chunks)
+        
+    except Exception as e:
+        app.logger.error(f"英単語チャンク選択エラー: {e}")
+        flash("エラーが発生しました")
+        return redirect(url_for('vocabulary_home'))
+
+@app.route('/vocabulary/start/<source>/<int:chapter_id>/<int:chunk_number>')
+@login_required
+def vocabulary_start(source, chapter_id, chunk_number):
     """英単語学習開始"""
     try:
-        # 100語の単語を取得
+        # 指定されたチャンクの単語を取得（仮の実装）
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute('''
@@ -1986,7 +2078,7 @@ def vocabulary_start(source):
                     FROM vocabulary_words 
                     WHERE source = %s 
                     ORDER BY RANDOM() 
-                    LIMIT 100
+                    LIMIT 20
                 ''', (source,))
                 words = cur.fetchall()
         
@@ -1998,6 +2090,8 @@ def vocabulary_start(source):
         session_id = str(datetime.now().timestamp())
         session['vocabulary_session'] = {
             'source': source,
+            'chapter_id': chapter_id,
+            'chunk_number': chunk_number,
             'words': [{'id': w['id'], 'word': w['word'], 'meaning': w['meaning'], 'example': w['example_sentence']} for w in words],
             'current_index': 0,
             'results': [],
