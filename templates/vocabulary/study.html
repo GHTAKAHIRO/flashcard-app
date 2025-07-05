@@ -80,39 +80,7 @@
             margin-bottom: 1rem;
         }
 
-        .timer {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1.2rem;
-            color: #667eea;
-        }
-        .progress-section {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        .progress-bar {
-            background: #e9ecef;
-            border-radius: 5px;
-            height: 10px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            background: #667eea;
-            height: 100%;
-        }
+
         .button-section {
             text-align: center;
         }
@@ -133,16 +101,16 @@
         .answer-btn.unknown {
             background: #dc3545;
         }
-
-        .auto-show-notice {
-            background: #ffc107;
-            color: white;
-            padding: 1rem;
-            border-radius: 5px;
-            text-align: center;
-            margin-bottom: 1rem;
-            font-weight: bold;
+        .answer-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
+        .answer-btn:not(:disabled) {
+            opacity: 1;
+            cursor: pointer;
+        }
+
+
     </style>
 </head>
 <body>
@@ -158,33 +126,11 @@
 
             <!-- コンテンツセクション -->
             <div class="content-section">
-                <!-- 進捗表示 -->
-                <div class="progress-section">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progress-fill" style="width: {{ (current_index / total_words) * 100 }}%"></div>
-                            </div>
-                        </div>
-                        <div class="col-md-4 text-end">
-                            <span class="text-muted">{{ current_index }} / {{ total_words }}</span>
-                        </div>
-                    </div>
-                </div>
-
-
-
-                <!-- 自動表示通知 -->
-                <div class="auto-show-notice">
-                    <i class="fas fa-clock me-2"></i>1秒後に自動で答えが表示されます
-                </div>
 
 
 
                 <!-- 単語カード -->
                 <div class="word-card">
-                    <div class="timer" id="timer">1</div>
-                    
                     <div class="card-inner" id="card-inner">
                         <!-- カードの表面（問題） -->
                         <div class="card-front">
@@ -215,46 +161,20 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let timer;
-        let timeLeft = 1;
         let isAnswered = false;
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
-            startTimer();
             // 問題表示と同時に自動発音
             setTimeout(function() {
                 pronounceWord();
             }, 500); // 0.5秒後に発音（ページ読み込み完了を待つ）
-        });
-
-        // タイマー開始
-        function startTimer() {
-            timeLeft = 1;
-            updateTimer();
             
-            timer = setInterval(function() {
-                timeLeft--;
-                updateTimer();
-                
-                if (timeLeft <= 0) {
-                    clearInterval(timer);
-                    showAnswer();
-                }
+            // 1秒後に自動で答えを表示
+            setTimeout(function() {
+                showAnswer();
             }, 1000);
-        }
-
-        // タイマー更新
-        function updateTimer() {
-            const timerElement = document.getElementById('timer');
-            if (timerElement) {
-                timerElement.textContent = timeLeft;
-                
-                if (timeLeft <= 0) {
-                    timerElement.style.display = 'none';
-                }
-            }
-        }
+        });
 
         // 答えを表示
         function showAnswer() {
