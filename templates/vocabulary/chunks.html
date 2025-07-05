@@ -2,127 +2,260 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>英単語学習 - チャンク選択</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* モバイルファーストのベーススタイル */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
         }
+
+        .container {
+            padding: 0;
+            max-width: 100%;
+        }
+
         .main-container {
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
+            border-radius: 0;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             backdrop-filter: blur(10px);
-            margin-top: 2rem;
-            margin-bottom: 2rem;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
+
+        /* ヘッダーセクション - モバイル最適化 */
         .header-section {
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
-            padding: 3rem 2rem;
-            border-radius: 20px 20px 0 0;
+            padding: 2rem 1rem;
             text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
+
+        .header-section h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .header-section p {
+            font-size: 1.1rem;
+            margin: 0;
+            opacity: 0.9;
+        }
+
+        /* コンテンツセクション - フレックスレイアウト */
         .content-section {
-            padding: 3rem 2rem;
+            flex: 1;
+            padding: 1.5rem 1rem;
         }
+
+        /* パンくずリスト - タッチ最適化 */
+        .breadcrumb {
+            background: transparent;
+            padding: 0;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .breadcrumb-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .breadcrumb-item a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            background: rgba(102, 126, 234, 0.1);
+            transition: all 0.2s ease;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            touch-action: manipulation;
+        }
+
+        .breadcrumb-item a:hover {
+            background: rgba(102, 126, 234, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .breadcrumb-item.active {
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        /* ナビゲーション - タッチ最適化 */
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 0.8rem 1.2rem;
+            border-radius: 25px;
+            background: rgba(102, 126, 234, 0.1);
+            transition: all 0.2s ease;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            touch-action: manipulation;
+        }
+
+        .nav-link:hover {
+            color: #764ba2;
+            background: rgba(102, 126, 234, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .nav-link:active {
+            transform: scale(0.95);
+        }
+
+        /* セクションタイトル */
+        .section-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* チャンクカード - タッチフレンドリー */
         .chunk-card {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
             border: none;
             margin-bottom: 1.5rem;
+            overflow: hidden;
+            cursor: pointer;
+            touch-action: manipulation;
         }
+
         .chunk-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
         }
+
+        .chunk-card:active {
+            transform: scale(0.98);
+        }
+
         .chunk-card.passed {
             background: linear-gradient(135deg, #fff9e6 0%, #fff5cc 100%);
             border: 2px solid #ffd700;
             box-shadow: 0 15px 35px rgba(255, 215, 0, 0.2);
         }
+
         .chunk-card.passed:hover {
             transform: translateY(-5px);
             box-shadow: 0 25px 45px rgba(255, 215, 0, 0.3);
         }
-        .start-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 50px;
-            padding: 1rem 2rem;
-            color: white;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .start-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-        }
-        .stats-card {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            border-radius: 15px;
+
+        .card-body {
             padding: 1.5rem;
-            text-align: center;
-            margin-bottom: 1rem;
         }
-        .nav-link {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .nav-link:hover {
-            color: #764ba2;
-        }
-        .breadcrumb {
-            background: transparent;
-            padding: 0;
-            margin-bottom: 2rem;
-        }
-        .breadcrumb-item a {
-            color: #667eea;
-            text-decoration: none;
-        }
-        .breadcrumb-item.active {
-            color: #6c757d;
-        }
-        .progress-bar {
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 10px;
-            height: 8px;
-            margin-top: 0.5rem;
-        }
-        .progress-fill {
-            background: white;
-            border-radius: 10px;
-            height: 100%;
-            transition: width 0.3s ease;
-        }
+
         .chunk-number {
             background: #667eea;
             color: white;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
             margin: 0 auto 1rem;
+            font-size: 1.2rem;
         }
+
         .chunk-number.completed {
             background: #28a745;
         }
+
         .chunk-number.passed {
             background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
             box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
         }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .card-text {
+            font-size: 0.95rem;
+            color: #666;
+            margin-bottom: 1.5rem;
+            line-height: 1.4;
+        }
+
+        /* 統計カード */
+        .stats-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 1.2rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stats-item {
+            text-align: center;
+        }
+
+        .stats-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.2rem;
+        }
+
+        .stats-label {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        /* 完了バッジ */
         .completion-badge {
             background: #d4edda;
             color: #155724;
@@ -130,24 +263,255 @@
             padding: 0.5rem 1rem;
             font-weight: bold;
             display: inline-block;
+            margin-bottom: 1rem;
         }
+
         .completion-badge.passed {
             background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
             color: #856404;
             box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
         }
-        .review-btn {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+
+        /* ボタン - タッチ最適化 */
+        .start-btn, .review-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
             border-radius: 50px;
             padding: 1rem 2rem;
             color: white;
-            font-weight: bold;
-            transition: all 0.3s ease;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            min-height: 50px;
+            touch-action: manipulation;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
+
+        .review-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
         .review-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        }
+
+        .start-btn:active, .review-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* プログレスバー */
+        .progress-bar {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            height: 8px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: white;
+            border-radius: 10px;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        /* タブレット向けスタイル */
+        @media (min-width: 768px) {
+            .main-container {
+                border-radius: 20px;
+                margin: 1rem;
+                min-height: calc(100vh - 2rem);
+            }
+
+            .header-section {
+                border-radius: 20px 20px 0 0;
+                padding: 2.5rem 2rem;
+            }
+
+            .header-section h1 {
+                font-size: 2.5rem;
+            }
+
+            .content-section {
+                padding: 2rem;
+            }
+
+            .section-title {
+                font-size: 2.2rem;
+            }
+
+            .breadcrumb {
+                margin-bottom: 2rem;
+            }
+
+            .nav {
+                gap: 1.5rem;
+            }
+
+            .nav-link {
+                padding: 1rem 1.5rem;
+                font-size: 1.1rem;
+            }
+
+            .card-body {
+                padding: 2rem;
+            }
+
+            .chunk-number {
+                width: 60px;
+                height: 60px;
+                font-size: 1.4rem;
+            }
+
+            .card-title {
+                font-size: 1.5rem;
+            }
+
+            .stats-card {
+                padding: 1.5rem;
+            }
+
+            .stats-number {
+                font-size: 2.2rem;
+            }
+
+            .start-btn, .review-btn {
+                padding: 1.2rem 2.5rem;
+                font-size: 1.1rem;
+                min-height: 55px;
+            }
+        }
+
+        /* デスクトップ向けスタイル */
+        @media (min-width: 1024px) {
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            .header-section h1 {
+                font-size: 3rem;
+            }
+
+            .header-section p {
+                font-size: 1.3rem;
+            }
+
+            .section-title {
+                font-size: 2.5rem;
+            }
+
+            .start-btn, .review-btn {
+                padding: 1.3rem 3rem;
+                font-size: 1.2rem;
+                min-height: 60px;
+            }
+        }
+
+        /* 大きなデスクトップ向け */
+        @media (min-width: 1400px) {
+            .container {
+                max-width: 1400px;
+            }
+        }
+
+        /* タッチデバイス向けの最適化 */
+        @media (hover: none) and (pointer: coarse) {
+            .chunk-card:hover {
+                transform: none;
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            }
+
+            .chunk-card.passed:hover {
+                transform: none;
+                box-shadow: 0 15px 35px rgba(255, 215, 0, 0.2);
+            }
+
+            .start-btn:hover, .review-btn:hover {
+                transform: none;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            }
+
+            .review-btn:hover {
+                box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+            }
+
+            .nav-link:hover {
+                transform: none;
+                background: rgba(102, 126, 234, 0.1);
+            }
+
+            .breadcrumb-item a:hover {
+                transform: none;
+                background: rgba(102, 126, 234, 0.1);
+            }
+        }
+
+        /* アニメーション */
+        @keyframes fadeInUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(30px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+
+        .chunk-card {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .chunk-card:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .chunk-card:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .chunk-card:nth-child(4) {
+            animation-delay: 0.3s;
+        }
+
+        /* アクセシビリティ */
+        .start-btn:focus, .review-btn:focus,
+        .nav-link:focus, .breadcrumb-item a:focus {
+            outline: 3px solid #007bff;
+            outline-offset: 2px;
+        }
+
+        /* ダークモード対応 */
+        @media (prefers-color-scheme: dark) {
+            .main-container {
+                background: rgba(26, 26, 26, 0.95);
+                color: white;
+            }
+
+            .chunk-card {
+                background: #2d2d2d;
+                color: white;
+            }
+
+            .card-title {
+                color: #ffffff;
+            }
+
+            .card-text {
+                color: #cccccc;
+            }
+
+            .section-title {
+                color: #ffffff;
+            }
         }
     </style>
 </head>
@@ -156,10 +520,10 @@
         <div class="main-container">
             <!-- ヘッダーセクション -->
             <div class="header-section">
-                <h1 class="display-4 fw-bold mb-3">
-                    <i class="fas fa-layer-group me-3"></i>{{ chapter_title }}
+                <h1>
+                    <i class="fas fa-layer-group me-2"></i>{{ chapter_title }}
                 </h1>
-                <p class="lead mb-0">チャンクを選択して学習を開始してください</p>
+                <p>チャンクを選択して学習を開始してください</p>
             </div>
 
             <!-- コンテンツセクション -->
@@ -180,67 +544,69 @@
                 </nav>
 
                 <!-- ナビゲーション -->
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <nav class="nav justify-content-center">
-                            <a class="nav-link" href="{{ url_for('dashboard') }}">
-                                <i class="fas fa-home me-2"></i>ダッシュボード
-                            </a>
-                            {% if current_user.is_admin %}
-                            <a class="nav-link" href="{{ url_for('vocabulary_admin') }}">
-                                <i class="fas fa-cog me-2"></i>管理画面
-                            </a>
-                            {% endif %}
-                        </nav>
-                    </div>
-                </div>
+                <nav class="nav">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-2"></i>ダッシュボード
+                    </a>
+                    {% if current_user.is_admin %}
+                    <a class="nav-link" href="{{ url_for('vocabulary_admin') }}">
+                        <i class="fas fa-cog me-2"></i>管理画面
+                    </a>
+                    {% endif %}
+                </nav>
 
                 <!-- チャンク一覧 -->
-                <div class="row">
-                    <div class="col-12">
-                        <h2 class="text-center mb-4">
-                            <i class="fas fa-list me-2"></i>チャンク一覧
-                        </h2>
-                    </div>
-                </div>
+                <h2 class="section-title">
+                    <i class="fas fa-list me-2"></i>チャンク一覧
+                </h2>
 
                 <div class="row">
                     {% for chunk in chunks %}
-                    <div class="col-md-6 col-lg-4">
-                        <div class="chunk-card {{ 'passed' if chunk.is_passed else '' }}">
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="chunk-card {% if chunk.is_passed %}passed{% endif %}">
                             <div class="card-body text-center">
-                                <div class="chunk-number {{ 'passed' if chunk.is_passed else 'completed' if chunk.is_completed else '' }}">
-                                    {% if chunk.is_passed %}
-                                        <i class="fas fa-crown"></i>
-                                    {% elif chunk.is_completed %}
-                                        <i class="fas fa-check"></i>
-                                    {% else %}
-                                        {{ chunk.chunk_number }}
+                                <div class="chunk-number {% if chunk.is_completed %}completed{% endif %} {% if chunk.is_passed %}passed{% endif %}">
+                                    {{ chunk.chunk_number }}
+                                </div>
+                                <h5 class="card-title">{{ chunk.title }}</h5>
+                                <p class="card-text">{{ chunk.description }}</p>
+                                
+                                {% if chunk.is_passed %}
+                                <div class="completion-badge passed">
+                                    <i class="fas fa-star me-1"></i>合格済み
+                                </div>
+                                {% elif chunk.is_completed %}
+                                <div class="completion-badge">
+                                    <i class="fas fa-check me-1"></i>完了
+                                </div>
+                                {% endif %}
+
+                                <div class="stats-card">
+                                    <div class="stats-grid">
+                                        <div class="stats-item">
+                                            <div class="stats-number">{{ chunk.total_words }}</div>
+                                            <div class="stats-label">単語数</div>
+                                        </div>
+                                        <div class="stats-item">
+                                            <div class="stats-number">{{ chunk.correct_count }}</div>
+                                            <div class="stats-label">正解数</div>
+                                        </div>
+                                    </div>
+                                    {% if chunk.total_words > 0 %}
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: {{ (chunk.correct_count / chunk.total_words * 100) | round(1) }}%"></div>
+                                    </div>
                                     {% endif %}
                                 </div>
-                                <h5 class="card-title {{ 'text-warning fw-bold' if chunk.is_passed else '' }}">チャンク {{ chunk.chunk_number }}</h5>
-                                <p class="card-text text-muted">
-                                    {% if chunk.is_passed %}
-                                        <i class="fas fa-star text-warning me-1"></i>20単語 - 合格済み
-                                    {% else %}
-                                        20単語
-                                    {% endif %}
-                                </p>
+
                                 {% if chunk.is_passed %}
-                                    <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number, mode='review') }}" class="btn review-btn">
-                                        <i class="fas fa-redo me-2"></i>復習
-                                    </a>
-                                {% elif chunk.is_completed %}
-                                    <div class="completion-badge mb-3" style="background: #fff3cd; color: #856404;">
-                                        <i class="fas fa-check-circle me-2"></i>学習済み
-                                    </div>
-                                    <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number) }}" class="btn start-btn">
-                                        <i class="fas fa-redo me-2"></i>再挑戦
-                                    </a>
+                                <a href="{{ url_for('vocabulary_study', source=source, chapter_id=chapter_id, chunk_id=chunk.id) }}" class="btn review-btn">
+                                    <i class="fas fa-redo me-2"></i>復習する
+                                </a>
                                 {% else %}
-                                    <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number) }}" class="btn start-btn">
-                                        <i class="fas fa-play me-2"></i>学習開始
-                                    </a>
+                                <a href="{{ url_for('vocabulary_study', source=source, chapter_id=chapter_id, chunk_id=chunk.id) }}" class="btn start-btn">
+                                    <i class="fas fa-play me-2"></i>学習開始
+                                </a>
                                 {% endif %}
                             </div>
                         </div>

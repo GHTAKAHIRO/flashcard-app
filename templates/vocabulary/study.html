@@ -2,57 +2,105 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>英単語学習 - 学習中</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {
-            background: #667eea;
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        /* モバイルファーストのベーススタイル */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        .container {
+            padding: 0;
+            max-width: 100%;
+        }
+
         .main-container {
             background: white;
-            border-radius: 10px;
-            margin-top: 2rem;
-            margin-bottom: 2rem;
+            border-radius: 0;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
+
+        /* ヘッダーセクション - モバイル最適化 */
         .header-section {
-            background: #4facfe;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
-            padding: 2rem;
-            border-radius: 10px 10px 0 0;
+            padding: 1rem;
             text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
+
+        .header-section h2 {
+            font-size: 1.5rem;
+            margin: 0 0 0.5rem 0;
+            font-weight: 600;
+        }
+
+        .header-section p {
+            font-size: 1rem;
+            margin: 0;
+            opacity: 0.9;
+        }
+
+        /* コンテンツセクション - フレックスレイアウト */
         .content-section {
-            padding: 3rem 2rem;
+            flex: 1;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
+
+        /* 単語カード - タッチフレンドリー */
         .word-card {
             background: white;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            padding: 3rem;
+            border: none;
+            border-radius: 20px;
+            padding: 2rem 1rem;
             text-align: center;
-            margin-bottom: 2rem;
-            min-height: 300px;
+            margin-bottom: 1rem;
+            min-height: 60vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             position: relative;
             perspective: 1000px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            cursor: pointer;
+            touch-action: manipulation;
         }
+
         .card-inner {
             position: relative;
             width: 100%;
             height: 100%;
             text-align: center;
-            transition: transform 0.8s ease-in-out;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
             transform-style: preserve-3d;
         }
+
         .card-inner.flipped {
             transform: rotateY(180deg);
         }
+
         .card-front, .card-back {
             position: absolute;
             width: 100%;
@@ -62,55 +110,217 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            padding: 1rem;
         }
+
         .card-back {
             transform: rotateY(180deg);
         }
+
         .word-text {
-            font-size: 3rem;
+            font-size: 2.5rem;
             font-weight: bold;
             color: #333;
             margin-bottom: 1rem;
             text-align: center;
+            line-height: 1.2;
+            word-break: break-word;
         }
 
         .meaning-text {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             color: #666;
+            margin-bottom: 1rem;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        /* ボタンセクション - タッチ最適化 */
+        .button-section {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 1rem;
             margin-bottom: 1rem;
         }
 
-
-        .button-section {
-            text-align: center;
-        }
         .answer-btn {
+            flex: 1;
             background: #667eea;
             border: none;
-            border-radius: 25px;
-            padding: 1rem 2rem;
+            border-radius: 50px;
+            padding: 1.2rem 1rem;
             color: white;
             font-weight: bold;
             font-size: 1.1rem;
-            margin: 0 0.5rem;
-            min-width: 120px;
+            min-height: 60px;
+            touch-action: manipulation;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
+
         .answer-btn.known {
-            background: #28a745;
+            background: linear-gradient(135deg, #28a745, #20c997);
         }
+
         .answer-btn.unknown {
-            background: #dc3545;
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
         }
+
         .answer-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-        }
-        .answer-btn:not(:disabled) {
-            opacity: 1;
-            cursor: pointer;
+            transform: scale(0.95);
         }
 
+        .answer-btn:not(:disabled):active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
 
+        .answer-btn:not(:disabled):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        /* タブレット向けスタイル */
+        @media (min-width: 768px) {
+            .main-container {
+                border-radius: 20px;
+                margin: 1rem;
+                min-height: calc(100vh - 2rem);
+            }
+
+            .header-section {
+                border-radius: 20px 20px 0 0;
+                padding: 1.5rem;
+            }
+
+            .header-section h2 {
+                font-size: 2rem;
+            }
+
+            .content-section {
+                padding: 2rem;
+            }
+
+            .word-card {
+                min-height: 50vh;
+                padding: 3rem 2rem;
+            }
+
+            .word-text {
+                font-size: 3rem;
+            }
+
+            .meaning-text {
+                font-size: 2rem;
+            }
+
+            .button-row {
+                gap: 1.5rem;
+            }
+
+            .answer-btn {
+                padding: 1.5rem 2rem;
+                font-size: 1.2rem;
+                min-height: 70px;
+            }
+        }
+
+        /* デスクトップ向けスタイル */
+        @media (min-width: 1024px) {
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+            }
+
+            .word-card {
+                min-height: 400px;
+                padding: 4rem 3rem;
+            }
+
+            .word-text {
+                font-size: 3.5rem;
+            }
+
+            .meaning-text {
+                font-size: 2.2rem;
+            }
+
+            .button-row {
+                gap: 2rem;
+            }
+
+            .answer-btn {
+                padding: 1.8rem 2.5rem;
+                font-size: 1.3rem;
+                min-height: 80px;
+            }
+        }
+
+        /* 大きなデスクトップ向け */
+        @media (min-width: 1400px) {
+            .container {
+                max-width: 1000px;
+            }
+
+            .word-card {
+                min-height: 500px;
+            }
+        }
+
+        /* タッチデバイス向けの最適化 */
+        @media (hover: none) and (pointer: coarse) {
+            .answer-btn:hover {
+                transform: none;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            }
+
+            .word-card {
+                cursor: default;
+            }
+        }
+
+        /* アニメーション */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .word-card {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        /* アクセシビリティ */
+        .answer-btn:focus {
+            outline: 3px solid #007bff;
+            outline-offset: 2px;
+        }
+
+        /* ダークモード対応 */
+        @media (prefers-color-scheme: dark) {
+            .main-container {
+                background: #1a1a1a;
+                color: white;
+            }
+
+            .word-card {
+                background: #2d2d2d;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            }
+
+            .word-text {
+                color: #ffffff;
+            }
+
+            .meaning-text {
+                color: #cccccc;
+            }
+        }
     </style>
 </head>
 <body>
@@ -118,19 +328,16 @@
         <div class="main-container">
             <!-- ヘッダーセクション -->
             <div class="header-section">
-                <h2 class="mb-2">
+                <h2>
                     <i class="fas fa-book-open me-2"></i>英単語学習
                 </h2>
-                <p class="mb-0">{{ current_index }} / {{ total_words }} 問目</p>
+                <p>{{ current_index }} / {{ total_words }} 問目</p>
             </div>
 
             <!-- コンテンツセクション -->
             <div class="content-section">
-
-
-
                 <!-- 単語カード -->
-                <div class="word-card">
+                <div class="word-card" onclick="toggleCard()">
                     <div class="card-inner" id="card-inner">
                         <!-- カードの表面（問題） -->
                         <div class="card-front">
@@ -148,12 +355,14 @@
 
                 <!-- 回答ボタン -->
                 <div class="button-section">
-                    <button class="answer-btn known" id="known-btn" onclick="answer('known')" disabled>
-                        <i class="fas fa-check me-2"></i>知っている
-                    </button>
-                    <button class="answer-btn unknown" id="unknown-btn" onclick="answer('unknown')" disabled>
-                        <i class="fas fa-times me-2"></i>知らない
-                    </button>
+                    <div class="button-row">
+                        <button class="answer-btn known" id="known-btn" onclick="answer('known')" disabled>
+                            <i class="fas fa-check me-2"></i>知っている
+                        </button>
+                        <button class="answer-btn unknown" id="unknown-btn" onclick="answer('unknown')" disabled>
+                            <i class="fas fa-times me-2"></i>知らない
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -162,32 +371,72 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let isAnswered = false;
+        let isCardFlipped = false;
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
             // 問題表示と同時に自動発音
             setTimeout(function() {
                 pronounceWord();
-            }, 500); // 0.5秒後に発音（ページ読み込み完了を待つ）
+            }, 500);
             
             // 1秒後に自動で答えを表示
             setTimeout(function() {
                 showAnswer();
             }, 1000);
+
+            // タッチイベントの設定
+            setupTouchEvents();
         });
+
+        // カードをタップして裏返す
+        function toggleCard() {
+            if (!isCardFlipped) {
+                showAnswer();
+            }
+        }
 
         // 答えを表示
         function showAnswer() {
+            if (isCardFlipped) return;
+            
             const cardInner = document.getElementById('card-inner');
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             
             // カードをひっくり返す
             cardInner.classList.add('flipped');
+            isCardFlipped = true;
             
             // ボタンを有効化
             knownBtn.disabled = false;
             unknownBtn.disabled = false;
+        }
+
+        // タッチイベントの設定
+        function setupTouchEvents() {
+            const card = document.querySelector('.word-card');
+            let startX = 0;
+            let startY = 0;
+
+            card.addEventListener('touchstart', function(e) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            });
+
+            card.addEventListener('touchend', function(e) {
+                if (isCardFlipped) return;
+                
+                const endX = e.changedTouches[0].clientX;
+                const endY = e.changedTouches[0].clientY;
+                const deltaX = Math.abs(endX - startX);
+                const deltaY = Math.abs(endY - startY);
+
+                // スワイプ判定（水平方向のスワイプが垂直方向より大きい場合）
+                if (deltaX > deltaY && deltaX > 50) {
+                    showAnswer();
+                }
+            });
         }
 
         // 回答処理
@@ -239,7 +488,7 @@
             // 新しい発音を作成
             currentUtterance = new SpeechSynthesisUtterance(word);
             currentUtterance.lang = 'en-US';
-            currentUtterance.rate = 0.8; // 少しゆっくり
+            currentUtterance.rate = 0.8;
             currentUtterance.pitch = 1.0;
             currentUtterance.volume = 1.0;
             
@@ -263,8 +512,14 @@
             
             if (event.key === 'j' || event.key === 'J') {
                 answer('known');
-                        } else if (event.key === 'f' || event.key === 'F') {
+            } else if (event.key === 'f' || event.key === 'F') {
                 answer('unknown');
+            } else if (event.key === ' ' || event.key === 'Enter') {
+                // スペースキーまたはエンターキーでカードを裏返す
+                event.preventDefault();
+                if (!isCardFlipped) {
+                    showAnswer();
+                }
             }
         });
     </script>
