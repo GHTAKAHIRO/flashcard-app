@@ -384,12 +384,27 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 基本の進捗情報を取得
                 cur.execute('''
                     SELECT is_completed, is_passed, completed_at, passed_at
                     FROM vocabulary_chunk_progress
                     WHERE user_id = %s AND source = %s AND chapter_id = %s AND chunk_number = %s
                 ''', (user_id, source, chapter_id, chunk_number))
                 result = cur.fetchone()
+                
+                # 正解数を取得
+                cur.execute('''
+                    SELECT COUNT(*) as correct_count
+                    FROM vocabulary_study_log
+                    WHERE user_id = %s AND source = %s AND chapter_id = %s AND chunk_number = %s AND result = 'known'
+                ''', (user_id, source, chapter_id, chunk_number))
+                correct_result = cur.fetchone()
+                correct_count = correct_result['correct_count'] if correct_result else 0
+                
+                if result:
+                    result = dict(result)
+                    result['correct_count'] = correct_count
+                
                 return result
     except Exception as e:
         app.logger.error(f"英単語チャンク進捗取得エラー: {e}")
@@ -2165,17 +2180,34 @@ def vocabulary_chunks(source, chapter_id):
         
         # 各チャンクの進捗状況をチェック
         for i in range(1, chunk_count + 1):
-            progress = get_vocabulary_chunk_progress(str(current_user.id), source, chapter_id, i)
-            is_completed = progress.get('is_completed', False) if progress else False
-            is_passed = progress.get('is_passed', False) if progress else False
-            
-            app.logger.info(f"チャンク{i}進捗: completed={is_completed}, passed={is_passed}, progress={progress}")
-            
-            chunks.append({
-                'chunk_number': i,
-                'is_completed': is_completed,
-                'is_passed': is_passed
-            })
+            try:
+                progress = get_vocabulary_chunk_progress(str(current_user.id), source, chapter_id, i)
+                is_completed = progress.get('is_completed', False) if progress else False
+                is_passed = progress.get('is_passed', False) if progress else False
+                correct_count = progress.get('correct_count', 0) if progress else 0
+                
+                app.logger.info(f"チャンク{i}進捗: completed={is_completed}, passed={is_passed}, correct_count={correct_count}, progress={progress}")
+                
+                chunks.append({
+                    'chunk_number': i,
+                    'title': f'チャンク {i}',
+                    'description': f'{20}単語の学習',
+                    'total_words': 20,
+                    'correct_count': correct_count,
+                    'is_completed': is_completed,
+                    'is_passed': is_passed
+                })
+            except Exception as e:
+                app.logger.error(f"チャンク{i}の進捗取得エラー: {e}")
+                chunks.append({
+                    'chunk_number': i,
+                    'title': f'チャンク {i}',
+                    'description': f'{20}単語の学習',
+                    'total_words': 20,
+                    'correct_count': 0,
+                    'is_completed': False,
+                    'is_passed': False
+                })
         
         return render_template('vocabulary/chunks.html',
                              source=source,
