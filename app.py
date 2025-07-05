@@ -1995,12 +1995,14 @@ def vocabulary_start(source):
             return redirect(url_for('vocabulary_home'))
         
         # セッションに学習情報を保存
+        session_id = str(datetime.now().timestamp())
         session['vocabulary_session'] = {
             'source': source,
             'words': [{'id': w['id'], 'word': w['word'], 'meaning': w['meaning'], 'example': w['example_sentence']} for w in words],
             'current_index': 0,
             'results': [],
-            'start_time': datetime.now().isoformat()
+            'start_time': datetime.now().isoformat(),
+            'session_id': session_id
         }
         
         return redirect(url_for('vocabulary_study', source=source))
@@ -2076,14 +2078,15 @@ def vocabulary_answer():
             with conn.cursor() as cur:
                 cur.execute('''
                     INSERT INTO vocabulary_study_log 
-                    (user_id, word_id, result, source, study_date)
-                    VALUES (%s, %s, %s, %s, %s)
+                    (user_id, word_id, result, source, study_date, session_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 ''', (
                     str(current_user.id),
                     current_word['id'],
                     result,
                     vocabulary_session['source'],
-                    datetime.now()
+                    datetime.now(),
+                    vocabulary_session.get('session_id', str(datetime.now().timestamp()))
                 ))
                 conn.commit()
         
@@ -2207,17 +2210,32 @@ def vocabulary_upload():
 def vocabulary_review(source):
     """英単語問題一覧画面"""
     try:
-        # 最新の学習結果を取得
+        # 最新のテストセッションの結果を取得
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 最新のセッションIDを取得
+                cur.execute('''
+                    SELECT session_id, MAX(study_date) as latest_date
+                    FROM vocabulary_study_log 
+                    WHERE user_id = %s AND source = %s
+                    GROUP BY session_id
+                    ORDER BY latest_date DESC
+                    LIMIT 1
+                ''', (str(current_user.id), source))
+                latest_session = cur.fetchone()
+                
+                if not latest_session:
+                    flash("学習履歴が見つかりません")
+                    return redirect(url_for('vocabulary_home'))
+                
+                # 最新セッションの結果を取得
                 cur.execute('''
                     SELECT vw.word, vw.meaning, vsl.result, vsl.study_date
                     FROM vocabulary_study_log vsl
                     JOIN vocabulary_words vw ON vsl.word_id = vw.id
-                    WHERE vsl.user_id = %s AND vsl.source = %s
-                    ORDER BY vsl.study_date DESC
-                    LIMIT 100
-                ''', (str(current_user.id), source))
+                    WHERE vsl.user_id = %s AND vsl.source = %s AND vsl.session_id = %s
+                    ORDER BY vsl.study_date ASC
+                ''', (str(current_user.id), source, latest_session['session_id']))
                 study_logs = cur.fetchall()
         
         if not study_logs:

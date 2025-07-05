@@ -56,9 +56,20 @@ def create_vocabulary_tables():
                     result VARCHAR(20) NOT NULL CHECK (result IN ('known', 'unknown')),
                     source VARCHAR(100) NOT NULL,
                     study_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    session_id VARCHAR(50),
                     FOREIGN KEY (word_id) REFERENCES vocabulary_words(id) ON DELETE CASCADE
                 )
             ''')
+            
+            # 既存のテーブルにsession_idカラムを追加（存在しない場合）
+            try:
+                cur.execute('ALTER TABLE vocabulary_study_log ADD COLUMN session_id VARCHAR(50)')
+                print("✅ session_idカラムを追加しました")
+            except Exception as e:
+                if "already exists" not in str(e):
+                    print(f"⚠️ session_idカラム追加エラー: {e}")
+                else:
+                    print("✅ session_idカラムは既に存在します")
             print("✅ vocabulary_study_log テーブルを作成しました")
             
             # インデックスを作成
@@ -75,6 +86,11 @@ def create_vocabulary_tables():
             cur.execute('''
                 CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_word_result 
                 ON vocabulary_study_log(word_id, result)
+            ''')
+            
+            cur.execute('''
+                CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_session 
+                ON vocabulary_study_log(session_id)
             ''')
             
             print("✅ インデックスを作成しました")
