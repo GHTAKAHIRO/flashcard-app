@@ -72,18 +72,7 @@
             opacity: 1;
             transform: translateY(0);
         }
-        .example-text {
-            font-size: 1rem;
-            color: #888;
-            font-style: italic;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.5s ease 0.2s;
-        }
-        .example-text.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
+
         .timer {
             position: absolute;
             top: 1rem;
@@ -143,26 +132,7 @@
         .answer-btn.unknown {
             background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
         }
-        .stats-section {
-            background: white;
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        }
-        .stat-item {
-            text-align: center;
-            padding: 1rem;
-        }
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #667eea;
-        }
-        .stat-label {
-            color: #666;
-            font-size: 0.9rem;
-        }
+
         .auto-show-notice {
             background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
             color: white;
@@ -209,29 +179,7 @@
                     </div>
                 </div>
 
-                <!-- 統計表示 -->
-                <div class="stats-section">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="stat-item">
-                                <div class="stat-number" id="known-count">0</div>
-                                <div class="stat-label">知っている</div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="stat-item">
-                                <div class="stat-number" id="unknown-count">0</div>
-                                <div class="stat-label">知らない</div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="stat-item">
-                                <div class="stat-number" id="accuracy">0%</div>
-                                <div class="stat-label">正答率</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
 
                 <!-- 自動表示通知 -->
                 <div class="auto-show-notice">
@@ -247,11 +195,6 @@
                     
                     <!-- 答え（日本語） -->
                     <div class="meaning-text" id="meaning-text">{{ word.meaning }}</div>
-                    
-                    <!-- 例文 -->
-                    {% if word.example %}
-                    <div class="example-text" id="example-text">{{ word.example }}</div>
-                    {% endif %}
                 </div>
 
                 <!-- 回答ボタン -->
@@ -272,8 +215,6 @@
         let timer;
         let timeLeft = 1;
         let isAnswered = false;
-        let knownCount = 0;
-        let unknownCount = 0;
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
@@ -311,15 +252,11 @@
         // 答えを表示
         function showAnswer() {
             const meaningText = document.getElementById('meaning-text');
-            const exampleText = document.getElementById('example-text');
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             
             // 答えを表示
             meaningText.classList.add('show');
-            if (exampleText) {
-                exampleText.classList.add('show');
-            }
             
             // ボタンを有効化
             knownBtn.disabled = false;
@@ -335,15 +272,6 @@
             if (isAnswered) return;
             
             isAnswered = true;
-            
-            // カウンター更新
-            if (result === 'known') {
-                knownCount++;
-            } else {
-                unknownCount++;
-            }
-            
-            updateStats();
             
             // サーバーに結果を送信
             fetch('/vocabulary/answer', {
@@ -370,22 +298,6 @@
                 console.error('Error:', error);
                 alert('エラーが発生しました');
             });
-        }
-
-        // 統計更新
-        function updateStats() {
-            const knownElement = document.getElementById('known-count');
-            const unknownElement = document.getElementById('unknown-count');
-            const accuracyElement = document.getElementById('accuracy');
-            
-            if (knownElement) knownElement.textContent = knownCount;
-            if (unknownElement) unknownElement.textContent = unknownCount;
-            
-            const total = knownCount + unknownCount;
-            if (total > 0) {
-                const accuracy = Math.round((knownCount / total) * 100);
-                if (accuracyElement) accuracyElement.textContent = accuracy + '%';
-            }
         }
 
         // キーボードショートカット

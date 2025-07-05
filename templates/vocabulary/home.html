@@ -135,25 +135,14 @@
                                 <p class="card-text text-muted">日常会話でよく使われる基本単語</p>
                                 <div class="stats-card mb-3">
                                     <div class="row">
-                                        <div class="col-6">
+                                        <div class="col-12">
                                             <div class="h4 mb-0">
                                                 {% set basic_data = vocabulary_sources | selectattr('source', 'equalto', 'basic') | first %}
-                                                {{ basic_data.known_words if basic_data else 0 }}
-                                            </div>
-                                            <small>習得済み</small>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="h4 mb-0">
                                                 {{ basic_data.total_available if basic_data else 0 }}
                                             </div>
                                             <small>総単語数</small>
                                         </div>
                                     </div>
-                                    {% if basic_data and basic_data.total_available > 0 %}
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: {{ (basic_data.known_words / basic_data.total_available * 100) }}%"></div>
-                                    </div>
-                                    {% endif %}
                                 </div>
                                 <a href="{{ url_for('vocabulary_start', source='basic') }}" class="btn start-btn">
                                     <i class="fas fa-play me-2"></i>学習開始
@@ -173,25 +162,14 @@
                                 <p class="card-text text-muted">ビジネス英語・TOEIC対策単語</p>
                                 <div class="stats-card mb-3">
                                     <div class="row">
-                                        <div class="col-6">
+                                        <div class="col-12">
                                             <div class="h4 mb-0">
                                                 {% set toeic_data = vocabulary_sources | selectattr('source', 'equalto', 'toeic') | first %}
-                                                {{ toeic_data.known_words if toeic_data else 0 }}
-                                            </div>
-                                            <small>習得済み</small>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="h4 mb-0">
                                                 {{ toeic_data.total_available if toeic_data else 0 }}
                                             </div>
                                             <small>総単語数</small>
                                         </div>
                                     </div>
-                                    {% if toeic_data and toeic_data.total_available > 0 %}
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: {{ (toeic_data.known_words / toeic_data.total_available * 100) }}%"></div>
-                                    </div>
-                                    {% endif %}
                                 </div>
                                 <a href="{{ url_for('vocabulary_start', source='toeic') }}" class="btn start-btn">
                                     <i class="fas fa-play me-2"></i>学習開始
@@ -211,25 +189,14 @@
                                 <p class="card-text text-muted">大学入試に必要な重要単語</p>
                                 <div class="stats-card mb-3">
                                     <div class="row">
-                                        <div class="col-6">
+                                        <div class="col-12">
                                             <div class="h4 mb-0">
                                                 {% set university_data = vocabulary_sources | selectattr('source', 'equalto', 'university') | first %}
-                                                {{ university_data.known_words if university_data else 0 }}
-                                            </div>
-                                            <small>習得済み</small>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="h4 mb-0">
                                                 {{ university_data.total_available if university_data else 0 }}
                                             </div>
                                             <small>総単語数</small>
                                         </div>
                                     </div>
-                                    {% if university_data and university_data.total_available > 0 %}
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: {{ (university_data.known_words / university_data.total_available * 100) }}%"></div>
-                                    </div>
-                                    {% endif %}
                                 </div>
                                 <a href="{{ url_for('vocabulary_start', source='university') }}" class="btn start-btn">
                                     <i class="fas fa-play me-2"></i>学習開始
