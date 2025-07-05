@@ -288,6 +288,20 @@
         .word-meaning.show {
             display: block;
         }
+        
+        /* パンくずリスト用のスタイル */
+        .breadcrumb {
+            background: transparent;
+            padding: 0;
+            margin-bottom: 2rem;
+        }
+        .breadcrumb-item a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .breadcrumb-item.active {
+            color: #6c757d;
+        }
     </style>
 </head>
 <body>
@@ -300,6 +314,29 @@
                 </h1>
                 <p class="lead mb-0">お疲れさまでした</p>
             </div>
+
+            <!-- パンくずリスト -->
+            <div class="content-section">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item">
+                            <a href="{{ url_for('vocabulary_home') }}">
+                                <i class="fas fa-home me-1"></i>英単語帳
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="{{ url_for('vocabulary_chapters', source=source) }}">{{ source_title }}</a>
+                        </li>
+                        {% if chapter_id %}
+                        <li class="breadcrumb-item">
+                            <a href="{{ url_for('vocabulary_chunks', source=source, chapter_id=chapter_id) }}">{{ chapter_title }}</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">チャンク{{ chunk_number }} 結果</li>
+                        {% else %}
+                        <li class="breadcrumb-item active" aria-current="page">学習結果</li>
+                        {% endif %}
+                    </ol>
+                </nav>
 
             <!-- コンテンツセクション -->
             <div class="content-section">
@@ -415,8 +452,13 @@
                 <!-- アクションボタン -->
                 <div class="action-buttons">
                     {% if unknown_count > 0 %}
-                    <a href="{{ url_for('vocabulary_start', source=source) }}" class="btn-custom btn-review">
-                        <i class="fas fa-redo me-2"></i>間違えた単語を復習
+                    <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk_number) }}" class="btn-custom btn-review">
+                        <i class="fas fa-redo me-2"></i>このチャンクを復習
+                    </a>
+                    {% endif %}
+                    {% if chapter_id %}
+                    <a href="{{ url_for('vocabulary_chunks', source=source, chapter_id=chapter_id) }}" class="btn-custom">
+                        <i class="fas fa-list me-2"></i>他のチャンクを選択
                     </a>
                     {% endif %}
                     <a href="{{ url_for('vocabulary_home') }}" class="btn-custom btn-home">

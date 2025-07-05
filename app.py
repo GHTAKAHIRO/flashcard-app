@@ -2210,6 +2210,26 @@ def vocabulary_result(source):
         unknown_count = len(unknown_words)
         all_words = results  # 全問題の結果
         
+        # チャンク情報を取得
+        chapter_id = vocabulary_session.get('chapter_id')
+        chunk_number = vocabulary_session.get('chunk_number')
+        
+        # ソースタイトルの設定
+        source_titles = {
+            'basic': '基本英単語帳',
+            'toeic': 'TOEIC単語帳',
+            'university': '大学受験単語帳'
+        }
+        source_title = source_titles.get(source, source)
+        
+        # 章タイトルの設定（仮の実装）
+        chapter_titles = {
+            1: 'Chapter 1: 基本単語',
+            2: 'Chapter 2: 動詞',
+            3: 'Chapter 3: 形容詞'
+        }
+        chapter_title = chapter_titles.get(chapter_id, f'Chapter {chapter_id}') if chapter_id else None
+        
         # セッションをクリア
         session.pop('vocabulary_session', None)
         
@@ -2219,7 +2239,11 @@ def vocabulary_result(source):
                              known_count=known_count,
                              unknown_count=unknown_count,
                              total_count=len(results),
-                             source=source)
+                             source=source,
+                             source_title=source_title,
+                             chapter_id=chapter_id,
+                             chapter_title=chapter_title,
+                             chunk_number=chunk_number)
         
     except Exception as e:
         app.logger.error(f"英単語結果画面エラー: {e}")
