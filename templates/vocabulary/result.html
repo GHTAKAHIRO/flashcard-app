@@ -266,6 +266,9 @@
 
                 <!-- アクションボタン -->
                 <div class="action-buttons">
+                    <a href="{{ url_for('vocabulary_review', source=source) }}" class="btn-custom">
+                        <i class="fas fa-list me-2"></i>問題一覧を見る
+                    </a>
                     {% if unknown_words %}
                     <a href="{{ url_for('vocabulary_start', source=source) }}" class="btn-custom btn-review">
                         <i class="fas fa-redo me-2"></i>間違えた単語を復習
