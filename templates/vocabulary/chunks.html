@@ -434,12 +434,13 @@
                 box-shadow: 0 15px 35px rgba(255, 215, 0, 0.2);
             }
 
-            .start-btn:hover, .review-btn:hover {
+            .start-btn:hover {
                 transform: none;
                 box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
             }
 
             .review-btn:hover {
+                transform: none;
                 box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
             }
 
@@ -600,11 +601,11 @@
                                 </div>
 
                                 {% if chunk.is_passed %}
-                                <a href="{{ url_for('vocabulary_study', source=source, chapter_id=chapter_id, chunk_id=chunk.id) }}" class="btn review-btn">
+                                <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number, mode='review') }}" class="btn review-btn">
                                     <i class="fas fa-redo me-2"></i>復習する
                                 </a>
                                 {% else %}
-                                <a href="{{ url_for('vocabulary_study', source=source, chapter_id=chapter_id, chunk_id=chunk.id) }}" class="btn start-btn">
+                                <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number) }}" class="btn start-btn">
                                     <i class="fas fa-play me-2"></i>学習開始
                                 </a>
                                 {% endif %}
