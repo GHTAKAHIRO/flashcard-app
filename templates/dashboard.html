@@ -92,6 +92,17 @@
         <a href="{{ url_for('logout') }}">ログアウト</a>
     </div>
 
+    <!-- 英単語学習へのリンク -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+        <h3 style="margin: 0 0 10px 0;">
+            <i class="fas fa-book-open me-2"></i>新しい英単語学習システム
+        </h3>
+        <p style="margin: 0 0 15px 0;">1秒自動表示・100語出題・間違えた単語の復習機能</p>
+        <a href="{{ url_for('vocabulary_home') }}" style="background: white; color: #667eea; padding: 10px 20px; border-radius: 25px; text-decoration: none; font-weight: bold; display: inline-block;">
+            <i class="fas fa-play me-2"></i>英単語学習を開始
+        </a>
+    </div>
+
     <h2>📚 学習する教材を選んでください</h2>
 
     {% for s in sources %}

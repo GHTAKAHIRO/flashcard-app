@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英単語管理 - 管理者画面</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+        .header-section {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+        }
+        .content-section {
+            padding: 3rem 2rem;
+        }
+        .upload-section {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 3rem;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #e9ecef;
+        }
+        .upload-area.dragover {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        .source-select {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 0.75rem;
+            font-size: 1rem;
+            width: 100%;
+            margin-bottom: 1rem;
+        }
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50px;
+            padding: 1rem 2rem;
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn-upload:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        .stats-section {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .nav-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .nav-link:hover {
+            color: #764ba2;
+        }
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        .progress {
+            height: 10px;
+            border-radius: 5px;
+        }
+        .template-download {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0.5rem 1rem;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 1rem;
+        }
+        .template-download:hover {
+            color: white;
+            text-decoration: none;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-container">
+            <!-- ヘッダーセクション -->
+            <div class="header-section">
+                <h1 class="display-4 fw-bold mb-3">
+                    <i class="fas fa-cog me-3"></i>英単語管理
+                </h1>
+                <p class="lead mb-0">管理者専用画面</p>
+            </div>
+
+            <!-- コンテンツセクション -->
+            <div class="content-section">
+                <!-- ナビゲーション -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <nav class="nav justify-content-center">
+                            <a class="nav-link" href="{{ url_for('vocabulary_home') }}">
+                                <i class="fas fa-home me-2"></i>ホーム
+                            </a>
+                            <a class="nav-link" href="{{ url_for('dashboard') }}">
+                                <i class="fas fa-tachometer-alt me-2"></i>ダッシュボード
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+
+                <!-- 統計情報 -->
+                <div class="stats-section">
+                    <h3 class="mb-4">
+                        <i class="fas fa-chart-bar me-2"></i>データ統計
+                    </h3>
+                    <div class="row">
+                        {% for source in sources %}
+                        <div class="col-md-4">
+                            <div class="stat-card">
+                                <div class="stat-number">{{ source.word_count }}</div>
+                                <div class="stat-label">{{ source.source }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- アップロードセクション -->
+                <div class="upload-section">
+                    <h3 class="mb-4">
+                        <i class="fas fa-upload me-2"></i>単語データアップロード
+                    </h3>
+                    
+                    <!-- アラート表示エリア -->
+                    <div id="alert-area"></div>
+                    
+                    <!-- アップロードフォーム -->
+                    <form id="upload-form" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="source-select" class="form-label">学習セット</label>
+                                <select class="source-select" id="source-select" name="source" required>
+                                    <option value="">セットを選択してください</option>
+                                    <option value="basic">基本英単語</option>
+                                    <option value="toeic">TOEIC単語</option>
+                                    <option value="university">大学受験単語</option>
+                                    <option value="custom">カスタム</option>
+                                </select>
+                                
+                                <div id="custom-source-input" style="display: none;">
+                                    <label for="custom-source" class="form-label">カスタムセット名</label>
+                                    <input type="text" class="form-control" id="custom-source" name="custom_source" placeholder="例: ビジネス英語">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="file-input" class="form-label">CSVファイル</label>
+                                <div class="upload-area" id="upload-area">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                    <p class="mb-2">ファイルをドラッグ&ドロップまたはクリックして選択</p>
+                                    <input type="file" id="file-input" name="file" accept=".csv" style="display: none;" required>
+                                    <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('file-input').click()">
+                                        ファイルを選択
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn-upload" id="upload-btn">
+                                <i class="fas fa-upload me-2"></i>アップロード
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <!-- テンプレートダウンロード -->
+                    <div class="text-center">
+                        <a href="#" class="template-download" onclick="downloadTemplate()">
+                            <i class="fas fa-download me-2"></i>CSVテンプレートをダウンロード
+                        </a>
+                    </div>
+                    
+                    <!-- 進捗バー -->
+                    <div class="progress mt-3" id="progress-bar" style="display: none;">
+                        <div class="progress-bar" id="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // ファイル選択処理
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                updateFileDisplay(file.name);
+            }
+        });
+
+        // ドラッグ&ドロップ処理
+        const uploadArea = document.getElementById('upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    document.getElementById('file-input').files = files;
+                    updateFileDisplay(file.name);
+                } else {
+                    showAlert('CSVファイルを選択してください', 'danger');
+                }
+            }
+        });
+
+        // ファイル表示更新
+        function updateFileDisplay(fileName) {
+            const uploadArea = document.getElementById('upload-area');
+            uploadArea.innerHTML = `
+                <i class="fas fa-file-csv fa-3x text-success mb-3"></i>
+                <p class="mb-2"><strong>${fileName}</strong></p>
+                <p class="text-muted">ファイルが選択されました</p>
+            `;
+        }
+
+        // セット選択処理
+        document.getElementById('source-select').addEventListener('change', function(e) {
+            const customInput = document.getElementById('custom-source-input');
+            if (e.target.value === 'custom') {
+                customInput.style.display = 'block';
+            } else {
+                customInput.style.display = 'none';
+            }
+        });
+
+        // フォーム送信処理
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const source = formData.get('source');
+            
+            if (source === 'custom') {
+                const customSource = formData.get('custom_source');
+                if (!customSource) {
+                    showAlert('カスタムセット名を入力してください', 'danger');
+                    return;
+                }
+                formData.set('source', customSource);
+            }
+            
+            uploadFile(formData);
+        });
+
+        // ファイルアップロード
+        function uploadFile(formData) {
+            const uploadBtn = document.getElementById('upload-btn');
+            const progressBar = document.getElementById('progress-bar');
+            const progressFill = document.getElementById('progress-fill');
+            
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>アップロード中...';
+            progressBar.style.display = 'block';
+            
+            fetch('/vocabulary/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    // フォームをリセット
+                    document.getElementById('upload-form').reset();
+                    document.getElementById('upload-area').innerHTML = `
+                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                        <p class="mb-2">ファイルをドラッグ&ドロップまたはクリックして選択</p>
+                        <input type="file" id="file-input" name="file" accept=".csv" style="display: none;" required>
+                        <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('file-input').click()">
+                            ファイルを選択
+                        </button>
+                    `;
+                } else {
+                    showAlert(data.error, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('アップロードに失敗しました', 'danger');
+            })
+            .finally(() => {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-upload me-2"></i>アップロード';
+                progressBar.style.display = 'none';
+            });
+        }
+
+        // アラート表示
+        function showAlert(message, type) {
+            const alertArea = document.getElementById('alert-area');
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            alertArea.innerHTML = alertHtml;
+        }
+
+        // テンプレートダウンロード
+        function downloadTemplate() {
+            const csvContent = 'word,meaning,example\nhello,こんにちは,Hello, how are you?\nworld,世界,The world is beautiful.\nstudy,勉強する,I study English every day.';
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'vocabulary_template.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html> 

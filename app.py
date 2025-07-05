@@ -1934,6 +1934,260 @@ def log_result():
         # 500エラー時はJSONで返す
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
+# ========== 英単語専用システム ==========
+
+@app.route('/vocabulary')
+@login_required
+def vocabulary_home():
+    """英単語学習のホーム画面"""
+    try:
+        # ユーザーの学習履歴を取得
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT DISTINCT source, COUNT(*) as total_words,
+                           COUNT(CASE WHEN result = 'known' THEN 1 END) as known_words
+                    FROM study_log 
+                    WHERE user_id = %s AND source LIKE 'vocabulary_%%'
+                    GROUP BY source
+                ''', (str(current_user.id),))
+                vocabulary_sources = cur.fetchall()
+        
+        return render_template('vocabulary/home.html', vocabulary_sources=vocabulary_sources)
+    except Exception as e:
+        app.logger.error(f"英単語ホーム画面エラー: {e}")
+        flash("エラーが発生しました")
+        return redirect(url_for('dashboard'))
+
+@app.route('/vocabulary/start/<source>')
+@login_required
+def vocabulary_start(source):
+    """英単語学習開始"""
+    try:
+        # 100語の単語を取得
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT id, word, meaning, example_sentence
+                    FROM vocabulary_words 
+                    WHERE source = %s 
+                    ORDER BY RANDOM() 
+                    LIMIT 100
+                ''', (source,))
+                words = cur.fetchall()
+        
+        if not words:
+            flash("単語が見つかりませんでした")
+            return redirect(url_for('vocabulary_home'))
+        
+        # セッションに学習情報を保存
+        session['vocabulary_session'] = {
+            'source': source,
+            'words': [{'id': w['id'], 'word': w['word'], 'meaning': w['meaning'], 'example': w['example_sentence']} for w in words],
+            'current_index': 0,
+            'results': [],
+            'start_time': datetime.now().isoformat()
+        }
+        
+        return redirect(url_for('vocabulary_study', source=source))
+        
+    except Exception as e:
+        app.logger.error(f"英単語学習開始エラー: {e}")
+        flash("学習の開始に失敗しました")
+        return redirect(url_for('vocabulary_home'))
+
+@app.route('/vocabulary/study/<source>')
+@login_required
+def vocabulary_study(source):
+    """英単語学習画面"""
+    try:
+        vocabulary_session = session.get('vocabulary_session')
+        if not vocabulary_session or vocabulary_session['source'] != source:
+            flash("学習セッションが見つかりません")
+            return redirect(url_for('vocabulary_home'))
+        
+        current_index = vocabulary_session['current_index']
+        words = vocabulary_session['words']
+        
+        if current_index >= len(words):
+            # 学習完了
+            return redirect(url_for('vocabulary_result', source=source))
+        
+        current_word = words[current_index]
+        
+        return render_template('vocabulary/study.html', 
+                             word=current_word, 
+                             current_index=current_index + 1,
+                             total_words=len(words),
+                             source=source)
+        
+    except Exception as e:
+        app.logger.error(f"英単語学習画面エラー: {e}")
+        flash("エラーが発生しました")
+        return redirect(url_for('vocabulary_home'))
+
+@app.route('/vocabulary/answer', methods=['POST'])
+@login_required
+def vocabulary_answer():
+    """英単語の回答処理"""
+    try:
+        data = request.get_json()
+        result = data.get('result')  # 'known' or 'unknown'
+        
+        vocabulary_session = session.get('vocabulary_session')
+        if not vocabulary_session:
+            return jsonify({'error': 'セッションが見つかりません'}), 400
+        
+        current_index = vocabulary_session['current_index']
+        words = vocabulary_session['words']
+        
+        if current_index >= len(words):
+            return jsonify({'error': '学習が完了しています'}), 400
+        
+        # 結果を記録
+        current_word = words[current_index]
+        vocabulary_session['results'].append({
+            'word_id': current_word['id'],
+            'word': current_word['word'],
+            'meaning': current_word['meaning'],
+            'result': result
+        })
+        
+        # 次の単語へ
+        vocabulary_session['current_index'] += 1
+        session['vocabulary_session'] = vocabulary_session
+        
+        # データベースに記録
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    INSERT INTO vocabulary_study_log 
+                    (user_id, word_id, result, source, study_date)
+                    VALUES (%s, %s, %s, %s, %s)
+                ''', (
+                    str(current_user.id),
+                    current_word['id'],
+                    result,
+                    vocabulary_session['source'],
+                    datetime.now()
+                ))
+                conn.commit()
+        
+        # 学習完了かチェック
+        if vocabulary_session['current_index'] >= len(words):
+            return jsonify({'status': 'completed'})
+        else:
+            return jsonify({'status': 'continue'})
+            
+    except Exception as e:
+        app.logger.error(f"英単語回答処理エラー: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/vocabulary/result/<source>')
+@login_required
+def vocabulary_result(source):
+    """英単語学習結果画面"""
+    try:
+        vocabulary_session = session.get('vocabulary_session')
+        if not vocabulary_session or vocabulary_session['source'] != source:
+            flash("学習セッションが見つかりません")
+            return redirect(url_for('vocabulary_home'))
+        
+        results = vocabulary_session['results']
+        unknown_words = [r for r in results if r['result'] == 'unknown']
+        known_count = len([r for r in results if r['result'] == 'known'])
+        unknown_count = len(unknown_words)
+        
+        # セッションをクリア
+        session.pop('vocabulary_session', None)
+        
+        return render_template('vocabulary/result.html',
+                             unknown_words=unknown_words,
+                             known_count=known_count,
+                             unknown_count=unknown_count,
+                             total_count=len(results),
+                             source=source)
+        
+    except Exception as e:
+        app.logger.error(f"英単語結果画面エラー: {e}")
+        flash("エラーが発生しました")
+        return redirect(url_for('vocabulary_home'))
+
+# ========== 英単語管理機能 ==========
+
+@app.route('/vocabulary/admin')
+@login_required
+def vocabulary_admin():
+    """英単語管理画面（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('vocabulary_home'))
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT source, COUNT(*) as word_count
+                    FROM vocabulary_words 
+                    GROUP BY source
+                    ORDER BY source
+                ''')
+                sources = cur.fetchall()
+        
+        return render_template('vocabulary/admin.html', sources=sources)
+        
+    except Exception as e:
+        app.logger.error(f"英単語管理画面エラー: {e}")
+        flash("エラーが発生しました")
+        return redirect(url_for('vocabulary_home'))
+
+@app.route('/vocabulary/upload', methods=['POST'])
+@login_required
+def vocabulary_upload():
+    """英単語データのアップロード（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        source = request.form.get('source', 'default')
+        
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        # CSVファイルを読み込み
+        csv_data = file.read().decode('utf-8').splitlines()
+        reader = csv.DictReader(csv_data)
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for row in reader:
+                    cur.execute('''
+                        INSERT INTO vocabulary_words (word, meaning, example_sentence, source)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (word, source) DO UPDATE SET
+                        meaning = EXCLUDED.meaning,
+                        example_sentence = EXCLUDED.example_sentence
+                    ''', (
+                        row.get('word', '').strip(),
+                        row.get('meaning', '').strip(),
+                        row.get('example', '').strip(),
+                        source
+                    ))
+                conn.commit()
+        
+        return jsonify({'success': True, 'message': f'{len(csv_data)-1}個の単語を登録しました'})
+        
+    except Exception as e:
+        app.logger.error(f"英単語アップロードエラー: {e}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
