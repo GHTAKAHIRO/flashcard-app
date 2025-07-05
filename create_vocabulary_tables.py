@@ -63,6 +63,25 @@ def create_vocabulary_tables():
                 )
             ''')
             
+            # 英単語チャンク進捗テーブル
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS vocabulary_chunk_progress (
+                    id SERIAL PRIMARY KEY,
+                    user_id VARCHAR(50) NOT NULL,
+                    source VARCHAR(100) NOT NULL,
+                    chapter_id INTEGER NOT NULL,
+                    chunk_number INTEGER NOT NULL,
+                    is_completed BOOLEAN DEFAULT FALSE,
+                    is_passed BOOLEAN DEFAULT FALSE,
+                    completed_at TIMESTAMP,
+                    passed_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, source, chapter_id, chunk_number)
+                )
+            ''')
+            print("✅ vocabulary_chunk_progress テーブルを作成しました")
+            
             # 既存のテーブルにsession_idカラムを追加（存在しない場合）
             try:
                 cur.execute('ALTER TABLE vocabulary_study_log ADD COLUMN session_id VARCHAR(50)')
@@ -124,6 +143,22 @@ def create_vocabulary_tables():
             cur.execute('''
                 CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_user_chapter_chunk 
                 ON vocabulary_study_log(user_id, chapter_id, chunk_number)
+            ''')
+            
+            # チャンク進捗用のインデックス
+            cur.execute('''
+                CREATE INDEX IF NOT EXISTS idx_vocabulary_chunk_progress_user_source 
+                ON vocabulary_chunk_progress(user_id, source)
+            ''')
+            
+            cur.execute('''
+                CREATE INDEX IF NOT EXISTS idx_vocabulary_chunk_progress_user_chapter 
+                ON vocabulary_chunk_progress(user_id, source, chapter_id)
+            ''')
+            
+            cur.execute('''
+                CREATE INDEX IF NOT EXISTS idx_vocabulary_chunk_progress_completion 
+                ON vocabulary_chunk_progress(user_id, source, chapter_id, is_completed, is_passed)
             ''')
             
             print("✅ インデックスを作成しました")

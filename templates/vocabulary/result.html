@@ -345,7 +345,13 @@
                         </div>
                     </div>
                     
-                    {% if (known_count / total_count) >= 0.8 %}
+                    {% if unknown_count == 0 %}
+                        <div class="result-icon success">
+                            <i class="fas fa-trophy"></i>
+                        </div>
+                        <h3 class="text-success">🎉 チャンク合格！おめでとうございます！</h3>
+                        <p class="text-success fw-bold">全問正解で合格マークを獲得しました！</p>
+                    {% elif (known_count / total_count) >= 0.8 %}
                         <div class="result-icon success">
                             <i class="fas fa-star"></i>
                         </div>

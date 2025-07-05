@@ -191,21 +191,30 @@
                     <div class="col-md-6 col-lg-4">
                         <div class="chunk-card">
                             <div class="card-body text-center">
-                                <div class="chunk-number {{ 'completed' if chunk.is_completed else '' }}">
-                                    {% if chunk.is_completed %}
-                                        <i class="fas fa-crown"></i>
+                                <div class="chunk-number {{ 'completed' if chunk.is_passed else '' }}">
+                                    {% if chunk.is_passed %}
+                                        <i class="fas fa-trophy"></i>
+                                    {% elif chunk.is_completed %}
+                                        <i class="fas fa-check"></i>
                                     {% else %}
                                         {{ chunk.chunk_number }}
                                     {% endif %}
                                 </div>
                                 <h5 class="card-title">チャンク {{ chunk.chunk_number }}</h5>
                                 <p class="card-text text-muted">20単語</p>
-                                {% if chunk.is_completed %}
+                                {% if chunk.is_passed %}
                                     <div class="completion-badge mb-3">
-                                        <i class="fas fa-check-circle me-2"></i>合格済み
+                                        <i class="fas fa-trophy me-2"></i>合格済み
                                     </div>
                                     <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number, mode='review') }}" class="btn review-btn">
                                         <i class="fas fa-redo me-2"></i>復習
+                                    </a>
+                                {% elif chunk.is_completed %}
+                                    <div class="completion-badge mb-3" style="background: #fff3cd; color: #856404;">
+                                        <i class="fas fa-check-circle me-2"></i>学習済み
+                                    </div>
+                                    <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number) }}" class="btn start-btn">
+                                        <i class="fas fa-redo me-2"></i>再挑戦
                                     </a>
                                 {% else %}
                                     <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number) }}" class="btn start-btn">
