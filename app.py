@@ -398,6 +398,8 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
 def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, is_completed=False, is_passed=False):
     """英単語チャンクの進捗状況を更新"""
     try:
+        app.logger.info(f"進捗更新開始: user={user_id}, source={source}, chapter={chapter_id}, chunk={chunk_number}, completed={is_completed}, passed={is_passed}")
+        
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # 既存のレコードがあるかチェック
@@ -408,6 +410,8 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
                 
                 existing = cur.fetchone()
                 now = datetime.now()
+                
+                app.logger.info(f"既存レコード: {existing}")
                 
                 if existing:
                     # 既存レコードを更新
@@ -429,29 +433,40 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
                         params.append(now)
                         params.extend([user_id, source, chapter_id, chunk_number])
                         
-                        cur.execute(f'''
+                        update_sql = f'''
                             UPDATE vocabulary_chunk_progress
                             SET {', '.join(update_fields)}
                             WHERE user_id = %s AND source = %s AND chapter_id = %s AND chunk_number = %s
-                        ''', params)
+                        '''
+                        app.logger.info(f"更新SQL: {update_sql}")
+                        app.logger.info(f"更新パラメータ: {params}")
+                        
+                        cur.execute(update_sql, params)
                 else:
                     # 新規レコードを作成
-                    cur.execute('''
+                    insert_sql = '''
                         INSERT INTO vocabulary_chunk_progress 
                         (user_id, source, chapter_id, chunk_number, is_completed, is_passed, completed_at, passed_at)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ''', (
+                    '''
+                    insert_params = (
                         user_id, source, chapter_id, chunk_number,
                         is_completed, is_passed,
                         now if is_completed else None,
                         now if is_passed else None
-                    ))
+                    )
+                    app.logger.info(f"挿入SQL: {insert_sql}")
+                    app.logger.info(f"挿入パラメータ: {insert_params}")
+                    
+                    cur.execute(insert_sql, insert_params)
                 
                 conn.commit()
+                app.logger.info(f"進捗更新完了: 成功")
                 return True
                 
     except Exception as e:
         app.logger.error(f"英単語チャンク進捗更新エラー: {e}")
+        app.logger.error(f"エラー詳細: {str(e)}")
         return False
 
 def check_stage_completion(user_id, source, stage, page_range, difficulty):
@@ -2154,6 +2169,8 @@ def vocabulary_chunks(source, chapter_id):
             is_completed = progress.get('is_completed', False) if progress else False
             is_passed = progress.get('is_passed', False) if progress else False
             
+            app.logger.info(f"チャンク{i}進捗: completed={is_completed}, passed={is_passed}, progress={progress}")
+            
             chunks.append({
                 'chunk_number': i,
                 'is_completed': is_completed,
@@ -2328,18 +2345,23 @@ def vocabulary_result(source):
         
         # チャンク進捗を更新
         if chapter_id and chunk_number:
+            app.logger.info(f"チャンク進捗更新: user={current_user.id}, source={source}, chapter={chapter_id}, chunk={chunk_number}, unknown_count={unknown_count}, mode={mode}")
+            
             # 学習完了として記録
-            update_vocabulary_chunk_progress(
+            update_success = update_vocabulary_chunk_progress(
                 str(current_user.id), source, chapter_id, chunk_number,
                 is_completed=True
             )
+            app.logger.info(f"学習完了更新結果: {update_success}")
             
             # 全問正解の場合、合格ステータスも更新
             if unknown_count == 0 and mode != 'retest':
-                update_vocabulary_chunk_progress(
+                app.logger.info(f"全問正解判定: 合格ステータスを更新")
+                update_success = update_vocabulary_chunk_progress(
                     str(current_user.id), source, chapter_id, chunk_number,
                     is_passed=True
                 )
+                app.logger.info(f"合格ステータス更新結果: {update_success}")
                 # キャッシュをクリア
                 clear_user_cache(str(current_user.id), source)
         
