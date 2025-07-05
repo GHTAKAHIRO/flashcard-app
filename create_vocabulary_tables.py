@@ -57,6 +57,8 @@ def create_vocabulary_tables():
                     source VARCHAR(100) NOT NULL,
                     study_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     session_id VARCHAR(50),
+                    chapter_id INTEGER,
+                    chunk_number INTEGER,
                     FOREIGN KEY (word_id) REFERENCES vocabulary_words(id) ON DELETE CASCADE
                 )
             ''')
@@ -70,6 +72,27 @@ def create_vocabulary_tables():
                     print(f"⚠️ session_idカラム追加エラー: {e}")
                 else:
                     print("✅ session_idカラムは既に存在します")
+            
+            # 既存のテーブルにchapter_idカラムを追加（存在しない場合）
+            try:
+                cur.execute('ALTER TABLE vocabulary_study_log ADD COLUMN chapter_id INTEGER')
+                print("✅ chapter_idカラムを追加しました")
+            except Exception as e:
+                if "already exists" not in str(e):
+                    print(f"⚠️ chapter_idカラム追加エラー: {e}")
+                else:
+                    print("✅ chapter_idカラムは既に存在します")
+            
+            # 既存のテーブルにchunk_numberカラムを追加（存在しない場合）
+            try:
+                cur.execute('ALTER TABLE vocabulary_study_log ADD COLUMN chunk_number INTEGER')
+                print("✅ chunk_numberカラムを追加しました")
+            except Exception as e:
+                if "already exists" not in str(e):
+                    print(f"⚠️ chunk_numberカラム追加エラー: {e}")
+                else:
+                    print("✅ chunk_numberカラムは既に存在します")
+            
             print("✅ vocabulary_study_log テーブルを作成しました")
             
             # インデックスを作成
@@ -91,6 +114,16 @@ def create_vocabulary_tables():
             cur.execute('''
                 CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_session 
                 ON vocabulary_study_log(session_id)
+            ''')
+            
+            cur.execute('''
+                CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_chapter_chunk 
+                ON vocabulary_study_log(chapter_id, chunk_number)
+            ''')
+            
+            cur.execute('''
+                CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_user_chapter_chunk 
+                ON vocabulary_study_log(user_id, chapter_id, chunk_number)
             ''')
             
             print("✅ インデックスを作成しました")
