@@ -40,7 +40,7 @@
         .header-section {
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
-            padding: 1rem;
+            padding: 0.75rem 1rem;
             text-align: center;
             position: sticky;
             top: 0;
@@ -63,11 +63,12 @@
         /* コンテンツセクション - フレックスレイアウト */
         .content-section {
             flex: 1;
-            padding: 1rem;
+            padding: 0.5rem;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: flex-start;
             min-height: 0;
+            gap: 1rem;
         }
 
         /* 単語カード - タッチフレンドリー */
@@ -75,11 +76,11 @@
             background: white;
             border: none;
             border-radius: 20px;
-            padding: 2rem 1rem;
+            padding: 1.5rem 1rem;
             text-align: center;
-            margin-bottom: 1rem;
-            min-height: 40vh;
-            max-height: 50vh;
+            margin-bottom: 0;
+            min-height: 30vh;
+            max-height: 40vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -142,6 +143,7 @@
             text-align: center;
             padding: 0.5rem 0;
             flex-shrink: 0;
+            margin-top: auto;
         }
 
         .button-row {
@@ -293,22 +295,52 @@
 
         /* モバイル向けの特別な調整 */
         @media (max-width: 767px) {
+            .header-section {
+                padding: 0.5rem 1rem;
+            }
+
+            .header-section h2 {
+                font-size: 1.3rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .header-section p {
+                font-size: 0.9rem;
+            }
+
+            .content-section {
+                padding: 0.25rem;
+                gap: 0.5rem;
+            }
+
             .word-card {
-                min-height: 35vh;
-                max-height: 45vh;
-                padding: 1.5rem 1rem;
+                min-height: 25vh;
+                max-height: 35vh;
+                padding: 1rem 0.5rem;
             }
 
             .word-text {
-                font-size: 2rem;
+                font-size: 1.8rem;
+                margin-bottom: 0.5rem;
             }
 
             .meaning-text {
-                font-size: 1.5rem;
+                font-size: 1.3rem;
+                margin-bottom: 0.5rem;
             }
 
             .button-section {
-                padding: 0.5rem 0;
+                padding: 0.25rem 0;
+            }
+
+            .button-row {
+                gap: 0.5rem;
+            }
+
+            .answer-btn {
+                padding: 1rem 0.5rem;
+                font-size: 1rem;
+                min-height: 50px;
             }
         }
 
