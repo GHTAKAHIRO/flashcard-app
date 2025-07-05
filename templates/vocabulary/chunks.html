@@ -582,23 +582,7 @@
                                 </div>
                                 {% endif %}
 
-                                <div class="stats-card">
-                                    <div class="stats-grid">
-                                        <div class="stats-item">
-                                            <div class="stats-number">{{ chunk.total_words }}</div>
-                                            <div class="stats-label">単語数</div>
-                                        </div>
-                                        <div class="stats-item">
-                                            <div class="stats-number">{{ chunk.correct_count }}</div>
-                                            <div class="stats-label">正解数</div>
-                                        </div>
-                                    </div>
-                                    {% if chunk.total_words > 0 %}
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: {{ (chunk.correct_count / chunk.total_words * 100) | round(1) }}%"></div>
-                                    </div>
-                                    {% endif %}
-                                </div>
+
 
                                 {% if chunk.is_passed %}
                                 <a href="{{ url_for('vocabulary_start', source=source, chapter_id=chapter_id, chunk_number=chunk.chunk_number, mode='review') }}" class="btn review-btn">
