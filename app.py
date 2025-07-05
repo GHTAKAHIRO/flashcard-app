@@ -352,6 +352,33 @@ def has_study_history(user_id, source):
         return False
 
 @simple_cache(expire_time=120)
+def check_chunk_completion(user_id, source, chapter_id, chunk_number):
+    """指定チャンクが合格済みかチェック"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 最新のセッションで全問正解したかチェック
+                cur.execute('''
+                    SELECT vsl.session_id, COUNT(*) as total_words,
+                           SUM(CASE WHEN vsl.result = 'known' THEN 1 ELSE 0 END) as correct_words
+                    FROM vocabulary_study_log vsl
+                    WHERE vsl.user_id = %s AND vsl.source = %s 
+                    AND vsl.chapter_id = %s AND vsl.chunk_number = %s
+                    GROUP BY vsl.session_id
+                    ORDER BY vsl.study_date DESC
+                    LIMIT 1
+                ''', (user_id, source, chapter_id, chunk_number))
+                result = cur.fetchone()
+                
+                if result and result[1] > 0:
+                    # 全問正解の場合のみ合格
+                    return result[2] == result[1]
+                return False
+                
+    except Exception as e:
+        app.logger.error(f"チャンク合格判定エラー: {e}")
+        return False
+
 def check_stage_completion(user_id, source, stage, page_range, difficulty):
     """指定ステージが完了しているかチェック（キャッシュ付き）"""
     try:
@@ -2046,11 +2073,12 @@ def vocabulary_chunks(source, chapter_id):
         chunks = []
         chunk_count = 5 if chapter_id == 1 else 4 if chapter_id == 2 else 3
         
+        # 各チャンクの合格状況をチェック
         for i in range(1, chunk_count + 1):
+            is_completed = check_chunk_completion(str(current_user.id), source, chapter_id, i)
             chunks.append({
                 'chunk_number': i,
-                'word_count': 20,
-                'completion_rate': 0  # 後で学習履歴から計算
+                'is_completed': is_completed
             })
         
         return render_template('vocabulary/chunks.html',
@@ -2066,8 +2094,9 @@ def vocabulary_chunks(source, chapter_id):
         return redirect(url_for('vocabulary_home'))
 
 @app.route('/vocabulary/start/<source>/<int:chapter_id>/<int:chunk_number>')
+@app.route('/vocabulary/start/<source>/<int:chapter_id>/<int:chunk_number>/<mode>')
 @login_required
-def vocabulary_start(source, chapter_id, chunk_number):
+def vocabulary_start(source, chapter_id, chunk_number, mode=None):
     """英単語学習開始"""
     try:
         # 指定されたチャンクの単語を取得（仮の実装）
@@ -2092,6 +2121,7 @@ def vocabulary_start(source, chapter_id, chunk_number):
             'source': source,
             'chapter_id': chapter_id,
             'chunk_number': chunk_number,
+            'mode': mode,  # 'review' または 'retest' または None
             'words': [{'id': w['id'], 'word': w['word'], 'meaning': w['meaning'], 'example': w['example_sentence']} for w in words],
             'current_index': 0,
             'results': [],
@@ -2172,15 +2202,17 @@ def vocabulary_answer():
             with conn.cursor() as cur:
                 cur.execute('''
                     INSERT INTO vocabulary_study_log 
-                    (user_id, word_id, result, source, study_date, session_id)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    (user_id, word_id, result, source, study_date, session_id, chapter_id, chunk_number)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ''', (
                     str(current_user.id),
                     current_word['id'],
                     result,
                     vocabulary_session['source'],
                     datetime.now(),
-                    vocabulary_session.get('session_id', str(datetime.now().timestamp()))
+                    vocabulary_session.get('session_id', str(datetime.now().timestamp())),
+                    vocabulary_session.get('chapter_id'),
+                    vocabulary_session.get('chunk_number')
                 ))
                 conn.commit()
         
@@ -2213,6 +2245,12 @@ def vocabulary_result(source):
         # チャンク情報を取得
         chapter_id = vocabulary_session.get('chapter_id')
         chunk_number = vocabulary_session.get('chunk_number')
+        mode = vocabulary_session.get('mode')
+        
+        # 再テストモードの場合、全問正解でも合格ステータスは変更しない
+        if mode == 'retest' and unknown_count == 0:
+            # 再テストで全問正解の場合、合格ステータスは維持
+            pass
         
         # ソースタイトルの設定
         source_titles = {
