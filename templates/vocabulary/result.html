@@ -175,6 +175,119 @@
             color: #28a745;
             margin-bottom: 1rem;
         }
+        
+        /* 問題一覧用のスタイル */
+        .review-section {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .filter-section {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .filter-btn {
+            background: #667eea;
+            border: none;
+            border-radius: 25px;
+            padding: 0.5rem 1rem;
+            color: white;
+            font-weight: bold;
+            margin: 0 0.5rem;
+            transition: all 0.3s ease;
+        }
+        .filter-btn:hover {
+            transform: scale(1.05);
+        }
+        .filter-btn.active {
+            background: #28a745;
+        }
+        .filter-btn.incorrect-only {
+            background: #dc3545;
+        }
+        .word-list {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .word-item {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .word-item:hover {
+            background: #e9ecef;
+        }
+        .word-item.correct {
+            border-left: 4px solid #28a745;
+        }
+        .word-item.incorrect {
+            border-left: 4px solid #dc3545;
+        }
+        .word-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .word-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .pronunciation-btn {
+            background: #667eea;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pronunciation-btn.playing {
+            background: #28a745;
+        }
+        .result-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .result-badge.correct {
+            background: #d4edda;
+            color: #155724;
+        }
+        .result-badge.incorrect {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .word-meaning {
+            font-size: 1.2rem;
+            color: #666;
+            margin-top: 1rem;
+            display: none;
+        }
+        .word-meaning.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -238,38 +351,70 @@
                     </div>
                 </div>
 
-                <!-- 間違えた単語一覧 -->
-                <div class="unknown-words-section">
+                <!-- 問題一覧セクション -->
+                <div class="review-section">
                     <h3 class="mb-4">
-                        <i class="fas fa-times-circle me-2 text-danger"></i>
-                        間違えた単語 ({{ unknown_words|length }}語)
+                        <i class="fas fa-list me-2"></i>問題一覧
                     </h3>
                     
-                    {% if unknown_words %}
-                        {% for word in unknown_words %}
-                        <div class="word-item">
-                            <div class="word-english">{{ word.word }}</div>
-                            <div class="word-meaning">{{ word.meaning }}</div>
-                            {% if word.example %}
-                            <div class="word-example">{{ word.example }}</div>
-                            {% endif %}
+                    <!-- フィルターセクション -->
+                    <div class="filter-section">
+                        <h5 class="mb-3">
+                            <i class="fas fa-filter me-2"></i>フィルター
+                        </h5>
+                        <button class="filter-btn active" onclick="filterWords('all')">
+                            <i class="fas fa-list me-2"></i>すべて ({{ total_count }})
+                        </button>
+                        <button class="filter-btn correct-only" onclick="filterWords('correct')">
+                            <i class="fas fa-check me-2"></i>正解のみ ({{ known_count }})
+                        </button>
+                        <button class="filter-btn incorrect-only" onclick="filterWords('incorrect')">
+                            <i class="fas fa-times me-2"></i>不正解のみ ({{ unknown_count }})
+                        </button>
+                        <button class="filter-btn" onclick="shuffleWords()">
+                            <i class="fas fa-random me-2"></i>ランダム並び替え
+                        </button>
+                    </div>
+
+                    <!-- 問題一覧 -->
+                    <div class="word-list">
+                        <h5 class="mb-3">
+                            <i class="fas fa-book me-2"></i>問題一覧
+                            <span id="word-count">({{ total_count }}問)</span>
+                        </h5>
+                        
+                        <div id="word-container">
+                            {% for word in all_words %}
+                            <div class="word-item {{ 'correct' if word.result == 'known' else 'incorrect' }}" 
+                                 data-result="{{ word.result }}" 
+                                 data-word="{{ word.word }}">
+                                <div class="word-header">
+                                    <div class="word-text">
+                                        {{ word.word }}
+                                        <button class="pronunciation-btn" onclick="pronounceWord('{{ word.word }}', event)" title="発音を聞く">
+                                            <i class="fas fa-volume-up"></i>
+                                        </button>
+                                    </div>
+                                    <span class="result-badge {{ 'correct' if word.result == 'known' else 'incorrect' }}">
+                                        {% if word.result == 'known' %}
+                                            <i class="fas fa-check me-1"></i>〇
+                                        {% else %}
+                                            <i class="fas fa-times me-1"></i>✕
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="word-meaning" id="meaning-{{ loop.index }}">
+                                    {{ word.meaning }}
+                                </div>
+                            </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="empty-state">
-                            <i class="fas fa-check-circle"></i>
-                            <h4>完璧です！</h4>
-                            <p>間違えた単語はありませんでした。</p>
-                        </div>
-                    {% endif %}
+                    </div>
                 </div>
 
                 <!-- アクションボタン -->
                 <div class="action-buttons">
-                    <a href="{{ url_for('vocabulary_review', source=source) }}" class="btn-custom">
-                        <i class="fas fa-list me-2"></i>問題一覧を見る
-                    </a>
-                    {% if unknown_words %}
+                    {% if unknown_count > 0 %}
                     <a href="{{ url_for('vocabulary_start', source=source) }}" class="btn-custom btn-review">
                         <i class="fas fa-redo me-2"></i>間違えた単語を復習
                     </a>
@@ -283,5 +428,113 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentFilter = 'all';
+        let speechSynthesis = window.speechSynthesis;
+        let currentUtterance = null;
+
+        // フィルター機能
+        function filterWords(filter) {
+            currentFilter = filter;
+            const wordItems = document.querySelectorAll('.word-item');
+            let visibleCount = 0;
+
+            wordItems.forEach(item => {
+                const result = item.dataset.result;
+                let shouldShow = false;
+
+                if (filter === 'all') {
+                    shouldShow = true;
+                } else if (filter === 'correct' && result === 'known') {
+                    shouldShow = true;
+                } else if (filter === 'incorrect' && result === 'unknown') {
+                    shouldShow = true;
+                }
+
+                if (shouldShow) {
+                    item.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            // フィルターボタンの状態を更新
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // 表示件数を更新
+            document.getElementById('word-count').textContent = `(${visibleCount}問)`;
+        }
+
+        // ランダム並び替え
+        function shuffleWords() {
+            const container = document.getElementById('word-container');
+            const wordItems = Array.from(container.children);
+
+            // Fisher-Yates シャッフル
+            for (let i = wordItems.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                container.appendChild(wordItems[j]);
+            }
+        }
+
+        // 発音機能
+        function pronounceWord(word, event) {
+            event.stopPropagation();
+            const pronunciationBtn = event.target.closest('.pronunciation-btn');
+            
+            // 既存の発音を停止
+            if (currentUtterance) {
+                speechSynthesis.cancel();
+            }
+            
+            // 新しい発音を作成
+            currentUtterance = new SpeechSynthesisUtterance(word);
+            currentUtterance.lang = 'en-US';
+            currentUtterance.rate = 0.8;
+            currentUtterance.pitch = 1.0;
+            currentUtterance.volume = 1.0;
+            
+            // ボタンの状態を変更
+            pronunciationBtn.classList.add('playing');
+            pronunciationBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+            
+            // 発音開始
+            speechSynthesis.speak(currentUtterance);
+            
+            // 発音終了時の処理
+            currentUtterance.onend = function() {
+                pronunciationBtn.classList.remove('playing');
+                pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                currentUtterance = null;
+            };
+            
+            // エラー時の処理
+            currentUtterance.onerror = function() {
+                pronunciationBtn.classList.remove('playing');
+                pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                currentUtterance = null;
+            };
+        }
+
+        // 問題クリックで解答表示
+        document.addEventListener('DOMContentLoaded', function() {
+            const wordItems = document.querySelectorAll('.word-item');
+            
+            wordItems.forEach((item, index) => {
+                item.addEventListener('click', function() {
+                    const meaningElement = document.getElementById(`meaning-${index + 1}`);
+                    if (meaningElement.classList.contains('show')) {
+                        meaningElement.classList.remove('show');
+                    } else {
+                        meaningElement.classList.add('show');
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html> 
