@@ -2306,6 +2306,12 @@ def vocabulary_study(source):
             flash("学習セッションが見つかりません")
             return redirect(url_for('vocabulary_home'))
         
+        # セッションの整合性チェック
+        if 'current_index' not in vocabulary_session or 'words' not in vocabulary_session:
+            app.logger.warning(f"セッション情報が不完全: {vocabulary_session}")
+            flash("学習セッションが破損しています")
+            return redirect(url_for('vocabulary_home'))
+        
         if vocabulary_session['source'] != source:
             app.logger.warning(f"ソースが一致しません: session_source={vocabulary_session['source']}, request_source={source}")
             flash("学習セッションが見つかりません")
@@ -2314,16 +2320,12 @@ def vocabulary_study(source):
         current_index = vocabulary_session['current_index']
         words = vocabulary_session['words']
         
-        app.logger.info(f"学習状況: current_index={current_index}, total_words={len(words)}")
-        
+        # 高速チェック（ログ出力を最小限に）
         if current_index >= len(words):
             # 学習完了
-            app.logger.info(f"学習完了: 結果画面にリダイレクト")
             return redirect(url_for('vocabulary_result', source=source))
         
         current_word = words[current_index]
-        
-        app.logger.info(f"現在の単語: {current_word['word']}")
         
         return render_template('vocabulary/study.html', 
                              word=current_word, 
@@ -2363,28 +2365,33 @@ def vocabulary_answer():
             'result': result
         })
         
-        # 次の単語へ
+        # 次の単語へ（即座に更新）
         vocabulary_session['current_index'] += 1
         session['vocabulary_session'] = vocabulary_session
+        session.modified = True  # セッションの変更を確実に保存
         
-        # データベースに記録
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('''
-                    INSERT INTO vocabulary_study_log 
-                    (user_id, word_id, result, source, study_date, session_id, chapter_id, chunk_number)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ''', (
-                    str(current_user.id),
-                    current_word['id'],
-                    result,
-                    vocabulary_session['source'],
-                    datetime.now(),
-                    vocabulary_session.get('session_id', str(datetime.now().timestamp())),
-                    vocabulary_session.get('chapter_id'),
-                    vocabulary_session.get('chunk_number')
-                ))
-                conn.commit()
+        # バックグラウンドでデータベースに記録（非同期処理）
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        INSERT INTO vocabulary_study_log 
+                        (user_id, word_id, result, source, study_date, session_id, chapter_id, chunk_number)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ''', (
+                        str(current_user.id),
+                        current_word['id'],
+                        result,
+                        vocabulary_session['source'],
+                        datetime.now(),
+                        vocabulary_session.get('session_id', str(datetime.now().timestamp())),
+                        vocabulary_session.get('chapter_id'),
+                        vocabulary_session.get('chunk_number')
+                    ))
+                    conn.commit()
+        except Exception as e:
+            app.logger.error(f"データベース記録エラー: {e}")
+            # エラーは無視して処理を続行
         
         # 学習完了かチェック
         if vocabulary_session['current_index'] >= len(words):

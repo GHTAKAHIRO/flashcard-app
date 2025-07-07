@@ -612,14 +612,30 @@
             
             isAnswered = true;
             
+            // 即座に視覚的フィードバック
+            const clickedBtn = event.target.closest('.answer-btn');
+            if (clickedBtn) {
+                clickedBtn.style.transform = 'scale(0.9)';
+                clickedBtn.style.transition = 'none';
+            }
+            
             // ボタンを即座に無効化
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             knownBtn.disabled = true;
             unknownBtn.disabled = true;
             
-            // 即座に画面遷移（サーバー応答を待たない）
-            window.location.reload();
+            // 即座に次の問題に切り替え（高速性を優先）
+            const currentIndex = parseInt('{{ current_index - 1 }}');
+            const totalWords = parseInt('{{ total_words }}');
+            
+            if (currentIndex + 1 >= totalWords) {
+                // 最後の問題の場合、完了画面へ
+                window.location.href = '/vocabulary/result/{{ source }}';
+            } else {
+                // 次の問題へ即座に切り替え
+                window.location.reload();
+            }
             
             // バックグラウンドでサーバーに結果を送信（エラーは無視）
             fetch('/vocabulary/answer', {
@@ -635,13 +651,15 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'completed') {
-                    // 完了時は結果ページに遷移
-                    window.location.href = '/vocabulary/result/{{ source }}';
+                    // 完了時は結果ページに遷移（既に遷移済みの場合は無視）
+                    if (window.location.pathname !== '/vocabulary/result/{{ source }}') {
+                        window.location.href = '/vocabulary/result/{{ source }}';
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                // エラーは無視して次の画面に進む
+                // エラーは無視
             });
         }
 
