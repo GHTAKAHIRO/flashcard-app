@@ -183,6 +183,8 @@
             }
         }
 
+
+
         /* ボタンセクション - タッチ最適化 */
         .button-section {
             text-align: center;
@@ -451,11 +453,12 @@
                                     <i class="fas fa-volume-up"></i>
                                 </button>
                             </div>
+                            <div class="meaning-text" id="meaning-text" style="display: none;">{{ word.meaning }}</div>
                         </div>
                         
                         <!-- カードの裏面（答え） -->
                         <div class="card-back">
-                            <div class="meaning-text" id="meaning-text">{{ word.meaning }}</div>
+                            <div class="meaning-text">{{ word.meaning }}</div>
                         </div>
                     </div>
                 </div>
@@ -492,41 +495,9 @@
 
             // タッチイベントの設定
             setupTouchEvents();
-            
-            // スマホ対応の自動発音設定
-            setupMobileAutoPronunciation();
         });
 
-        // スマホ対応の自動発音設定
-        function setupMobileAutoPronunciation() {
-            let hasAutoPronounced = false;
-            
-            // ユーザーが画面をタップした時に自動発音
-            const autoPronounce = function() {
-                if (!hasAutoPronounced) {
-                    hasAutoPronounced = true;
-                    setTimeout(function() {
-                        pronounceWord();
-                    }, 100);
-                }
-            };
-            
-            // タッチイベントで自動発音
-            document.addEventListener('touchstart', autoPronounce, { once: true });
-            
-            // クリックイベントでも自動発音（デスクトップ対応）
-            document.addEventListener('click', autoPronounce, { once: true });
-            
-            // キーボードイベントでも自動発音
-            document.addEventListener('keydown', autoPronounce, { once: true });
-            
-            // 5秒後に自動発音を試行（一部のブラウザでは動作する場合がある）
-            setTimeout(function() {
-                if (!hasAutoPronounced) {
-                    pronounceWord();
-                }
-            }, 5000);
-        }
+
 
         // 音声合成の初期化（モバイル対応）
         function initializeSpeechSynthesis() {
@@ -559,7 +530,7 @@
 
 
 
-        // カードをタップして裏返す
+        // カードをタップして答えを表示
         function toggleCard() {
             if (!isCardFlipped) {
                 showAnswer();
@@ -570,12 +541,12 @@
         function showAnswer() {
             if (isCardFlipped) return;
             
-            const cardInner = document.getElementById('card-inner');
+            const meaningElement = document.getElementById('meaning-text');
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             
-            // カードをひっくり返す
-            cardInner.classList.add('flipped');
+            // 日本語の意味を表示
+            meaningElement.style.display = 'block';
             isCardFlipped = true;
             
             // ボタンを有効化
