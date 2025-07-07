@@ -213,11 +213,12 @@
             font-size: 1.1rem;
             min-height: 60px;
             touch-action: manipulation;
-            transition: all 0.1s ease;
+            transition: all 0.05s ease;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            will-change: transform;
         }
 
         .answer-btn.known {
@@ -235,8 +236,9 @@
         }
 
         .answer-btn:not(:disabled):active {
-            transform: scale(0.92);
+            transform: scale(0.85);
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: transform 0.02s ease;
         }
 
         .answer-btn:not(:disabled):hover {
@@ -495,14 +497,16 @@
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
-            // 音声合成の初期化（モバイル対応）
-            initializeSpeechSynthesis();
-            
             // 即座に答えを表示（遅延なし）
             showAnswer();
 
             // タッチイベントの設定
             setupTouchEvents();
+            
+            // 音声合成の初期化（バックグラウンドで実行）
+            setTimeout(() => {
+                initializeSpeechSynthesis();
+            }, 50);
         });
 
 
@@ -548,14 +552,7 @@
             knownBtn.disabled = false;
             unknownBtn.disabled = false;
             
-            // 音声合成の初期化を非同期で実行
-            setTimeout(() => {
-                if (speechSynthesis.onvoiceschanged !== undefined) {
-                    speechSynthesis.onvoiceschanged = function() {
-                        // 音声合成の初期化完了
-                    };
-                }
-            }, 100);
+            
         }
 
         // タッチイベントの設定
@@ -591,19 +588,22 @@
             // 即座に視覚的フィードバック
             const clickedBtn = event.target.closest('.answer-btn');
             if (clickedBtn) {
-                clickedBtn.style.transform = 'scale(0.9)';
-                clickedBtn.style.transition = 'transform 0.05s ease';
+                clickedBtn.style.transform = 'scale(0.85)';
+                clickedBtn.style.transition = 'transform 0.02s ease';
             }
             
             isAnswered = true;
             
-            // ボタンを無効化して重複クリックを防止
+            // ボタンを即座に無効化
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             knownBtn.disabled = true;
             unknownBtn.disabled = true;
             
-            // サーバーに結果を送信
+            // 即座にページ遷移の準備
+            let isCompleted = false;
+            
+            // サーバーに結果を送信（非同期）
             fetch('/vocabulary/answer', {
                 method: 'POST',
                 headers: {
@@ -617,21 +617,28 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'completed') {
-                    // 学習完了
+                    isCompleted = true;
+                    // 学習完了 - 即座に遷移
                     window.location.href = '/vocabulary/result/{{ source }}';
                 } else {
-                    // 次の単語へ
+                    // 次の単語へ - 即座にリロード
                     window.location.reload();
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('エラーが発生しました');
                 // エラー時はボタンを再度有効化
                 isAnswered = false;
                 knownBtn.disabled = false;
                 unknownBtn.disabled = false;
             });
+            
+            // タイムアウト処理（3秒後に強制リロード）
+            setTimeout(() => {
+                if (!isCompleted) {
+                    window.location.reload();
+                }
+            }, 3000);
         }
 
         // 発音機能（モバイル対応）
