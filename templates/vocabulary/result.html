@@ -302,63 +302,189 @@
 
         /* === ここからスマホ用CSS === */
         @media (max-width: 767px) {
-            /* フィルター全体 */
-            .filter-section, .filter-card {
-                width: 100% !important;
-                min-width: 0 !important;
-                padding: 0.5rem 0.2rem !important;
-                box-sizing: border-box;
+            /* 全体のコンテナ調整 */
+            .container {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
+            .main-container {
+                margin-top: 1rem !important;
+                margin-bottom: 1rem !important;
+                border-radius: 15px !important;
+            }
+            .content-section {
+                padding: 1.5rem 1rem !important;
+            }
+            
+            /* ヘッダーセクション */
+            .header-section {
+                padding: 2rem 1rem !important;
+                border-radius: 15px 15px 0 0 !important;
+            }
+            .header-section h1 {
+                font-size: 1.8rem !important;
+            }
+            .header-section .lead {
+                font-size: 1rem !important;
+            }
+            
+            /* パンくずリスト */
+            .breadcrumb {
+                font-size: 0.8rem !important;
                 margin-bottom: 1rem !important;
             }
-            .filter-section h3, .filter-card h3 {
-                font-size: 1.1rem !important;
-                margin-bottom: 0.5rem !important;
-            }
-            .filter-btn-group, .filter-btns {
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 0.4rem !important;
-                width: 100% !important;
-            }
-            .filter-btn, .btn-filter {
-                width: 100% !important;
-                font-size: 1rem !important;
-                padding: 0.7rem 0.5rem !important;
-                box-sizing: border-box;
+            .breadcrumb-item {
                 word-break: break-all;
             }
-
+            
+            /* 結果カード */
+            .result-card {
+                padding: 1.5rem 1rem !important;
+                margin-bottom: 1.5rem !important;
+            }
+            .accuracy-meter {
+                width: 120px !important;
+                height: 120px !important;
+            }
+            .accuracy-text {
+                font-size: 1.2rem !important;
+            }
+            .result-icon {
+                font-size: 3rem !important;
+            }
+            .result-card h3 {
+                font-size: 1.3rem !important;
+            }
+            
+            /* 統計グリッド */
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 0.8rem !important;
+                margin: 1.5rem 0 !important;
+            }
+            .stat-item {
+                padding: 1rem 0.5rem !important;
+            }
+            .stat-number {
+                font-size: 2rem !important;
+            }
+            .stat-label {
+                font-size: 0.8rem !important;
+            }
+            
+            /* フィルターセクション */
+            .filter-section {
+                padding: 1rem !important;
+                margin-bottom: 1.5rem !important;
+            }
+            .filter-section h5 {
+                font-size: 1rem !important;
+                margin-bottom: 1rem !important;
+            }
+            .filter-btn {
+                width: 100% !important;
+                margin: 0 0 0.5rem 0 !important;
+                padding: 0.8rem 0.5rem !important;
+                font-size: 0.9rem !important;
+                word-break: break-all;
+                white-space: normal !important;
+            }
+            
             /* 問題一覧 */
-            .question-list-section, .question-list-card {
-                width: 100% !important;
-                min-width: 0 !important;
-                padding: 0.5rem 0.2rem !important;
-                box-sizing: border-box;
+            .review-section {
+                padding: 1.5rem 1rem !important;
+                margin-bottom: 1.5rem !important;
+            }
+            .review-section h3 {
+                font-size: 1.2rem !important;
                 margin-bottom: 1rem !important;
             }
-            .question-list-section h3, .question-list-card h3 {
-                font-size: 1.1rem !important;
-                margin-bottom: 0.5rem !important;
+            .word-list {
+                padding: 1rem !important;
+                margin-bottom: 1.5rem !important;
             }
-            .question-list, .result-list, .wrong-list-section ul {
+            .word-list h5 {
+                font-size: 1rem !important;
+                margin-bottom: 1rem !important;
+            }
+            .word-item {
+                padding: 1rem !important;
+                margin-bottom: 0.8rem !important;
+            }
+            .word-header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 0.5rem !important;
+            }
+            .word-text {
+                font-size: 1.3rem !important;
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 0.5rem !important;
+            }
+            .pronunciation-btn {
+                width: 35px !important;
+                height: 35px !important;
+                font-size: 0.9rem !important;
+            }
+            .result-badge {
+                align-self: flex-start !important;
+                font-size: 0.7rem !important;
+                padding: 0.2rem 0.5rem !important;
+            }
+            .word-meaning {
+                font-size: 1rem !important;
+                margin-top: 0.8rem !important;
+            }
+            
+            /* アクションボタン */
+            .action-buttons {
+                margin-top: 1.5rem !important;
+            }
+            .btn-custom {
                 width: 100% !important;
-                overflow-x: auto !important;
+                margin: 0 0 0.8rem 0 !important;
+                padding: 1rem 1.5rem !important;
                 font-size: 1rem !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                box-sizing: border-box;
             }
-            .question-list li, .result-list li, .wrong-list-section li {
-                font-size: 1rem !important;
-                padding: 0.3rem 0.2rem !important;
-                word-break: break-all;
-                border-radius: 6px;
-                margin-bottom: 0.2rem;
+            
+            /* テキストの調整 */
+            .text-muted {
+                font-size: 0.9rem !important;
             }
-            /* ボタンやアイコンが横並びの場合は折り返し */
-            .question-list .btn-group, .result-list .btn-group {
-                flex-wrap: wrap !important;
-                gap: 0.3rem !important;
+        }
+        
+        /* さらに小さい画面用 */
+        @media (max-width: 480px) {
+            .container {
+                padding-left: 0.3rem !important;
+                padding-right: 0.3rem !important;
+            }
+            .content-section {
+                padding: 1rem 0.5rem !important;
+            }
+            .header-section {
+                padding: 1.5rem 0.5rem !important;
+            }
+            .header-section h1 {
+                font-size: 1.5rem !important;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr !important;
+                gap: 0.5rem !important;
+            }
+            .stat-item {
+                padding: 0.8rem 0.3rem !important;
+            }
+            .stat-number {
+                font-size: 1.8rem !important;
+            }
+            .word-text {
+                font-size: 1.1rem !important;
+            }
+            .btn-custom {
+                padding: 0.8rem 1rem !important;
+                font-size: 0.9rem !important;
             }
         }
     </style>
