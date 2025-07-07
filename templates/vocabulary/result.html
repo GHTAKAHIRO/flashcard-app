@@ -812,6 +812,14 @@
             
             // 音声合成の初期化
             initializeSpeechSynthesis();
+            
+            // セッションストレージのクリーンアップ
+            try {
+                sessionStorage.removeItem('vocabulary_results');
+                sessionStorage.removeItem('vocabulary_source');
+            } catch (e) {
+                console.log('セッションストレージのクリーンアップでエラー:', e);
+            }
         });
     </script>
 </body>

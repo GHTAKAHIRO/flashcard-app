@@ -2460,6 +2460,8 @@ def vocabulary_complete():
         session['vocabulary_session'] = vocabulary_session
         session.modified = True
         
+        app.logger.info(f"英単語学習完了: user={current_user.id}, results_count={len(results)}")
+        
         # データベースにすべての結果を記録
         try:
             with get_db_connection() as conn:
@@ -2480,8 +2482,10 @@ def vocabulary_complete():
                             vocabulary_session.get('chunk_number')
                         ))
                     conn.commit()
+                    app.logger.info(f"データベース記録完了: {len(results)}件")
         except Exception as e:
             app.logger.error(f"データベース記録エラー: {e}")
+            # データベースエラーでもセッションは保存されているので続行
         
         return jsonify({'status': 'success'})
         
@@ -2529,6 +2533,15 @@ def vocabulary_result(source):
                         
             except Exception as e:
                 app.logger.error(f"データベースからの結果取得エラー: {e}")
+        
+        # 結果がまだ空の場合は、エラーページを表示
+        if not results:
+            app.logger.warning(f"セッションとデータベースの両方から結果を取得できませんでした: user={current_user.id}, source={source}")
+            # フラッシュメッセージを表示してホームにリダイレクト
+            flash("学習結果の取得に失敗しました。再度学習を開始してください。")
+            return redirect(url_for('vocabulary_home'))
+        
+        app.logger.info(f"結果ページ表示: user={current_user.id}, source={source}, results_count={len(results)}")
         
         unknown_words = [r for r in results if r['result'] == 'unknown']
         known_count = len([r for r in results if r['result'] == 'known'])
@@ -2578,9 +2591,6 @@ def vocabulary_result(source):
         }
         chapter_title = chapter_titles.get(chapter_id, f'Chapter {chapter_id}') if chapter_id else None
         
-        # セッションをクリア
-        session.pop('vocabulary_session', None)
-        
         return render_template('vocabulary/result.html',
                              unknown_words=unknown_words,
                              all_words=all_words,
@@ -2592,6 +2602,9 @@ def vocabulary_result(source):
                              chapter_id=chapter_id,
                              chapter_title=chapter_title,
                              chunk_number=chunk_number)
+        
+        # セッションをクリア（テンプレート表示後に実行）
+        session.pop('vocabulary_session', None)
         
     except Exception as e:
         app.logger.error(f"英単語結果画面エラー: {e}")

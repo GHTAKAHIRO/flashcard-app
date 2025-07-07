@@ -714,18 +714,22 @@
                 result: result
             });
             
-            // 即座に次の問題に切り替え（高速性を優先）
-            switchToNextWord();
-            
             // 最後の問題の場合は、すべての結果をサーバーに送信
             if (currentWordIndex >= totalWords) {
                 sendAllResults();
+            } else {
+                // 次の問題に切り替え
+                switchToNextWord();
             }
         }
         
         // すべての結果をサーバーに送信
         function sendAllResults() {
             console.log('すべての結果をサーバーに送信:', clientResults);
+            
+            // セッションに結果を保存（フォールバック用）
+            sessionStorage.setItem('vocabulary_results', JSON.stringify(clientResults));
+            sessionStorage.setItem('vocabulary_source', '{{ source }}');
             
             fetch('/vocabulary/complete', {
                 method: 'POST',
@@ -737,16 +741,23 @@
                     results: clientResults
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'success') {
                     // 結果ページに遷移
                     window.location.href = '/vocabulary/result/{{ source }}';
+                } else {
+                    throw new Error('Server returned error status');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                // エラー時も結果ページに遷移
+                // エラー時も結果ページに遷移（セッションストレージのデータを使用）
                 window.location.href = '/vocabulary/result/{{ source }}';
             });
         }
