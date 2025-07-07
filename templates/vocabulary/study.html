@@ -213,7 +213,7 @@
             font-size: 1.1rem;
             min-height: 60px;
             touch-action: manipulation;
-            transition: all 0.05s ease;
+            transition: none;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             user-select: none;
             -webkit-user-select: none;
@@ -238,12 +238,13 @@
         .answer-btn:not(:disabled):active {
             transform: scale(0.85);
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            transition: transform 0.02s ease;
+            transition: none;
         }
 
         .answer-btn:not(:disabled):hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            transition: none;
         }
         
 
@@ -589,7 +590,7 @@
             const clickedBtn = event.target.closest('.answer-btn');
             if (clickedBtn) {
                 clickedBtn.style.transform = 'scale(0.85)';
-                clickedBtn.style.transition = 'transform 0.02s ease';
+                clickedBtn.style.transition = 'none';
             }
             
             isAnswered = true;
