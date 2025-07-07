@@ -521,8 +521,11 @@
                 return;
             }
             
-            // 即座に答えを表示（遅延なし）
-            showAnswer();
+            // 初期状態では問題のみを表示（解答は非表示）
+            const meaningElement = document.getElementById('meaning-text');
+            const pronunciationSection = document.getElementById('pronunciation-section');
+            meaningElement.style.display = 'none';
+            pronunciationSection.style.display = 'none';
 
             // タッチイベントの設定
             setupTouchEvents();
@@ -534,6 +537,11 @@
             setTimeout(() => {
                 initializeSpeechSynthesis();
             }, 50);
+            
+            // 1秒後に自動で解答を表示
+            setTimeout(() => {
+                showAnswer();
+            }, 1000);
         });
 
 
@@ -672,9 +680,10 @@
                 progressElement.textContent = `${currentWordIndex + 1} / ${totalWords} 問目`;
             }
             
-            // 即座に答えを表示してボタンを有効化
-            console.log('答えを表示してボタンを有効化');
-            showAnswer();
+            // 1秒後に自動で解答を表示
+            setTimeout(() => {
+                showAnswer();
+            }, 1000);
         }
 
         // 回答処理
