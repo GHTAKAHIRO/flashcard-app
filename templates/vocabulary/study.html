@@ -497,6 +497,11 @@
     <script>
         let isAnswered = false;
         let isCardFlipped = false;
+        
+        // 全問題データを事前に準備
+        const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe }}');
+        let currentWordIndex = parseInt('{{ current_index - 1 }}');
+        const totalWords = parseInt('{{ total_words }}');
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
@@ -606,6 +611,45 @@
             });
         }
 
+        // 次の問題に即座に切り替え
+        function switchToNextWord() {
+            currentWordIndex++;
+            
+            if (currentWordIndex >= totalWords) {
+                // 学習完了
+                window.location.href = '/vocabulary/result/{{ source }}';
+                return;
+            }
+            
+            // 次の問題を表示
+            const nextWord = allWords[currentWordIndex];
+            const wordText = document.getElementById('word-text');
+            const meaningText = document.getElementById('meaning-text');
+            
+            wordText.textContent = nextWord.word;
+            meaningText.textContent = nextWord.meaning;
+            meaningText.style.display = 'none';
+            
+            // 状態をリセット
+            isAnswered = false;
+            isCardFlipped = false;
+            
+            // ボタンをリセット
+            const knownBtn = document.getElementById('known-btn');
+            const unknownBtn = document.getElementById('unknown-btn');
+            const pronunciationSection = document.getElementById('pronunciation-section');
+            
+            knownBtn.disabled = true;
+            unknownBtn.disabled = true;
+            pronunciationSection.style.display = 'none';
+            
+            // 進捗表示を更新
+            const progressElement = document.querySelector('.header-section p');
+            if (progressElement) {
+                progressElement.textContent = `${currentWordIndex + 1} / ${totalWords} 問目`;
+            }
+        }
+
         // 回答処理
         function answer(result) {
             if (isAnswered) return;
@@ -626,18 +670,9 @@
             unknownBtn.disabled = true;
             
             // 即座に次の問題に切り替え（高速性を優先）
-            const currentIndex = parseInt('{{ current_index - 1 }}');
-            const totalWords = parseInt('{{ total_words }}');
+            switchToNextWord();
             
-            if (currentIndex + 1 >= totalWords) {
-                // 最後の問題の場合、完了画面へ
-                window.location.href = '/vocabulary/result/{{ source }}';
-            } else {
-                // 次の問題へ即座に切り替え
-                window.location.reload();
-            }
-            
-            // バックグラウンドでサーバーに結果を送信（エラーは無視）
+            // バックグラウンドでサーバーに結果を送信
             fetch('/vocabulary/answer', {
                 method: 'POST',
                 headers: {

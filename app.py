@@ -2370,33 +2370,54 @@ def vocabulary_answer():
         session['vocabulary_session'] = vocabulary_session
         session.modified = True  # セッションの変更を確実に保存
         
-        # バックグラウンドでデータベースに記録（非同期処理）
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute('''
-                        INSERT INTO vocabulary_study_log 
-                        (user_id, word_id, result, source, study_date, session_id, chapter_id, chunk_number)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ''', (
-                        str(current_user.id),
-                        current_word['id'],
-                        result,
-                        vocabulary_session['source'],
-                        datetime.now(),
-                        vocabulary_session.get('session_id', str(datetime.now().timestamp())),
-                        vocabulary_session.get('chapter_id'),
-                        vocabulary_session.get('chunk_number')
-                    ))
-                    conn.commit()
-        except Exception as e:
-            app.logger.error(f"データベース記録エラー: {e}")
-            # エラーは無視して処理を続行
-        
         # 学習完了かチェック
         if vocabulary_session['current_index'] >= len(words):
+            # 完了時はデータベース記録を確実に実行
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute('''
+                            INSERT INTO vocabulary_study_log 
+                            (user_id, word_id, result, source, study_date, session_id, chapter_id, chunk_number)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ''', (
+                            str(current_user.id),
+                            current_word['id'],
+                            result,
+                            vocabulary_session['source'],
+                            datetime.now(),
+                            vocabulary_session.get('session_id', str(datetime.now().timestamp())),
+                            vocabulary_session.get('chapter_id'),
+                            vocabulary_session.get('chunk_number')
+                        ))
+                        conn.commit()
+            except Exception as e:
+                app.logger.error(f"データベース記録エラー: {e}")
+            
             return jsonify({'status': 'completed'})
         else:
+            # 継続時はバックグラウンドでデータベース記録
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute('''
+                            INSERT INTO vocabulary_study_log 
+                            (user_id, word_id, result, source, study_date, session_id, chapter_id, chunk_number)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ''', (
+                            str(current_user.id),
+                            current_word['id'],
+                            result,
+                            vocabulary_session['source'],
+                            datetime.now(),
+                            vocabulary_session.get('session_id', str(datetime.now().timestamp())),
+                            vocabulary_session.get('chapter_id'),
+                            vocabulary_session.get('chunk_number')
+                        ))
+                        conn.commit()
+            except Exception as e:
+                app.logger.error(f"データベース記録エラー: {e}")
+            
             return jsonify({'status': 'continue'})
             
     except Exception as e:
