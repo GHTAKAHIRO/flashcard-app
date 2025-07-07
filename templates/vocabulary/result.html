@@ -583,15 +583,26 @@
             }
         }
 
-        // 発音機能
+        // 発音機能（モバイル対応）
         function pronounceWord(word, event) {
             event.stopPropagation();
             const pronunciationBtn = event.target.closest('.pronunciation-btn');
+            
+            // 音声合成が利用可能かチェック
+            if (!speechSynthesis) {
+                console.warn('音声合成が利用できません');
+                showPronunciationError(pronunciationBtn);
+                return;
+            }
             
             // 既存の発音を停止
             if (currentUtterance) {
                 speechSynthesis.cancel();
             }
+            
+            // ボタンの状態を変更
+            pronunciationBtn.classList.add('playing');
+            pronunciationBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
             
             // 新しい発音を作成
             currentUtterance = new SpeechSynthesisUtterance(word);
@@ -600,12 +611,14 @@
             currentUtterance.pitch = 1.0;
             currentUtterance.volume = 1.0;
             
-            // ボタンの状態を変更
-            pronunciationBtn.classList.add('playing');
-            pronunciationBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-            
             // 発音開始
-            speechSynthesis.speak(currentUtterance);
+            try {
+                speechSynthesis.speak(currentUtterance);
+            } catch (error) {
+                console.error('発音エラー:', error);
+                showPronunciationError(pronunciationBtn);
+                return;
+            }
             
             // 発音終了時の処理
             currentUtterance.onend = function() {
@@ -615,11 +628,52 @@
             };
             
             // エラー時の処理
-            currentUtterance.onerror = function() {
-                pronunciationBtn.classList.remove('playing');
-                pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+            currentUtterance.onerror = function(event) {
+                console.error('発音エラー:', event.error);
+                showPronunciationError(pronunciationBtn);
                 currentUtterance = null;
             };
+        }
+
+        // 発音エラー時の処理
+        function showPronunciationError(btn) {
+            btn.classList.remove('playing');
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            btn.style.background = '#dc3545';
+            
+            setTimeout(function() {
+                btn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                btn.style.background = '#667eea';
+            }, 2000);
+        }
+
+        // 音声合成の初期化（モバイル対応）
+        function initializeSpeechSynthesis() {
+            // 音声合成が利用可能かチェック
+            if (!window.speechSynthesis) {
+                console.warn('音声合成が利用できません');
+                return;
+            }
+            
+            // モバイルブラウザでの音声合成初期化
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = function() {
+                    console.log('音声合成が初期化されました');
+                    // 利用可能な音声をログ出力（デバッグ用）
+                    const voices = speechSynthesis.getVoices();
+                    console.log('利用可能な音声:', voices.length, '個');
+                    voices.forEach((voice, index) => {
+                        if (voice.lang.startsWith('en')) {
+                            console.log(`音声${index}: ${voice.name} (${voice.lang})`);
+                        }
+                    });
+                };
+            }
+            
+            // 音声合成の状態を確認
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
         }
 
         // 問題クリックで解答表示
@@ -636,6 +690,9 @@
                     }
                 });
             });
+            
+            // 音声合成の初期化
+            initializeSpeechSynthesis();
         });
     </script>
 </body>

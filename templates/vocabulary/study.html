@@ -139,6 +139,50 @@
             font-weight: bold;
         }
 
+        /* 発音ボタンのスタイル */
+        .pronunciation-btn {
+            background: #667eea;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 1rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .pronunciation-btn:hover {
+            background: #5a6fd8;
+            transform: scale(1.05);
+        }
+
+        .pronunciation-btn.playing {
+            background: #28a745;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* モバイル向け発音ボタン */
+        @media (max-width: 767px) {
+            .pronunciation-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 1.2rem;
+                margin-left: 0.5rem;
+            }
+        }
+
         /* ボタンセクション - タッチ最適化 */
         .button-section {
             text-align: center;
@@ -403,6 +447,9 @@
                         <div class="card-front">
                             <div class="word-text" id="word-text">
                                 {{ word.word }}
+                                <button class="pronunciation-btn" onclick="pronounceWord(event)" title="発音を聞く">
+                                    <i class="fas fa-volume-up"></i>
+                                </button>
                             </div>
                         </div>
                         
@@ -435,10 +482,8 @@
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
-            // 問題表示と同時に自動発音
-            setTimeout(function() {
-                pronounceWord();
-            }, 500);
+            // 音声合成の初期化（モバイル対応）
+            initializeSpeechSynthesis();
             
             // 1秒後に自動で答えを表示
             setTimeout(function() {
@@ -447,7 +492,72 @@
 
             // タッチイベントの設定
             setupTouchEvents();
+            
+            // スマホ対応の自動発音設定
+            setupMobileAutoPronunciation();
         });
+
+        // スマホ対応の自動発音設定
+        function setupMobileAutoPronunciation() {
+            let hasAutoPronounced = false;
+            
+            // ユーザーが画面をタップした時に自動発音
+            const autoPronounce = function() {
+                if (!hasAutoPronounced) {
+                    hasAutoPronounced = true;
+                    setTimeout(function() {
+                        pronounceWord();
+                    }, 100);
+                }
+            };
+            
+            // タッチイベントで自動発音
+            document.addEventListener('touchstart', autoPronounce, { once: true });
+            
+            // クリックイベントでも自動発音（デスクトップ対応）
+            document.addEventListener('click', autoPronounce, { once: true });
+            
+            // キーボードイベントでも自動発音
+            document.addEventListener('keydown', autoPronounce, { once: true });
+            
+            // 5秒後に自動発音を試行（一部のブラウザでは動作する場合がある）
+            setTimeout(function() {
+                if (!hasAutoPronounced) {
+                    pronounceWord();
+                }
+            }, 5000);
+        }
+
+        // 音声合成の初期化（モバイル対応）
+        function initializeSpeechSynthesis() {
+            // 音声合成が利用可能かチェック
+            if (!window.speechSynthesis) {
+                console.warn('音声合成が利用できません');
+                return;
+            }
+            
+            // モバイルブラウザでの音声合成初期化
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = function() {
+                    console.log('音声合成が初期化されました');
+                    // 利用可能な音声をログ出力（デバッグ用）
+                    const voices = speechSynthesis.getVoices();
+                    console.log('利用可能な音声:', voices.length, '個');
+                    voices.forEach((voice, index) => {
+                        if (voice.lang.startsWith('en')) {
+                            console.log(`音声${index}: ${voice.name} (${voice.lang})`);
+                        }
+                    });
+                };
+            }
+            
+            // 音声合成の状態を確認
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+        }
+
+
 
         // カードをタップして裏返す
         function toggleCard() {
@@ -532,17 +642,37 @@
             });
         }
 
-        // 発音機能
+        // 発音機能（モバイル対応）
         let speechSynthesis = window.speechSynthesis;
         let currentUtterance = null;
 
-        function pronounceWord() {
+        function pronounceWord(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            
             const wordElement = document.getElementById('word-text');
             const word = wordElement.textContent.trim();
+            const pronunciationBtn = event ? event.target.closest('.pronunciation-btn') : null;
+            
+            // 音声合成が利用可能かチェック
+            if (!speechSynthesis) {
+                console.warn('音声合成が利用できません');
+                if (pronunciationBtn) {
+                    showPronunciationError(pronunciationBtn);
+                }
+                return;
+            }
             
             // 既存の発音を停止
             if (currentUtterance) {
                 speechSynthesis.cancel();
+            }
+            
+            // ボタンの状態を変更
+            if (pronunciationBtn) {
+                pronunciationBtn.classList.add('playing');
+                pronunciationBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
             }
             
             // 新しい発音を作成
@@ -553,17 +683,45 @@
             currentUtterance.volume = 1.0;
             
             // 発音開始
-            speechSynthesis.speak(currentUtterance);
+            try {
+                speechSynthesis.speak(currentUtterance);
+            } catch (error) {
+                console.error('発音エラー:', error);
+                if (pronunciationBtn) {
+                    showPronunciationError(pronunciationBtn);
+                }
+                return;
+            }
             
             // 発音終了時の処理
             currentUtterance.onend = function() {
+                if (pronunciationBtn) {
+                    pronunciationBtn.classList.remove('playing');
+                    pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                }
                 currentUtterance = null;
             };
             
             // エラー時の処理
-            currentUtterance.onerror = function() {
+            currentUtterance.onerror = function(event) {
+                console.error('発音エラー:', event.error);
+                if (pronunciationBtn) {
+                    showPronunciationError(pronunciationBtn);
+                }
                 currentUtterance = null;
             };
+        }
+
+        // 発音エラー時の処理
+        function showPronunciationError(btn) {
+            btn.classList.remove('playing');
+            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            btn.style.background = '#dc3545';
+            
+            setTimeout(function() {
+                btn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                btn.style.background = '#667eea';
+            }, 2000);
         }
 
         // キーボードショートカット
