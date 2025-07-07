@@ -140,19 +140,23 @@
         }
 
         /* 発音ボタンのスタイル */
+        .pronunciation-section {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        
         .pronunciation-btn {
             background: #667eea;
             border: none;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             color: white;
-            font-size: 1rem;
+            font-size: 1.2rem;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin-left: 1rem;
             transition: all 0.2s ease;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
@@ -176,10 +180,9 @@
         /* モバイル向け発音ボタン */
         @media (max-width: 767px) {
             .pronunciation-btn {
-                width: 50px;
-                height: 50px;
-                font-size: 1.2rem;
-                margin-left: 0.5rem;
+                width: 60px;
+                height: 60px;
+                font-size: 1.4rem;
             }
         }
 
@@ -449,11 +452,13 @@
                         <div class="card-front">
                             <div class="word-text" id="word-text">
                                 {{ word.word }}
+                            </div>
+                            <div class="meaning-text" id="meaning-text" style="display: none;">{{ word.meaning }}</div>
+                            <div class="pronunciation-section" id="pronunciation-section" style="display: none;">
                                 <button class="pronunciation-btn" onclick="pronounceWord(event)" title="発音を聞く">
                                     <i class="fas fa-volume-up"></i>
                                 </button>
                             </div>
-                            <div class="meaning-text" id="meaning-text" style="display: none;">{{ word.meaning }}</div>
                         </div>
                         
                         <!-- カードの裏面（答え） -->
@@ -542,11 +547,13 @@
             if (isCardFlipped) return;
             
             const meaningElement = document.getElementById('meaning-text');
+            const pronunciationSection = document.getElementById('pronunciation-section');
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             
-            // 日本語の意味を表示
+            // 日本語の意味と発音ボタンを表示
             meaningElement.style.display = 'block';
+            pronunciationSection.style.display = 'block';
             isCardFlipped = true;
             
             // ボタンを有効化
