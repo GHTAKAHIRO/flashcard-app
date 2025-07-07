@@ -499,12 +499,25 @@
         let isCardFlipped = false;
         
         // 全問題データを事前に準備
-        const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe }}');
-        let currentWordIndex = parseInt('{{ current_index - 1 }}');
-        const totalWords = parseInt('{{ total_words }}');
+        const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe if vocabulary_session and vocabulary_session.words else "[]" }}');
+        let currentWordIndex = parseInt('{{ current_index - 1 }}') || 0;
+        const totalWords = parseInt('{{ total_words }}') || 0;
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
+            // データの整合性チェック
+            if (!allWords || allWords.length === 0) {
+                console.error('問題データが読み込まれていません');
+                alert('問題データの読み込みに失敗しました。ページを再読み込みしてください。');
+                return;
+            }
+            
+            if (currentWordIndex >= allWords.length) {
+                console.error('現在の問題番号が不正です');
+                window.location.href = '/vocabulary/result/{{ source }}';
+                return;
+            }
+            
             // 即座に答えを表示（遅延なし）
             showAnswer();
 

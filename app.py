@@ -2243,21 +2243,27 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
     try:
         app.logger.info(f"英単語学習開始: user={current_user.id}, source={source}, chapter={chapter_id}, chunk={chunk_number}, mode={mode}")
         
-        # 指定されたチャンクの単語を取得（仮の実装）
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute('''
-                    SELECT id, word, meaning, example_sentence
-                    FROM vocabulary_words 
-                    WHERE source = %s 
-                    ORDER BY RANDOM() 
-                    LIMIT 20
-                ''', (source,))
-                words = cur.fetchall()
-        
-        if not words:
-            app.logger.warning(f"単語が見つかりません: source={source}")
-            flash("単語が見つかりませんでした")
+        # 指定されたチャンクの単語を取得
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('''
+                        SELECT id, word, meaning, example_sentence
+                        FROM vocabulary_words 
+                        WHERE source = %s 
+                        ORDER BY RANDOM() 
+                        LIMIT 20
+                    ''', (source,))
+                    words = cur.fetchall()
+            
+            if not words:
+                app.logger.warning(f"単語が見つかりません: source={source}")
+                flash("単語が見つかりませんでした")
+                return redirect(url_for('vocabulary_home'))
+                
+        except Exception as e:
+            app.logger.error(f"データベース接続エラー: {e}")
+            flash("データベース接続エラーが発生しました")
             return redirect(url_for('vocabulary_home'))
         
         # セッションに学習情報を保存
@@ -2275,16 +2281,22 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
         }
         
         # セッションに保存
-        session['vocabulary_session'] = vocabulary_session
-        session.modified = True  # セッションの変更を確実に保存
-        
-        app.logger.info(f"セッション保存完了: session_id={session_id}, words_count={len(words)}")
-        
-        # リダイレクト先のURLを生成
-        study_url = url_for('vocabulary_study', source=source)
-        app.logger.info(f"学習画面にリダイレクト: {study_url}")
-        
-        return redirect(study_url)
+        try:
+            session['vocabulary_session'] = vocabulary_session
+            session.modified = True  # セッションの変更を確実に保存
+            
+            app.logger.info(f"セッション保存完了: session_id={session_id}, words_count={len(words)}")
+            
+            # リダイレクト先のURLを生成
+            study_url = url_for('vocabulary_study', source=source)
+            app.logger.info(f"学習画面にリダイレクト: {study_url}")
+            
+            return redirect(study_url)
+            
+        except Exception as e:
+            app.logger.error(f"セッション保存エラー: {e}")
+            flash("セッション保存エラーが発生しました")
+            return redirect(url_for('vocabulary_home'))
         
     except Exception as e:
         app.logger.error(f"英単語学習開始エラー: {e}")
@@ -2303,7 +2315,13 @@ def vocabulary_study(source):
         
         if not vocabulary_session:
             app.logger.warning(f"セッション情報が見つかりません: user={current_user.id}, source={source}")
-            flash("学習セッションが見つかりません")
+            flash("学習セッションが見つかりません。学習を再開始してください。")
+            return redirect(url_for('vocabulary_home'))
+        
+        # セッションの整合性チェック
+        if 'current_index' not in vocabulary_session or 'words' not in vocabulary_session:
+            app.logger.warning(f"セッション情報が不完全: {vocabulary_session}")
+            flash("学習セッションが破損しています。学習を再開始してください。")
             return redirect(url_for('vocabulary_home'))
         
         # セッションの整合性チェック
@@ -2331,7 +2349,8 @@ def vocabulary_study(source):
                              word=current_word, 
                              current_index=current_index + 1,
                              total_words=len(words),
-                             source=source)
+                             source=source,
+                             vocabulary_session=vocabulary_session)
         
     except Exception as e:
         app.logger.error(f"英単語学習画面エラー: {e}")
