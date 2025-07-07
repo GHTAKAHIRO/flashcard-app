@@ -213,8 +213,11 @@
             font-size: 1.1rem;
             min-height: 60px;
             touch-action: manipulation;
-            transition: all 0.2s ease;
+            transition: all 0.1s ease;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .answer-btn.known {
@@ -232,13 +235,19 @@
         }
 
         .answer-btn:not(:disabled):active {
-            transform: scale(0.95);
+            transform: scale(0.92);
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
 
         .answer-btn:not(:disabled):hover {
-            transform: translateY(-2px);
+            transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        /* タッチデバイスでの即座の反応 */
+        .answer-btn:not(:disabled):active {
+            transform: scale(0.92) !important;
+            transition: transform 0.05s ease !important;
         }
 
         /* タブレット向けスタイル */
@@ -334,6 +343,11 @@
             .answer-btn:hover {
                 transform: none;
                 box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            }
+            
+            .answer-btn:active {
+                transform: scale(0.92) !important;
+                transition: transform 0.05s ease !important;
             }
 
             .word-card {
@@ -599,7 +613,20 @@
         function answer(result) {
             if (isAnswered) return;
             
+            // 即座に視覚的フィードバック
+            const clickedBtn = event.target.closest('.answer-btn');
+            if (clickedBtn) {
+                clickedBtn.style.transform = 'scale(0.9)';
+                clickedBtn.style.transition = 'transform 0.05s ease';
+            }
+            
             isAnswered = true;
+            
+            // ボタンを無効化して重複クリックを防止
+            const knownBtn = document.getElementById('known-btn');
+            const unknownBtn = document.getElementById('unknown-btn');
+            knownBtn.disabled = true;
+            unknownBtn.disabled = true;
             
             // サーバーに結果を送信
             fetch('/vocabulary/answer', {
@@ -625,6 +652,10 @@
             .catch(error => {
                 console.error('Error:', error);
                 alert('エラーが発生しました');
+                // エラー時はボタンを再度有効化
+                isAnswered = false;
+                knownBtn.disabled = false;
+                unknownBtn.disabled = false;
             });
         }
 
@@ -742,8 +773,10 @@
             if (isAnswered) return;
             
             if (event.key === 'j' || event.key === 'J') {
+                event.preventDefault();
                 answer('known');
             } else if (event.key === 'f' || event.key === 'F') {
+                event.preventDefault();
                 answer('unknown');
             } else if (event.key === ' ' || event.key === 'Enter') {
                 // スペースキーまたはエンターキーでカードを裏返す
@@ -752,6 +785,31 @@
                     showAnswer();
                 }
             }
+        });
+        
+        // タッチイベントの最適化
+        document.addEventListener('DOMContentLoaded', function() {
+            const knownBtn = document.getElementById('known-btn');
+            const unknownBtn = document.getElementById('unknown-btn');
+            
+            // タッチイベントの最適化
+            [knownBtn, unknownBtn].forEach(btn => {
+                btn.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    if (!isAnswered && !btn.disabled) {
+                        this.style.transform = 'scale(0.92)';
+                        this.style.transition = 'transform 0.05s ease';
+                    }
+                }, { passive: false });
+                
+                btn.addEventListener('touchend', function(e) {
+                    e.preventDefault();
+                    if (!isAnswered && !btn.disabled) {
+                        this.style.transform = '';
+                        this.style.transition = '';
+                    }
+                }, { passive: false });
+            });
         });
     </script>
 </body>
