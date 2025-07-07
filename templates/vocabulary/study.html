@@ -498,10 +498,8 @@
             // 音声合成の初期化（モバイル対応）
             initializeSpeechSynthesis();
             
-            // 1秒後に自動で答えを表示
-            setTimeout(function() {
-                showAnswer();
-            }, 1000);
+            // 即座に答えを表示（遅延なし）
+            showAnswer();
 
             // タッチイベントの設定
             setupTouchEvents();
@@ -515,29 +513,6 @@
             if (!window.speechSynthesis) {
                 console.warn('音声合成が利用できません');
                 return;
-            }
-            
-            // モバイルブラウザでの音声合成初期化
-            if (speechSynthesis.onvoiceschanged !== undefined) {
-                speechSynthesis.onvoiceschanged = function() {
-                    console.log('音声合成が初期化されました');
-                    // 利用可能な音声をログ出力（デバッグ用）
-                    const voices = speechSynthesis.getVoices();
-                    console.log('利用可能な音声:', voices.length, '個');
-                    
-                    // 英語音声を優先順位付きで表示
-                    const englishVoices = voices.filter(voice => voice.lang.startsWith('en'));
-                    console.log('英語音声:', englishVoices.length, '個');
-                    englishVoices.forEach((voice, index) => {
-                        const isPreferred = voice.name.includes('Google') || 
-                                           voice.name.includes('Samantha') || 
-                                           voice.name.includes('Alex') ||
-                                           voice.name.includes('Daniel') ||
-                                           voice.name.includes('Karen') ||
-                                           voice.name.includes('Microsoft');
-                        console.log(`${isPreferred ? '★' : ' '} 音声${index}: ${voice.name} (${voice.lang})`);
-                    });
-                };
             }
             
             // 音声合成の状態を確認
@@ -572,6 +547,15 @@
             // ボタンを有効化
             knownBtn.disabled = false;
             unknownBtn.disabled = false;
+            
+            // 音声合成の初期化を非同期で実行
+            setTimeout(() => {
+                if (speechSynthesis.onvoiceschanged !== undefined) {
+                    speechSynthesis.onvoiceschanged = function() {
+                        // 音声合成の初期化完了
+                    };
+                }
+            }, 100);
         }
 
         // タッチイベントの設定
@@ -690,43 +674,15 @@
             currentUtterance.pitch = 1.0;
             currentUtterance.volume = 1.0;
             
-            // より自然な英語音声を選択
+            // 英語音声を選択（簡略化）
             const voices = speechSynthesis.getVoices();
-            const englishVoices = voices.filter(voice => 
-                voice.lang.startsWith('en') && 
-                (voice.name.includes('Google') || 
-                 voice.name.includes('Samantha') || 
-                 voice.name.includes('Alex') ||
-                 voice.name.includes('Daniel') ||
-                 voice.name.includes('Karen') ||
-                 voice.name.includes('Microsoft') ||
-                 voice.name.includes('Enhanced') ||
-                 voice.name.includes('Premium'))
-            );
-            
+            const englishVoices = voices.filter(voice => voice.lang.startsWith('en'));
             if (englishVoices.length > 0) {
-                // より自然な音声を優先選択
                 currentUtterance.voice = englishVoices[0];
-                console.log('選択された音声:', englishVoices[0].name);
-            } else {
-                // フォールバック: 利用可能な英語音声を選択
-                const fallbackVoices = voices.filter(voice => voice.lang.startsWith('en'));
-                if (fallbackVoices.length > 0) {
-                    currentUtterance.voice = fallbackVoices[0];
-                    console.log('フォールバック音声:', fallbackVoices[0].name);
-                }
             }
             
             // 発音開始
-            try {
-                speechSynthesis.speak(currentUtterance);
-            } catch (error) {
-                console.error('発音エラー:', error);
-                if (pronunciationBtn) {
-                    showPronunciationError(pronunciationBtn);
-                }
-                return;
-            }
+            speechSynthesis.speak(currentUtterance);
             
             // 発音終了時の処理
             currentUtterance.onend = function() {
