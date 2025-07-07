@@ -244,11 +244,7 @@
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
         }
         
-        /* タッチデバイスでの即座の反応 */
-        .answer-btn:not(:disabled):active {
-            transform: scale(0.92) !important;
-            transition: transform 0.05s ease !important;
-        }
+
 
         /* タブレット向けスタイル */
         @media (min-width: 768px) {
@@ -343,11 +339,6 @@
             .answer-btn:hover {
                 transform: none;
                 box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            }
-            
-            .answer-btn:active {
-                transform: scale(0.92) !important;
-                transition: transform 0.05s ease !important;
             }
 
             .word-card {
@@ -787,30 +778,7 @@
             }
         });
         
-        // タッチイベントの最適化
-        document.addEventListener('DOMContentLoaded', function() {
-            const knownBtn = document.getElementById('known-btn');
-            const unknownBtn = document.getElementById('unknown-btn');
-            
-            // タッチイベントの最適化
-            [knownBtn, unknownBtn].forEach(btn => {
-                btn.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    if (!isAnswered && !btn.disabled) {
-                        this.style.transform = 'scale(0.92)';
-                        this.style.transition = 'transform 0.05s ease';
-                    }
-                }, { passive: false });
-                
-                btn.addEventListener('touchend', function(e) {
-                    e.preventDefault();
-                    if (!isAnswered && !btn.disabled) {
-                        this.style.transform = '';
-                        this.style.transition = '';
-                    }
-                }, { passive: false });
-            });
-        });
+
     </script>
 </body>
 </html> 
