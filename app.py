@@ -2443,6 +2443,52 @@ def vocabulary_answer():
         app.logger.error(f"英単語回答処理エラー: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/vocabulary/complete', methods=['POST'])
+@login_required
+def vocabulary_complete():
+    """英単語学習完了処理"""
+    try:
+        data = request.get_json()
+        results = data.get('results', [])
+        
+        vocabulary_session = session.get('vocabulary_session')
+        if not vocabulary_session:
+            return jsonify({'error': 'セッションが見つかりません'}), 400
+        
+        # セッションに結果を保存
+        vocabulary_session['results'] = results
+        session['vocabulary_session'] = vocabulary_session
+        session.modified = True
+        
+        # データベースにすべての結果を記録
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    for result in results:
+                        cur.execute('''
+                            INSERT INTO vocabulary_study_log 
+                            (user_id, word_id, result, source, study_date, session_id, chapter_id, chunk_number)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ''', (
+                            str(current_user.id),
+                            result['word_id'],
+                            result['result'],
+                            vocabulary_session['source'],
+                            datetime.now(),
+                            vocabulary_session.get('session_id', str(datetime.now().timestamp())),
+                            vocabulary_session.get('chapter_id'),
+                            vocabulary_session.get('chunk_number')
+                        ))
+                    conn.commit()
+        except Exception as e:
+            app.logger.error(f"データベース記録エラー: {e}")
+        
+        return jsonify({'status': 'success'})
+        
+    except Exception as e:
+        app.logger.error(f"英単語完了処理エラー: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/vocabulary/result/<source>')
 @login_required
 def vocabulary_result(source):
@@ -2453,7 +2499,37 @@ def vocabulary_result(source):
             flash("学習セッションが見つかりません")
             return redirect(url_for('vocabulary_home'))
         
-        results = vocabulary_session['results']
+        results = vocabulary_session.get('results', [])
+        
+        # 結果が空の場合は、データベースから取得を試行
+        if not results:
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        cur.execute('''
+                            SELECT vw.word, vw.meaning, vsl.result
+                            FROM vocabulary_study_log vsl
+                            JOIN vocabulary_words vw ON vsl.word_id = vw.id
+                            WHERE vsl.user_id = %s AND vsl.source = %s AND vsl.session_id = %s
+                            ORDER BY vsl.study_date
+                        ''', (str(current_user.id), source, vocabulary_session.get('session_id')))
+                        db_results = cur.fetchall()
+                        
+                        # データベースの結果をセッション形式に変換
+                        results = [{
+                            'word': r['word'],
+                            'meaning': r['meaning'],
+                            'result': r['result']
+                        } for r in db_results]
+                        
+                        # セッションに保存
+                        vocabulary_session['results'] = results
+                        session['vocabulary_session'] = vocabulary_session
+                        session.modified = True
+                        
+            except Exception as e:
+                app.logger.error(f"データベースからの結果取得エラー: {e}")
+        
         unknown_words = [r for r in results if r['result'] == 'unknown']
         known_count = len([r for r in results if r['result'] == 'known'])
         unknown_count = len(unknown_words)

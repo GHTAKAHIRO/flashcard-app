@@ -502,6 +502,9 @@
         const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe if vocabulary_session and vocabulary_session.words else "[]" }}');
         let currentWordIndex = parseInt('{{ current_index - 1 }}') || 0;
         const totalWords = parseInt('{{ total_words }}') || 0;
+        
+        // クライアント側で結果を管理
+        const clientResults = [];
 
         // ページ読み込み時の初期化
         document.addEventListener('DOMContentLoaded', function() {
@@ -693,32 +696,49 @@
             knownBtn.disabled = true;
             unknownBtn.disabled = true;
             
+            // クライアント側で結果を記録
+            const currentWord = allWords[currentWordIndex];
+            clientResults.push({
+                word_id: currentWord.id,
+                word: currentWord.word,
+                meaning: currentWord.meaning,
+                result: result
+            });
+            
             // 即座に次の問題に切り替え（高速性を優先）
             switchToNextWord();
             
-            // バックグラウンドでサーバーに結果を送信
-            fetch('/vocabulary/answer', {
+            // 最後の問題の場合は、すべての結果をサーバーに送信
+            if (currentWordIndex >= totalWords) {
+                sendAllResults();
+            }
+        }
+        
+        // すべての結果をサーバーに送信
+        function sendAllResults() {
+            console.log('すべての結果をサーバーに送信:', clientResults);
+            
+            fetch('/vocabulary/complete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token() }}'
                 },
                 body: JSON.stringify({
-                    result: result
+                    results: clientResults
                 })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'completed') {
-                    // 完了時は結果ページに遷移（既に遷移済みの場合は無視）
-                    if (window.location.pathname !== '/vocabulary/result/{{ source }}') {
-                        window.location.href = '/vocabulary/result/{{ source }}';
-                    }
+                if (data.status === 'success') {
+                    // 結果ページに遷移
+                    window.location.href = '/vocabulary/result/{{ source }}';
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                // エラーは無視
+                // エラー時も結果ページに遷移
+                window.location.href = '/vocabulary/result/{{ source }}';
             });
         }
 
