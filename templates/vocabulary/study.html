@@ -560,7 +560,12 @@
 
         // 答えを表示
         function showAnswer() {
-            if (isCardFlipped) return;
+            if (isCardFlipped) {
+                console.log('既に答えが表示されています');
+                return;
+            }
+            
+            console.log('答えを表示中...');
             
             const meaningElement = document.getElementById('meaning-text');
             const pronunciationSection = document.getElementById('pronunciation-section');
@@ -576,7 +581,7 @@
             knownBtn.disabled = false;
             unknownBtn.disabled = false;
             
-            
+            console.log('答え表示完了、ボタン有効化');
         }
 
         // 高速ボタンイベントの設定
@@ -627,9 +632,11 @@
         // 次の問題に即座に切り替え
         function switchToNextWord() {
             currentWordIndex++;
+            console.log(`次の問題に切り替え: ${currentWordIndex + 1}/${totalWords}`);
             
             if (currentWordIndex >= totalWords) {
                 // 学習完了
+                console.log('学習完了 - 結果ページに遷移');
                 window.location.href = '/vocabulary/result/{{ source }}';
                 return;
             }
@@ -661,6 +668,10 @@
             if (progressElement) {
                 progressElement.textContent = `${currentWordIndex + 1} / ${totalWords} 問目`;
             }
+            
+            // 即座に答えを表示してボタンを有効化
+            console.log('答えを表示してボタンを有効化');
+            showAnswer();
         }
 
         // 回答処理
