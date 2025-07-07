@@ -159,7 +159,7 @@
             border: none;
             margin-bottom: 1.5rem;
             overflow: hidden;
-            cursor: pointer;
+            cursor: default;
             touch-action: manipulation;
         }
 
@@ -599,5 +599,64 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // チャンク選択ボタンのクリックイベントを確実に動作させる
+        document.addEventListener('DOMContentLoaded', function() {
+            // 学習開始ボタンと復習ボタンのクリックイベントを追加
+            const startButtons = document.querySelectorAll('.start-btn');
+            const reviewButtons = document.querySelectorAll('.review-btn');
+            
+            startButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const href = this.getAttribute('href');
+                    console.log('学習開始ボタンクリック:', href);
+                    
+                    // ボタンを無効化して重複クリックを防ぐ
+                    this.disabled = true;
+                    this.style.opacity = '0.6';
+                    
+                    // 少し遅延してからリダイレクト
+                    setTimeout(() => {
+                        window.location.href = href;
+                    }, 100);
+                });
+            });
+            
+            reviewButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const href = this.getAttribute('href');
+                    console.log('復習ボタンクリック:', href);
+                    
+                    // ボタンを無効化して重複クリックを防ぐ
+                    this.disabled = true;
+                    this.style.opacity = '0.6';
+                    
+                    // 少し遅延してからリダイレクト
+                    setTimeout(() => {
+                        window.location.href = href;
+                    }, 100);
+                });
+            });
+            
+            // チャンクカード全体のクリックイベントを無効化
+            const chunkCards = document.querySelectorAll('.chunk-card');
+            chunkCards.forEach(card => {
+                card.addEventListener('click', function(e) {
+                    // ボタン以外のクリックは無視
+                    if (!e.target.closest('.start-btn') && !e.target.closest('.review-btn')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html> 

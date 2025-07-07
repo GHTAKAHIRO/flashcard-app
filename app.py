@@ -2227,6 +2227,8 @@ def vocabulary_chunks(source, chapter_id):
 def vocabulary_start(source, chapter_id, chunk_number, mode=None):
     """英単語学習開始"""
     try:
+        app.logger.info(f"英単語学習開始: user={current_user.id}, source={source}, chapter={chapter_id}, chunk={chunk_number}, mode={mode}")
+        
         # 指定されたチャンクの単語を取得（仮の実装）
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -2240,12 +2242,13 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
                 words = cur.fetchall()
         
         if not words:
+            app.logger.warning(f"単語が見つかりません: source={source}")
             flash("単語が見つかりませんでした")
             return redirect(url_for('vocabulary_home'))
         
         # セッションに学習情報を保存
         session_id = str(datetime.now().timestamp())
-        session['vocabulary_session'] = {
+        vocabulary_session = {
             'source': source,
             'chapter_id': chapter_id,
             'chunk_number': chunk_number,
@@ -2257,7 +2260,17 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
             'session_id': session_id
         }
         
-        return redirect(url_for('vocabulary_study', source=source))
+        # セッションに保存
+        session['vocabulary_session'] = vocabulary_session
+        session.modified = True  # セッションの変更を確実に保存
+        
+        app.logger.info(f"セッション保存完了: session_id={session_id}, words_count={len(words)}")
+        
+        # リダイレクト先のURLを生成
+        study_url = url_for('vocabulary_study', source=source)
+        app.logger.info(f"学習画面にリダイレクト: {study_url}")
+        
+        return redirect(study_url)
         
     except Exception as e:
         app.logger.error(f"英単語学習開始エラー: {e}")
@@ -2269,19 +2282,34 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
 def vocabulary_study(source):
     """英単語学習画面"""
     try:
+        app.logger.info(f"英単語学習画面アクセス: user={current_user.id}, source={source}")
+        
         vocabulary_session = session.get('vocabulary_session')
-        if not vocabulary_session or vocabulary_session['source'] != source:
+        app.logger.info(f"セッション情報: {vocabulary_session}")
+        
+        if not vocabulary_session:
+            app.logger.warning(f"セッション情報が見つかりません: user={current_user.id}, source={source}")
+            flash("学習セッションが見つかりません")
+            return redirect(url_for('vocabulary_home'))
+        
+        if vocabulary_session['source'] != source:
+            app.logger.warning(f"ソースが一致しません: session_source={vocabulary_session['source']}, request_source={source}")
             flash("学習セッションが見つかりません")
             return redirect(url_for('vocabulary_home'))
         
         current_index = vocabulary_session['current_index']
         words = vocabulary_session['words']
         
+        app.logger.info(f"学習状況: current_index={current_index}, total_words={len(words)}")
+        
         if current_index >= len(words):
             # 学習完了
+            app.logger.info(f"学習完了: 結果画面にリダイレクト")
             return redirect(url_for('vocabulary_result', source=source))
         
         current_word = words[current_index]
+        
+        app.logger.info(f"現在の単語: {current_word['word']}")
         
         return render_template('vocabulary/study.html', 
                              word=current_word, 
