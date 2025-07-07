@@ -519,10 +519,18 @@
                     // 利用可能な音声をログ出力（デバッグ用）
                     const voices = speechSynthesis.getVoices();
                     console.log('利用可能な音声:', voices.length, '個');
-                    voices.forEach((voice, index) => {
-                        if (voice.lang.startsWith('en')) {
-                            console.log(`音声${index}: ${voice.name} (${voice.lang})`);
-                        }
+                    
+                    // 英語音声を優先順位付きで表示
+                    const englishVoices = voices.filter(voice => voice.lang.startsWith('en'));
+                    console.log('英語音声:', englishVoices.length, '個');
+                    englishVoices.forEach((voice, index) => {
+                        const isPreferred = voice.name.includes('Google') || 
+                                           voice.name.includes('Samantha') || 
+                                           voice.name.includes('Alex') ||
+                                           voice.name.includes('Daniel') ||
+                                           voice.name.includes('Karen') ||
+                                           voice.name.includes('Microsoft');
+                        console.log(`${isPreferred ? '★' : ' '} 音声${index}: ${voice.name} (${voice.lang})`);
                     });
                 };
             }
@@ -656,9 +664,36 @@
             // 新しい発音を作成
             currentUtterance = new SpeechSynthesisUtterance(word);
             currentUtterance.lang = 'en-US';
-            currentUtterance.rate = 0.8;
+            currentUtterance.rate = 0.85;  // 自然な速度
             currentUtterance.pitch = 1.0;
             currentUtterance.volume = 1.0;
+            
+            // より自然な英語音声を選択
+            const voices = speechSynthesis.getVoices();
+            const englishVoices = voices.filter(voice => 
+                voice.lang.startsWith('en') && 
+                (voice.name.includes('Google') || 
+                 voice.name.includes('Samantha') || 
+                 voice.name.includes('Alex') ||
+                 voice.name.includes('Daniel') ||
+                 voice.name.includes('Karen') ||
+                 voice.name.includes('Microsoft') ||
+                 voice.name.includes('Enhanced') ||
+                 voice.name.includes('Premium'))
+            );
+            
+            if (englishVoices.length > 0) {
+                // より自然な音声を優先選択
+                currentUtterance.voice = englishVoices[0];
+                console.log('選択された音声:', englishVoices[0].name);
+            } else {
+                // フォールバック: 利用可能な英語音声を選択
+                const fallbackVoices = voices.filter(voice => voice.lang.startsWith('en'));
+                if (fallbackVoices.length > 0) {
+                    currentUtterance.voice = fallbackVoices[0];
+                    console.log('フォールバック音声:', fallbackVoices[0].name);
+                }
+            }
             
             // 発音開始
             try {
