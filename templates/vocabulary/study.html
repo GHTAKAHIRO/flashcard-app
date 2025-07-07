@@ -219,6 +219,8 @@
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
             will-change: transform;
+            pointer-events: auto;
+            cursor: pointer;
         }
 
         .answer-btn.known {
@@ -479,10 +481,10 @@
                 <!-- 回答ボタン -->
                 <div class="button-section">
                     <div class="button-row">
-                        <button class="answer-btn known" id="known-btn" onclick="answer('known')" disabled>
+                        <button class="answer-btn known" id="known-btn" disabled>
                             <i class="fas fa-check me-2"></i>知っている
                         </button>
-                        <button class="answer-btn unknown" id="unknown-btn" onclick="answer('unknown')" disabled>
+                        <button class="answer-btn unknown" id="unknown-btn" disabled>
                             <i class="fas fa-times me-2"></i>知らない
                         </button>
                     </div>
@@ -503,6 +505,9 @@
 
             // タッチイベントの設定
             setupTouchEvents();
+            
+            // 高速ボタンイベントの設定
+            setupFastButtonEvents();
             
             // 音声合成の初期化（バックグラウンドで実行）
             setTimeout(() => {
@@ -556,6 +561,25 @@
             
         }
 
+        // 高速ボタンイベントの設定
+        function setupFastButtonEvents() {
+            const knownBtn = document.getElementById('known-btn');
+            const unknownBtn = document.getElementById('unknown-btn');
+            
+            // 即座に実行されるイベントリスナー
+            knownBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                answer('known');
+            }, { passive: false });
+            
+            unknownBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                answer('unknown');
+            }, { passive: false });
+        }
+
         // タッチイベントの設定
         function setupTouchEvents() {
             const card = document.querySelector('.word-card');
@@ -586,13 +610,6 @@
         function answer(result) {
             if (isAnswered) return;
             
-            // 即座に視覚的フィードバック
-            const clickedBtn = event.target.closest('.answer-btn');
-            if (clickedBtn) {
-                clickedBtn.style.transform = 'scale(0.85)';
-                clickedBtn.style.transition = 'none';
-            }
-            
             isAnswered = true;
             
             // ボタンを即座に無効化
@@ -601,10 +618,10 @@
             knownBtn.disabled = true;
             unknownBtn.disabled = true;
             
-            // 即座にページ遷移の準備
-            let isCompleted = false;
+            // 即座に画面遷移（サーバー応答を待たない）
+            window.location.reload();
             
-            // サーバーに結果を送信（非同期）
+            // バックグラウンドでサーバーに結果を送信（エラーは無視）
             fetch('/vocabulary/answer', {
                 method: 'POST',
                 headers: {
@@ -618,28 +635,14 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'completed') {
-                    isCompleted = true;
-                    // 学習完了 - 即座に遷移
+                    // 完了時は結果ページに遷移
                     window.location.href = '/vocabulary/result/{{ source }}';
-                } else {
-                    // 次の単語へ - 即座にリロード
-                    window.location.reload();
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                // エラー時はボタンを再度有効化
-                isAnswered = false;
-                knownBtn.disabled = false;
-                unknownBtn.disabled = false;
+                // エラーは無視して次の画面に進む
             });
-            
-            // タイムアウト処理（3秒後に強制リロード）
-            setTimeout(() => {
-                if (!isCompleted) {
-                    window.location.reload();
-                }
-            }, 3000);
         }
 
         // 発音機能（モバイル対応）
@@ -723,24 +726,27 @@
             }, 2000);
         }
 
-        // キーボードショートカット
+        // 高速キーボードショートカット
         document.addEventListener('keydown', function(event) {
             if (isAnswered) return;
             
             if (event.key === 'j' || event.key === 'J') {
                 event.preventDefault();
+                event.stopPropagation();
                 answer('known');
             } else if (event.key === 'f' || event.key === 'F') {
                 event.preventDefault();
+                event.stopPropagation();
                 answer('unknown');
             } else if (event.key === ' ' || event.key === 'Enter') {
                 // スペースキーまたはエンターキーでカードを裏返す
                 event.preventDefault();
+                event.stopPropagation();
                 if (!isCardFlipped) {
                     showAnswer();
                 }
             }
-        });
+        }, { passive: false });
         
 
     </script>
