@@ -51,6 +51,20 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# --- ここからカスタムフィルタ追加 ---
+def to_kanji_circle(value):
+    kanji_circles = {
+        1: '①', 2: '②', 3: '③', 4: '④', 5: '⑤',
+        6: '⑥', 7: '⑦', 8: '⑧', 9: '⑨', 10: '⑩'
+    }
+    try:
+        return kanji_circles.get(int(value), str(value))
+    except Exception:
+        return str(value)
+
+app.jinja_env.filters['to_kanji_circle'] = to_kanji_circle
+# --- カスタムフィルタここまで ---
+
 # 🚀 非同期ログ処理システム
 log_queue = queue.Queue(maxsize=1000)
 log_worker_active = True
