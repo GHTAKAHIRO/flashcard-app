@@ -797,7 +797,13 @@
 
         // 問題クリックで解答表示
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('結果ページ読み込み完了');
+            console.log('総問題数:', {{ total_count }});
+            console.log('正解数:', {{ known_count }});
+            console.log('不正解数:', {{ unknown_count }});
+            
             const wordItems = document.querySelectorAll('.word-item');
+            console.log('問題アイテム数:', wordItems.length);
             
             wordItems.forEach((item, index) => {
                 item.addEventListener('click', function() {
