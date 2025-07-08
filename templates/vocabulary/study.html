@@ -715,7 +715,7 @@
             });
             
             // 最後の問題の場合は、すべての結果をサーバーに送信
-            if (currentWordIndex >= totalWords) {
+            if (currentWordIndex + 1 >= totalWords) {
                 sendAllResults();
             } else {
                 // 次の問題に切り替え
@@ -726,6 +726,9 @@
         // すべての結果をサーバーに送信
         function sendAllResults() {
             console.log('すべての結果をサーバーに送信:', clientResults);
+            console.log('結果数:', clientResults.length);
+            console.log('現在の問題番号:', currentWordIndex);
+            console.log('総問題数:', totalWords);
             
             // セッションに結果を保存（フォールバック用）
             sessionStorage.setItem('vocabulary_results', JSON.stringify(clientResults));
@@ -742,14 +745,17 @@
                 })
             })
             .then(response => {
+                console.log('サーバーレスポンス:', response.status, response.statusText);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
+                console.log('サーバーレスポンスデータ:', data);
                 if (data.status === 'success') {
                     // 結果ページに遷移
+                    console.log('結果ページに遷移中...');
                     window.location.href = '/vocabulary/result/{{ source }}';
                 } else {
                     throw new Error('Server returned error status');
@@ -758,6 +764,7 @@
             .catch(error => {
                 console.error('Error:', error);
                 // エラー時も結果ページに遷移（セッションストレージのデータを使用）
+                console.log('エラー時も結果ページに遷移...');
                 window.location.href = '/vocabulary/result/{{ source }}';
             });
         }

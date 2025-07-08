@@ -2498,8 +2498,13 @@ def vocabulary_complete():
 def vocabulary_result(source):
     """英単語学習結果画面"""
     try:
+        app.logger.info(f"結果ページアクセス: user={current_user.id}, source={source}")
+        
         vocabulary_session = session.get('vocabulary_session')
+        app.logger.info(f"セッション情報: {vocabulary_session}")
+        
         if not vocabulary_session or vocabulary_session['source'] != source:
+            app.logger.warning(f"セッションが見つからないか、ソースが一致しません: session={vocabulary_session}, source={source}")
             flash("学習セッションが見つかりません")
             return redirect(url_for('vocabulary_home'))
         
@@ -2540,6 +2545,8 @@ def vocabulary_result(source):
             # フラッシュメッセージを表示してホームにリダイレクト
             flash("学習結果の取得に失敗しました。再度学習を開始してください。")
             return redirect(url_for('vocabulary_home'))
+        
+        app.logger.info(f"結果データ取得成功: {len(results)}件")
         
         app.logger.info(f"結果ページ表示: user={current_user.id}, source={source}, results_count={len(results)}")
         
@@ -2591,6 +2598,9 @@ def vocabulary_result(source):
         }
         chapter_title = chapter_titles.get(chapter_id, f'Chapter {chapter_id}') if chapter_id else None
         
+        # セッションをクリア（テンプレート表示前に実行）
+        session.pop('vocabulary_session', None)
+        
         return render_template('vocabulary/result.html',
                              unknown_words=unknown_words,
                              all_words=all_words,
@@ -2602,9 +2612,6 @@ def vocabulary_result(source):
                              chapter_id=chapter_id,
                              chapter_title=chapter_title,
                              chunk_number=chunk_number)
-        
-        # セッションをクリア（テンプレート表示後に実行）
-        session.pop('vocabulary_session', None)
         
     except Exception as e:
         app.logger.error(f"英単語結果画面エラー: {e}")
