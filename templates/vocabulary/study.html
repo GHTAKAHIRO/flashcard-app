@@ -464,7 +464,7 @@
                                 {{ word.word }}
                             </div>
                             <div class="meaning-text" id="meaning-text" style="display: none;">{{ word.meaning }}</div>
-                            <div class="pronunciation-section" id="pronunciation-section" style="display: none;">
+                            <div class="pronunciation-section" id="pronunciation-section">
                                 <button class="pronunciation-btn" onclick="pronounceWord(event)" title="発音を聞く">
                                     <i class="fas fa-volume-up"></i>
                                 </button>
@@ -555,7 +555,11 @@
 
         // カードをタップして答えを表示
         function toggleCard() {
-            if (!isCardFlipped) {
+            if (isCardFlipped) {
+                // 既に解答が表示されている場合は問題に戻す
+                hideAnswer();
+            } else {
+                // 問題が表示されている場合は解答を表示
                 showAnswer();
             }
         }
@@ -584,6 +588,30 @@
             unknownBtn.disabled = false;
             
             console.log('答え表示完了、ボタン有効化');
+        }
+
+        // 答えを隠す
+        function hideAnswer() {
+            if (!isCardFlipped) {
+                console.log('既に問題が表示されています');
+                return;
+            }
+            
+            console.log('問題に戻す...');
+            
+            const meaningElement = document.getElementById('meaning-text');
+            const knownBtn = document.getElementById('known-btn');
+            const unknownBtn = document.getElementById('unknown-btn');
+            
+            // 日本語の意味を非表示
+            meaningElement.style.display = 'none';
+            isCardFlipped = false;
+            
+            // ボタンを無効化
+            knownBtn.disabled = true;
+            unknownBtn.disabled = true;
+            
+            console.log('問題表示完了、ボタン無効化');
         }
 
         // 高速ボタンイベントの設定
@@ -816,12 +844,10 @@
                 event.stopPropagation();
                 answer('unknown', event);
             } else if (event.key === ' ' || event.key === 'Enter') {
-                // スペースキーまたはエンターキーでカードを裏返す
+                // スペースキーまたはエンターキーでカードを切り替え
                 event.preventDefault();
                 event.stopPropagation();
-                if (!isCardFlipped) {
-                    showAnswer();
-                }
+                toggleCard();
             }
         }, { passive: false });
         
@@ -853,11 +879,9 @@
             // ボタンをリセット
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
-            const pronunciationSection = document.getElementById('pronunciation-section');
             
             knownBtn.disabled = true;
             unknownBtn.disabled = true;
-            pronunciationSection.style.display = 'none';
             
             // 進捗表示を更新
             const progressElement = document.querySelector('.header-section p');
