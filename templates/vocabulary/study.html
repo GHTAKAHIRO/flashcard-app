@@ -573,14 +573,18 @@
             
             console.log('答えを表示中...');
             
+            const wordText = document.getElementById('word-text');
             const meaningElement = document.getElementById('meaning-text');
             const pronunciationSection = document.getElementById('pronunciation-section');
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             
-            // 日本語の意味と発音ボタンを表示
+            // 問題と音声ボタンを非表示
+            wordText.style.display = 'none';
+            pronunciationSection.style.display = 'none';
+            
+            // 日本語の意味を表示
             meaningElement.style.display = 'block';
-            pronunciationSection.style.display = 'block';
             isCardFlipped = true;
             
             // ボタンを有効化
@@ -599,9 +603,15 @@
             
             console.log('問題に戻す...');
             
+            const wordText = document.getElementById('word-text');
             const meaningElement = document.getElementById('meaning-text');
+            const pronunciationSection = document.getElementById('pronunciation-section');
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
+            
+            // 問題と音声ボタンを表示
+            wordText.style.display = 'block';
+            pronunciationSection.style.display = 'block';
             
             // 日本語の意味を非表示
             meaningElement.style.display = 'none';
@@ -867,9 +877,14 @@
             const nextWord = allWords[currentWordIndex];
             const wordText = document.getElementById('word-text');
             const meaningText = document.getElementById('meaning-text');
+            const pronunciationSection = document.getElementById('pronunciation-section');
             
             wordText.textContent = nextWord.word;
             meaningText.textContent = nextWord.meaning;
+            
+            // 問題と音声ボタンを表示、解答を非表示
+            wordText.style.display = 'block';
+            pronunciationSection.style.display = 'block';
             meaningText.style.display = 'none';
             
             // 状態をリセット
