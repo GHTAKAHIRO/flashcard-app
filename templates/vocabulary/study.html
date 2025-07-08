@@ -421,17 +421,19 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            background: #000000;
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 9999;
+            z-index: 10000;
             opacity: 0;
             transition: opacity 0.3s ease;
+            pointer-events: none;
         }
 
         .countdown-overlay.show {
             opacity: 1;
+            pointer-events: auto;
         }
 
         .countdown-content {
@@ -457,6 +459,11 @@
             0% { transform: scale(0.5); opacity: 0; }
             50% { transform: scale(1.2); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* カウントダウン中はメインコンテンツを非表示 */
+        .countdown-active .main-container {
+            visibility: hidden;
         }
 
         /* モバイル向けカウントダウン調整 */
@@ -580,6 +587,8 @@
             
             // カウントダウンオーバーレイを表示
             overlay.classList.add('show');
+            // メインコンテンツを非表示にするクラスを追加
+            document.body.classList.add('countdown-active');
             
             let count = 3;
             
@@ -596,6 +605,8 @@
                     
                     setTimeout(() => {
                         overlay.classList.remove('show');
+                        // メインコンテンツを再表示
+                        document.body.classList.remove('countdown-active');
                         isCountdownActive = false;
                         initializeTest();
                     }, 1000);
@@ -701,17 +712,25 @@
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             
+            // 既存のイベントリスナーを削除
+            knownBtn.replaceWith(knownBtn.cloneNode(true));
+            unknownBtn.replaceWith(unknownBtn.cloneNode(true));
+            
+            // 新しい要素を取得
+            const newKnownBtn = document.getElementById('known-btn');
+            const newUnknownBtn = document.getElementById('unknown-btn');
+            
             // 即座に実行されるイベントリスナー
-            knownBtn.addEventListener('click', function(e) {
+            newKnownBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                answer('known');
+                answer('known', e);
             }, { passive: false });
             
-            unknownBtn.addEventListener('click', function(e) {
+            newUnknownBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                answer('unknown');
+                answer('unknown', e);
             }, { passive: false });
         }
 
@@ -788,13 +807,13 @@
         }
 
         // 回答処理
-        function answer(result) {
+        function answer(result, event) {
             if (isAnswered) return;
             
             isAnswered = true;
             
             // 即座に視覚的フィードバック
-            const clickedBtn = event.target.closest('.answer-btn');
+            const clickedBtn = event ? event.target.closest('.answer-btn') : null;
             if (clickedBtn) {
                 clickedBtn.style.transform = 'scale(0.9)';
                 clickedBtn.style.transition = 'none';
@@ -958,11 +977,11 @@
             if (event.key === 'j' || event.key === 'J') {
                 event.preventDefault();
                 event.stopPropagation();
-                answer('known');
+                answer('known', event);
             } else if (event.key === 'f' || event.key === 'F') {
                 event.preventDefault();
                 event.stopPropagation();
-                answer('unknown');
+                answer('unknown', event);
             } else if (event.key === ' ' || event.key === 'Enter') {
                 // スペースキーまたはエンターキーでカードを裏返す
                 event.preventDefault();
