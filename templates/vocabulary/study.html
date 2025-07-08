@@ -134,7 +134,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 1rem;
             margin-bottom: 1rem;
         }
 
@@ -156,71 +155,9 @@
             font-weight: bold;
         }
 
-        /* 発音ボタンのスタイル */
-        .pronunciation-section {
-            text-align: center;
-            margin-top: 0;
-        }
-        
-        .pronunciation-btn {
-            background: #667eea;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            color: white;
-            font-size: 1.2rem;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
 
-        .pronunciation-btn:hover {
-            background: #5a6fd8;
-            transform: scale(1.05);
-        }
 
-        .pronunciation-btn.playing {
-            background: #28a745;
-            animation: pulse 1s infinite;
-        }
 
-        /* 自動音声設定ボタン */
-        .auto-sound-toggle {
-            position: fixed;
-            top: 80px;
-            right: 15px;
-            background: rgba(102, 126, 234, 0.9);
-            border: none;
-            border-radius: 50%;
-            width: 45px;
-            height: 45px;
-            color: white;
-            font-size: 1rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 1000;
-        }
-
-        .auto-sound-toggle:hover {
-            background: rgba(102, 126, 234, 1);
-            transform: scale(1.1);
-        }
-
-        .auto-sound-toggle.active {
-            background: rgba(40, 167, 69, 0.9);
-        }
-
-        .auto-sound-toggle.active:hover {
-            background: rgba(40, 167, 69, 1);
-        }
 
         @keyframes pulse {
             0% { transform: scale(1); }
@@ -228,22 +165,7 @@
             100% { transform: scale(1); }
         }
 
-        /* モバイル向け発音ボタン */
-        @media (max-width: 767px) {
-            .pronunciation-btn {
-                width: 60px;
-                height: 60px;
-                font-size: 1.4rem;
-            }
-            
-            .auto-sound-toggle {
-                width: 50px;
-                height: 50px;
-                font-size: 1.2rem;
-                top: 70px;
-                right: 10px;
-            }
-        }
+
 
 
 
@@ -345,9 +267,7 @@
                 font-size: 2rem;
             }
 
-            .word-container {
-                gap: 1.5rem;
-            }
+
 
             .button-row {
                 gap: 1.5rem;
@@ -380,9 +300,7 @@
                 font-size: 2.2rem;
             }
 
-            .word-container {
-                gap: 2rem;
-            }
+
 
             .button-row {
                 gap: 2rem;
@@ -524,10 +442,7 @@
                 <p>{{ current_index }} / {{ total_words }} 問目</p>
             </div>
 
-            <!-- 自動音声設定ボタン -->
-            <button class="auto-sound-toggle" id="auto-sound-toggle" onclick="toggleAutoSound()" title="自動音声のオン/オフ">
-                <i class="fas fa-volume-up"></i>
-            </button>
+
 
             <!-- コンテンツセクション -->
             <div class="content-section">
@@ -539,11 +454,6 @@
                             <div class="word-container">
                                 <div class="word-text" id="word-text">
                                     {{ word.word }}
-                                </div>
-                                <div class="pronunciation-section" id="pronunciation-section">
-                                    <button class="pronunciation-btn" onclick="pronounceWord(event)" title="発音を聞く">
-                                        <i class="fas fa-volume-up"></i>
-                                    </button>
                                 </div>
                             </div>
                             <div class="meaning-text" id="meaning-text" style="display: none;">{{ word.meaning }}</div>
@@ -575,7 +485,6 @@
     <script>
         let isAnswered = false;
         let isCardFlipped = false;
-        let autoSoundEnabled = true; // 自動音声の有効/無効
         
         // 全問題データを事前に準備
         const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe if vocabulary_session and vocabulary_session.words else "[]" }}');
@@ -602,11 +511,9 @@
             
             // 初期状態では問題のみを表示（解答は非表示）
             const meaningElement = document.getElementById('meaning-text');
-            const pronunciationSection = document.getElementById('pronunciation-section');
             const wordText = document.getElementById('word-text');
             
             meaningElement.style.display = 'none';
-            pronunciationSection.style.display = 'block';
             wordText.style.display = 'block';
 
             // タッチイベントの設定
@@ -618,10 +525,10 @@
             // 音声合成の初期化（バックグラウンドで実行）
             setTimeout(() => {
                 initializeSpeechSynthesis();
-                // 自動音声設定の初期化
-                initializeAutoSound();
-                // 自動音声読み上げを開始
-                autoPronounceCurrentWord();
+                // 音声リストが既に読み込まれている場合は即座に自動発音
+                if (speechSynthesis.getVoices().length > 0) {
+                    autoPronounceCurrentWord();
+                }
             }, 100);
         });
 
@@ -636,6 +543,17 @@
             // 音声合成の状態を確認
             if (speechSynthesis.speaking) {
                 speechSynthesis.cancel();
+            }
+            
+            // 音声リストの読み込みを待つ（モバイル対応）
+            if (speechSynthesis.getVoices().length === 0) {
+                speechSynthesis.addEventListener('voiceschanged', function() {
+                    console.log('音声リストが読み込まれました');
+                    // 音声リスト読み込み後に自動発音を実行
+                    setTimeout(() => {
+                        autoPronounceCurrentWord();
+                    }, 100);
+                });
             }
         }
 
@@ -661,13 +579,11 @@
             
             const wordText = document.getElementById('word-text');
             const meaningElement = document.getElementById('meaning-text');
-            const pronunciationSection = document.getElementById('pronunciation-section');
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             
-            // 問題と音声ボタンを非表示
+            // 問題を非表示
             wordText.style.display = 'none';
-            pronunciationSection.style.display = 'none';
             
             // 日本語の意味を表示
             meaningElement.style.display = 'block';
@@ -691,13 +607,11 @@
             
             const wordText = document.getElementById('word-text');
             const meaningElement = document.getElementById('meaning-text');
-            const pronunciationSection = document.getElementById('pronunciation-section');
             const knownBtn = document.getElementById('known-btn');
             const unknownBtn = document.getElementById('unknown-btn');
             
-            // 問題と音声ボタンを表示
+            // 問題を表示
             wordText.style.display = 'block';
-            pronunciationSection.style.display = 'block';
             
             // 日本語の意味を非表示
             meaningElement.style.display = 'none';
@@ -884,93 +798,10 @@
             return defaultVoice;
         }
 
-        function pronounceWord(event) {
-            if (event) {
-                event.stopPropagation();
-            }
-            
-            const wordElement = document.getElementById('word-text');
-            const word = wordElement.textContent.trim();
-            const pronunciationBtn = event ? event.target.closest('.pronunciation-btn') : null;
-            
-            // 音声合成が利用可能かチェック
-            if (!speechSynthesis) {
-                console.warn('音声合成が利用できません');
-                if (pronunciationBtn) {
-                    showPronunciationError(pronunciationBtn);
-                }
-                return;
-            }
-            
-            // 既存の発音を停止
-            if (currentUtterance) {
-                speechSynthesis.cancel();
-            }
-            
-            // ボタンの状態を変更
-            if (pronunciationBtn) {
-                pronunciationBtn.classList.add('playing');
-                pronunciationBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-            }
-            
-            // 新しい発音を作成
-            currentUtterance = new SpeechSynthesisUtterance(word);
-            
-            // 言語設定
-            currentUtterance.lang = 'en-US';
-            
-            // より自然な発音のための設定
-            currentUtterance.rate = 0.9;    // 少し遅めの速度（0.85 → 0.9）
-            currentUtterance.pitch = 1.1;   // 少し高めのピッチ（1.0 → 1.1）
-            currentUtterance.volume = 0.9;  // 適度な音量（1.0 → 0.9）
-            
-            // より良い音声を選択
-            const selectedVoice = selectBestVoice();
-            if (selectedVoice) {
-                currentUtterance.voice = selectedVoice;
-            }
-            
-            // 発音開始
-            speechSynthesis.speak(currentUtterance);
-            
-            // 発音終了時の処理
-            currentUtterance.onend = function() {
-                if (pronunciationBtn) {
-                    pronunciationBtn.classList.remove('playing');
-                    pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                }
-                currentUtterance = null;
-            };
-            
-            // エラー時の処理
-            currentUtterance.onerror = function(event) {
-                console.error('発音エラー:', event.error);
-                if (pronunciationBtn) {
-                    showPronunciationError(pronunciationBtn);
-                }
-                currentUtterance = null;
-            };
-        }
 
-        // 発音エラー時の処理
-        function showPronunciationError(btn) {
-            btn.classList.remove('playing');
-            btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
-            btn.style.background = '#dc3545';
-            
-            setTimeout(function() {
-                btn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                btn.style.background = '#667eea';
-            }, 2000);
-        }
 
         // 自動音声読み上げ機能
         function autoPronounceCurrentWord() {
-            // 自動音声が無効の場合は何もしない
-            if (!autoSoundEnabled) {
-                return;
-            }
-            
             const wordElement = document.getElementById('word-text');
             const word = wordElement.textContent.trim();
             
@@ -1017,46 +848,7 @@
             };
         }
 
-        // 自動音声のオン/オフ切り替え
-        function toggleAutoSound() {
-            autoSoundEnabled = !autoSoundEnabled;
-            const toggleBtn = document.getElementById('auto-sound-toggle');
-            
-            if (autoSoundEnabled) {
-                toggleBtn.classList.add('active');
-                toggleBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                toggleBtn.title = '自動音声: オン';
-                console.log('自動音声を有効にしました');
-            } else {
-                toggleBtn.classList.remove('active');
-                toggleBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-                toggleBtn.title = '自動音声: オフ';
-                console.log('自動音声を無効にしました');
-            }
-            
-            // 設定をローカルストレージに保存
-            localStorage.setItem('autoSoundEnabled', autoSoundEnabled);
-        }
 
-        // 自動音声設定の初期化
-        function initializeAutoSound() {
-            // ローカルストレージから設定を読み込み
-            const savedSetting = localStorage.getItem('autoSoundEnabled');
-            if (savedSetting !== null) {
-                autoSoundEnabled = savedSetting === 'true';
-            }
-            
-            const toggleBtn = document.getElementById('auto-sound-toggle');
-            if (autoSoundEnabled) {
-                toggleBtn.classList.add('active');
-                toggleBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                toggleBtn.title = '自動音声: オン';
-            } else {
-                toggleBtn.classList.remove('active');
-                toggleBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-                toggleBtn.title = '自動音声: オフ';
-            }
-        }
 
         // 高速キーボードショートカット
         document.addEventListener('keydown', function(event) {
@@ -1094,14 +886,12 @@
             const nextWord = allWords[currentWordIndex];
             const wordText = document.getElementById('word-text');
             const meaningText = document.getElementById('meaning-text');
-            const pronunciationSection = document.getElementById('pronunciation-section');
             
             wordText.textContent = nextWord.word;
             meaningText.textContent = nextWord.meaning;
             
-            // 問題と音声ボタンを表示、解答を非表示
+            // 問題を表示、解答を非表示
             wordText.style.display = 'block';
-            pronunciationSection.style.display = 'block';
             meaningText.style.display = 'none';
             
             // 状態をリセット
