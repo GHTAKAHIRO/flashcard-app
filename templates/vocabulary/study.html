@@ -130,6 +130,23 @@
             word-break: break-word;
         }
 
+        .word-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .word-text {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #333;
+            line-height: 1.2;
+            word-break: break-word;
+            margin: 0;
+        }
+
         .meaning-text {
             font-size: 2.4rem;
             color: #222;
@@ -142,7 +159,7 @@
         /* 発音ボタンのスタイル */
         .pronunciation-section {
             text-align: center;
-            margin-top: 1rem;
+            margin-top: 0;
         }
         
         .pronunciation-btn {
@@ -286,6 +303,10 @@
                 font-size: 2rem;
             }
 
+            .word-container {
+                gap: 1.5rem;
+            }
+
             .button-row {
                 gap: 1.5rem;
             }
@@ -315,6 +336,10 @@
 
             .meaning-text {
                 font-size: 2.2rem;
+            }
+
+            .word-container {
+                gap: 2rem;
             }
 
             .button-row {
@@ -381,12 +406,16 @@
 
             .word-text {
                 font-size: 1.8rem;
-                margin-bottom: 0.5rem;
+                margin-bottom: 0;
             }
 
             .meaning-text {
                 font-size: 2rem;
                 margin-bottom: 0.5rem;
+            }
+
+            .word-container {
+                gap: 0.5rem;
             }
 
             .button-section {
@@ -460,15 +489,17 @@
                     <div class="card-inner" id="card-inner">
                         <!-- カードの表面（問題） -->
                         <div class="card-front">
-                            <div class="word-text" id="word-text">
-                                {{ word.word }}
+                            <div class="word-container">
+                                <div class="word-text" id="word-text">
+                                    {{ word.word }}
+                                </div>
+                                <div class="pronunciation-section" id="pronunciation-section">
+                                    <button class="pronunciation-btn" onclick="pronounceWord(event)" title="発音を聞く">
+                                        <i class="fas fa-volume-up"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="meaning-text" id="meaning-text" style="display: none;">{{ word.meaning }}</div>
-                            <div class="pronunciation-section" id="pronunciation-section">
-                                <button class="pronunciation-btn" onclick="pronounceWord(event)" title="発音を聞く">
-                                    <i class="fas fa-volume-up"></i>
-                                </button>
-                            </div>
                         </div>
                         
                         <!-- カードの裏面（答え） -->
@@ -524,8 +555,11 @@
             // 初期状態では問題のみを表示（解答は非表示）
             const meaningElement = document.getElementById('meaning-text');
             const pronunciationSection = document.getElementById('pronunciation-section');
+            const wordText = document.getElementById('word-text');
+            
             meaningElement.style.display = 'none';
-            pronunciationSection.style.display = 'none';
+            pronunciationSection.style.display = 'block';
+            wordText.style.display = 'block';
 
             // タッチイベントの設定
             setupTouchEvents();
