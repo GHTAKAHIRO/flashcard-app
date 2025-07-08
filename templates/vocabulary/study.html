@@ -188,6 +188,40 @@
             animation: pulse 1s infinite;
         }
 
+        /* 自動音声設定ボタン */
+        .auto-sound-toggle {
+            position: fixed;
+            top: 80px;
+            right: 15px;
+            background: rgba(102, 126, 234, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+
+        .auto-sound-toggle:hover {
+            background: rgba(102, 126, 234, 1);
+            transform: scale(1.1);
+        }
+
+        .auto-sound-toggle.active {
+            background: rgba(40, 167, 69, 0.9);
+        }
+
+        .auto-sound-toggle.active:hover {
+            background: rgba(40, 167, 69, 1);
+        }
+
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
@@ -200,6 +234,14 @@
                 width: 60px;
                 height: 60px;
                 font-size: 1.4rem;
+            }
+            
+            .auto-sound-toggle {
+                width: 50px;
+                height: 50px;
+                font-size: 1.2rem;
+                top: 70px;
+                right: 10px;
             }
         }
 
@@ -482,6 +524,11 @@
                 <p>{{ current_index }} / {{ total_words }} 問目</p>
             </div>
 
+            <!-- 自動音声設定ボタン -->
+            <button class="auto-sound-toggle" id="auto-sound-toggle" onclick="toggleAutoSound()" title="自動音声のオン/オフ">
+                <i class="fas fa-volume-up"></i>
+            </button>
+
             <!-- コンテンツセクション -->
             <div class="content-section">
                 <!-- 単語カード -->
@@ -528,6 +575,7 @@
     <script>
         let isAnswered = false;
         let isCardFlipped = false;
+        let autoSoundEnabled = true; // 自動音声の有効/無効
         
         // 全問題データを事前に準備
         const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe if vocabulary_session and vocabulary_session.words else "[]" }}');
@@ -570,7 +618,11 @@
             // 音声合成の初期化（バックグラウンドで実行）
             setTimeout(() => {
                 initializeSpeechSynthesis();
-            }, 50);
+                // 自動音声設定の初期化
+                initializeAutoSound();
+                // 自動音声読み上げを開始
+                autoPronounceCurrentWord();
+            }, 100);
         });
 
         // 音声合成の初期化（モバイル対応）
@@ -912,6 +964,100 @@
             }, 2000);
         }
 
+        // 自動音声読み上げ機能
+        function autoPronounceCurrentWord() {
+            // 自動音声が無効の場合は何もしない
+            if (!autoSoundEnabled) {
+                return;
+            }
+            
+            const wordElement = document.getElementById('word-text');
+            const word = wordElement.textContent.trim();
+            
+            // 音声合成が利用可能かチェック
+            if (!speechSynthesis) {
+                console.warn('音声合成が利用できません');
+                return;
+            }
+            
+            // 既存の発音を停止
+            if (currentUtterance) {
+                speechSynthesis.cancel();
+            }
+            
+            // 新しい発音を作成
+            currentUtterance = new SpeechSynthesisUtterance(word);
+            
+            // 言語設定
+            currentUtterance.lang = 'en-US';
+            
+            // 自動読み上げ用の設定（少し遅めで聞き取りやすく）
+            currentUtterance.rate = 0.85;    // 自動読み上げは少し遅め
+            currentUtterance.pitch = 1.0;    // 標準的なピッチ
+            currentUtterance.volume = 0.8;   // 適度な音量
+            
+            // より良い音声を選択
+            const selectedVoice = selectBestVoice();
+            if (selectedVoice) {
+                currentUtterance.voice = selectedVoice;
+            }
+            
+            // 発音開始
+            speechSynthesis.speak(currentUtterance);
+            
+            // 発音終了時の処理
+            currentUtterance.onend = function() {
+                currentUtterance = null;
+            };
+            
+            // エラー時の処理
+            currentUtterance.onerror = function(event) {
+                console.error('自動発音エラー:', event.error);
+                currentUtterance = null;
+            };
+        }
+
+        // 自動音声のオン/オフ切り替え
+        function toggleAutoSound() {
+            autoSoundEnabled = !autoSoundEnabled;
+            const toggleBtn = document.getElementById('auto-sound-toggle');
+            
+            if (autoSoundEnabled) {
+                toggleBtn.classList.add('active');
+                toggleBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                toggleBtn.title = '自動音声: オン';
+                console.log('自動音声を有効にしました');
+            } else {
+                toggleBtn.classList.remove('active');
+                toggleBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                toggleBtn.title = '自動音声: オフ';
+                console.log('自動音声を無効にしました');
+            }
+            
+            // 設定をローカルストレージに保存
+            localStorage.setItem('autoSoundEnabled', autoSoundEnabled);
+        }
+
+        // 自動音声設定の初期化
+        function initializeAutoSound() {
+            // ローカルストレージから設定を読み込み
+            const savedSetting = localStorage.getItem('autoSoundEnabled');
+            if (savedSetting !== null) {
+                autoSoundEnabled = savedSetting === 'true';
+            }
+            
+            const toggleBtn = document.getElementById('auto-sound-toggle');
+            if (autoSoundEnabled) {
+                toggleBtn.classList.add('active');
+                toggleBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                toggleBtn.title = '自動音声: オン';
+            } else {
+                toggleBtn.classList.remove('active');
+                toggleBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                toggleBtn.title = '自動音声: オフ';
+            }
+        }
+
         // 高速キーボードショートカット
         document.addEventListener('keydown', function(event) {
             if (isAnswered) return;
@@ -974,6 +1120,11 @@
             if (progressElement) {
                 progressElement.textContent = `${currentWordIndex + 1} / ${totalWords} 問目`;
             }
+            
+            // 次の問題の自動音声読み上げ
+            setTimeout(() => {
+                autoPronounceCurrentWord();
+            }, 300);
         }
     </script>
 </body>
