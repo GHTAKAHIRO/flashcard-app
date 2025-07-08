@@ -414,6 +414,61 @@
             animation: fadeIn 0.5s ease-out;
         }
 
+        /* カウントダウン用スタイル */
+        .countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .countdown-overlay.show {
+            opacity: 1;
+        }
+
+        .countdown-content {
+            text-align: center;
+            color: white;
+            animation: countdownPulse 1s ease-in-out;
+        }
+
+        .countdown-number {
+            font-size: 8rem;
+            font-weight: bold;
+            margin: 0;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .countdown-text {
+            font-size: 2rem;
+            margin-top: 1rem;
+            opacity: 0.9;
+        }
+
+        @keyframes countdownPulse {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* モバイル向けカウントダウン調整 */
+        @media (max-width: 767px) {
+            .countdown-number {
+                font-size: 6rem;
+            }
+            .countdown-text {
+                font-size: 1.5rem;
+            }
+        }
+
         /* アクセシビリティ */
         .answer-btn:focus {
             outline: 3px solid #007bff;
@@ -493,10 +548,18 @@
         </div>
     </div>
 
+    <div class="countdown-overlay" id="countdown-overlay">
+        <div class="countdown-content">
+            <div class="countdown-number">3</div>
+            <div class="countdown-text">秒後にテストが開始します</div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let isAnswered = false;
         let isCardFlipped = false;
+        let isCountdownActive = false;
         
         // 全問題データを事前に準備
         const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe if vocabulary_session and vocabulary_session.words else "[]" }}');
@@ -506,8 +569,44 @@
         // クライアント側で結果を管理
         const clientResults = [];
 
-        // ページ読み込み時の初期化
-        document.addEventListener('DOMContentLoaded', function() {
+        // カウントダウン機能
+        function startCountdown() {
+            if (isCountdownActive) return;
+            
+            isCountdownActive = true;
+            const overlay = document.getElementById('countdown-overlay');
+            const numberElement = overlay.querySelector('.countdown-number');
+            const textElement = overlay.querySelector('.countdown-text');
+            
+            // カウントダウンオーバーレイを表示
+            overlay.classList.add('show');
+            
+            let count = 3;
+            
+            function updateCountdown() {
+                if (count > 0) {
+                    numberElement.textContent = count;
+                    textElement.textContent = '秒後にテストが開始します';
+                    count--;
+                    setTimeout(updateCountdown, 1000);
+                } else {
+                    // カウントダウン終了
+                    numberElement.textContent = 'スタート！';
+                    textElement.textContent = 'テスト開始！';
+                    
+                    setTimeout(() => {
+                        overlay.classList.remove('show');
+                        isCountdownActive = false;
+                        initializeTest();
+                    }, 1000);
+                }
+            }
+            
+            updateCountdown();
+        }
+
+        // テスト初期化
+        function initializeTest() {
             // データの整合性チェック
             if (!allWords || allWords.length === 0) {
                 console.error('問題データが読み込まれていません');
@@ -542,9 +641,13 @@
             setTimeout(() => {
                 showAnswer();
             }, 1000);
+        }
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            // カウントダウンを開始
+            startCountdown();
         });
-
-
 
         // 音声合成の初期化（モバイル対応）
         function initializeSpeechSynthesis() {
@@ -559,8 +662,6 @@
                 speechSynthesis.cancel();
             }
         }
-
-
 
         // カードをタップして答えを表示
         function toggleCard() {
