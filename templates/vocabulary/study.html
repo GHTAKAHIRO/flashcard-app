@@ -798,6 +798,40 @@
         let speechSynthesis = window.speechSynthesis;
         let currentUtterance = null;
 
+        // より良い音声を選択する関数
+        function selectBestVoice() {
+            const voices = speechSynthesis.getVoices();
+            console.log('利用可能な音声:', voices.map(v => `${v.name} (${v.lang})`));
+            
+            // 優先順位で音声を選択
+            const voicePreferences = [
+                // 高品質な英語音声を優先
+                voice => voice.lang.startsWith('en') && (voice.name.includes('Google') || voice.name.includes('Natural') || voice.name.includes('Premium')),
+                voice => voice.lang.startsWith('en-US') && voice.name.includes('Female'),
+                voice => voice.lang.startsWith('en-US') && voice.name.includes('Male'),
+                voice => voice.lang.startsWith('en-GB') && voice.name.includes('Female'),
+                voice => voice.lang.startsWith('en-GB') && voice.name.includes('Male'),
+                voice => voice.lang.startsWith('en'),
+                // フォールバック
+                voice => voice.lang.startsWith('en')
+            ];
+            
+            for (const preference of voicePreferences) {
+                const selectedVoice = voices.find(preference);
+                if (selectedVoice) {
+                    console.log('選択された音声:', selectedVoice.name, selectedVoice.lang);
+                    return selectedVoice;
+                }
+            }
+            
+            // デフォルト音声
+            const defaultVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+            if (defaultVoice) {
+                console.log('デフォルト音声を使用:', defaultVoice.name, defaultVoice.lang);
+            }
+            return defaultVoice;
+        }
+
         function pronounceWord(event) {
             if (event) {
                 event.stopPropagation();
@@ -829,16 +863,19 @@
             
             // 新しい発音を作成
             currentUtterance = new SpeechSynthesisUtterance(word);
-            currentUtterance.lang = 'en-US';
-            currentUtterance.rate = 0.85;  // 自然な速度
-            currentUtterance.pitch = 1.0;
-            currentUtterance.volume = 1.0;
             
-            // 英語音声を選択（簡略化）
-            const voices = speechSynthesis.getVoices();
-            const englishVoices = voices.filter(voice => voice.lang.startsWith('en'));
-            if (englishVoices.length > 0) {
-                currentUtterance.voice = englishVoices[0];
+            // 言語設定
+            currentUtterance.lang = 'en-US';
+            
+            // より自然な発音のための設定
+            currentUtterance.rate = 0.9;    // 少し遅めの速度（0.85 → 0.9）
+            currentUtterance.pitch = 1.1;   // 少し高めのピッチ（1.0 → 1.1）
+            currentUtterance.volume = 0.9;  // 適度な音量（1.0 → 0.9）
+            
+            // より良い音声を選択
+            const selectedVoice = selectBestVoice();
+            if (selectedVoice) {
+                currentUtterance.voice = selectedVoice;
             }
             
             // 発音開始
