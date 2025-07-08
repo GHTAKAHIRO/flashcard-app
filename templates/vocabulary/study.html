@@ -525,10 +525,6 @@
             // 音声合成の初期化（バックグラウンドで実行）
             setTimeout(() => {
                 initializeSpeechSynthesis();
-                // 音声リストが既に読み込まれている場合は即座に自動発音
-                if (speechSynthesis.getVoices().length > 0) {
-                    autoPronounceCurrentWord();
-                }
             }, 100);
         });
 
@@ -549,10 +545,6 @@
             if (speechSynthesis.getVoices().length === 0) {
                 speechSynthesis.addEventListener('voiceschanged', function() {
                     console.log('音声リストが読み込まれました');
-                    // 音声リスト読み込み後に自動発音を実行
-                    setTimeout(() => {
-                        autoPronounceCurrentWord();
-                    }, 100);
                 });
             }
         }
@@ -592,6 +584,9 @@
             // ボタンを有効化
             knownBtn.disabled = false;
             unknownBtn.disabled = false;
+            
+            // 問題クリック時に音声を発音
+            autoPronounceCurrentWord();
             
             console.log('答え表示完了、ボタン有効化');
         }
@@ -911,10 +906,7 @@
                 progressElement.textContent = `${currentWordIndex + 1} / ${totalWords} 問目`;
             }
             
-            // 次の問題の自動音声読み上げ
-            setTimeout(() => {
-                autoPronounceCurrentWord();
-            }, 300);
+
         }
     </script>
 </body>
