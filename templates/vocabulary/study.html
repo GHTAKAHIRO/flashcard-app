@@ -135,6 +135,47 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .result-overlay {
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: resultPopIn 0.3s ease-out;
+        }
+
+        .result-symbol {
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .result-correct-overlay {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .result-incorrect-overlay {
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+
+        @keyframes resultPopIn {
+            from {
+                opacity: 0;
+                transform: scale(0.5) rotate(-180deg);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
         }
 
         .word-text {
@@ -225,10 +266,19 @@
 
         .choice-btn.correct {
             background: linear-gradient(135deg, #28a745, #20c997);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+            transform: scale(1.05);
         }
 
         .choice-btn.incorrect {
             background: linear-gradient(135deg, #dc3545, #fd7e14);
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+
+        .choice-btn.selected-wrong {
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+            transform: scale(1.05);
         }
 
         .choice-btn:disabled {
@@ -564,6 +614,10 @@
                                 <div class="word-text" id="word-text">
                                     {{ word.word }}
                                 </div>
+                                <!-- 結果表示エリア -->
+                                <div class="result-overlay" id="result-overlay" style="display: none;">
+                                    <div class="result-symbol" id="result-symbol"></div>
+                                </div>
                             </div>
                             <div class="meaning-text" id="meaning-text" style="display: none;">{{ word.meaning }}</div>
                         </div>
@@ -750,6 +804,23 @@
             }
         }
 
+        // 問題に〇✕を表示
+        function showWordResult(isCorrect) {
+            const resultOverlay = document.getElementById('result-overlay');
+            const resultSymbol = document.getElementById('result-symbol');
+            
+            if (resultOverlay && resultSymbol) {
+                resultOverlay.style.display = 'flex';
+                resultOverlay.className = 'result-overlay ' + (isCorrect ? 'result-correct-overlay' : 'result-incorrect-overlay');
+                
+                if (isCorrect) {
+                    resultSymbol.innerHTML = '〇';
+                } else {
+                    resultSymbol.innerHTML = '✕';
+                }
+            }
+        }
+
         // 判定表示
         function showResult(isCorrect) {
             const resultIndicator = document.getElementById('result-indicator');
@@ -845,10 +916,13 @@
                     if (i === currentWord.correct_index) {
                         choiceBtn.classList.add('correct');
                     } else if (i === selectedIndex && !isCorrect) {
-                        choiceBtn.classList.add('incorrect');
+                        choiceBtn.classList.add('selected-wrong');
                     }
                 }
             }
+            
+            // 問題に〇✕を表示
+            showWordResult(isCorrect);
             
             // 判定表示
             showResult(isCorrect);
@@ -1070,7 +1144,7 @@
                 
                 if (choiceBtn) {
                     choiceBtn.disabled = false;
-                    choiceBtn.classList.remove('correct', 'incorrect');
+                    choiceBtn.classList.remove('correct', 'incorrect', 'selected-wrong');
                 }
                 
                 if (choiceText) {
@@ -1082,6 +1156,12 @@
             const resultIndicator = document.getElementById('result-indicator');
             if (resultIndicator) {
                 resultIndicator.style.display = 'none';
+            }
+            
+            // 問題の結果表示を非表示
+            const resultOverlay = document.getElementById('result-overlay');
+            if (resultOverlay) {
+                resultOverlay.style.display = 'none';
             }
             
             // 進捗表示を更新
