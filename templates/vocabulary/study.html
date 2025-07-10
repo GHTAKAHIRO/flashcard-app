@@ -180,8 +180,11 @@
         .choices-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
             gap: 0.75rem;
             margin-bottom: 1rem;
+            width: 100%;
+            aspect-ratio: 2/1;
         }
 
         .choice-btn {
@@ -192,7 +195,6 @@
             color: white;
             font-weight: bold;
             font-size: 1rem;
-            min-height: 70px;
             touch-action: manipulation;
             transition: none;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
@@ -207,12 +209,18 @@
             align-items: center;
             justify-content: center;
             text-align: center;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            margin: 0;
         }
 
         .choice-text {
             font-size: 0.9rem;
             line-height: 1.2;
             word-break: break-word;
+            margin: 0;
+            padding: 0;
         }
 
         .choice-btn.correct {
@@ -239,6 +247,81 @@
             transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
             transition: none;
+        }
+
+        /* タイマー関連のスタイル */
+        .timer-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .timer-bar {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .timer-fill {
+            height: 100%;
+            background: #fff;
+            border-radius: 4px;
+            transition: width 0.1s linear;
+            width: 100%;
+        }
+
+        .timer-text {
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            min-width: 1.5rem;
+            text-align: center;
+        }
+
+        /* 判定表示のスタイル */
+        .result-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 15px;
+            animation: resultFadeIn 0.3s ease-out;
+        }
+
+        .result-icon {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .result-correct {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .result-incorrect {
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
+            color: white;
+        }
+
+        @keyframes resultFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
         
 
@@ -287,7 +370,6 @@
             .choice-btn {
                 padding: 1.2rem 1rem;
                 font-size: 1.1rem;
-                min-height: 80px;
             }
 
             .choice-text {
@@ -324,7 +406,6 @@
             .choice-btn {
                 padding: 1.5rem 1.5rem;
                 font-size: 1.2rem;
-                min-height: 90px;
             }
 
             .choice-text {
@@ -408,7 +489,6 @@
             .choice-btn {
                 padding: 0.8rem 0.5rem;
                 font-size: 0.9rem;
-                min-height: 60px;
             }
 
             .choice-text {
@@ -463,6 +543,12 @@
                     <i class="fas fa-book-open me-2"></i>英単語学習
                 </h2>
                 <p>{{ current_index }} / {{ total_words }} 問目</p>
+                <div class="timer-container">
+                    <div class="timer-bar">
+                        <div class="timer-fill" id="timer-fill"></div>
+                    </div>
+                    <span class="timer-text" id="timer-text">2</span>
+                </div>
             </div>
 
 
@@ -505,6 +591,11 @@
                             <span class="choice-text" id="choice-text-3"></span>
                         </button>
                     </div>
+                    <!-- 判定表示 -->
+                    <div class="result-indicator" id="result-indicator" style="display: none;">
+                        <div class="result-icon" id="result-icon"></div>
+                        <div class="result-text" id="result-text"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -514,6 +605,8 @@
     <script>
         let isAnswered = false;
         let isCardFlipped = false;
+        let timer = null;
+        let timeLeft = 2; // 2秒の制限時間
         
         // 全問題データを事前に準備
         const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe if vocabulary_session and vocabulary_session.words else "[]" }}');
@@ -540,6 +633,9 @@
             
             // 初期状態で選択肢を表示
             showChoices();
+
+            // タイマー開始
+            startTimer();
 
             // タッチイベントの設定
             setupTouchEvents();
@@ -612,6 +708,68 @@
             // この関数は使用しません
         }
 
+        // タイマー開始
+        function startTimer() {
+            timeLeft = 2;
+            updateTimerDisplay();
+            
+            timer = setInterval(() => {
+                timeLeft -= 0.1;
+                updateTimerDisplay();
+                
+                if (timeLeft <= 0) {
+                    // 時間切れ
+                    stopTimer();
+                    if (!isAnswered) {
+                        // 時間切れで不正解として処理
+                        const currentWord = allWords[currentWordIndex];
+                        const randomIndex = Math.floor(Math.random() * 4);
+                        answer(randomIndex, null);
+                    }
+                }
+            }, 100);
+        }
+
+        // タイマー停止
+        function stopTimer() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+        }
+
+        // タイマー表示更新
+        function updateTimerDisplay() {
+            const timerFill = document.getElementById('timer-fill');
+            const timerText = document.getElementById('timer-text');
+            
+            if (timerFill && timerText) {
+                const percentage = Math.max(0, (timeLeft / 2) * 100);
+                timerFill.style.width = percentage + '%';
+                timerText.textContent = Math.ceil(timeLeft);
+            }
+        }
+
+        // 判定表示
+        function showResult(isCorrect) {
+            const resultIndicator = document.getElementById('result-indicator');
+            const resultIcon = document.getElementById('result-icon');
+            const resultText = document.getElementById('result-text');
+            
+            if (resultIndicator && resultIcon && resultText) {
+                resultIndicator.style.display = 'flex';
+                resultIndicator.className = 'result-indicator ' + (isCorrect ? 'result-correct' : 'result-incorrect');
+                
+                if (isCorrect) {
+                    resultIcon.innerHTML = '✓';
+                    resultText.textContent = '正解！';
+                } else {
+                    resultIcon.innerHTML = '✗';
+                    resultText.textContent = '不正解';
+                }
+            }
+        }
+
         // 高速ボタンイベントの設定
         function setupFastButtonEvents() {
             // 4つの選択肢ボタンのイベントリスナーを設定
@@ -663,6 +821,9 @@
             
             isAnswered = true;
             
+            // タイマーを停止
+            stopTimer();
+            
             // 即座に視覚的フィードバック
             const clickedBtn = event ? event.target.closest('.choice-btn') : null;
             if (clickedBtn) {
@@ -688,6 +849,9 @@
                     }
                 }
             }
+            
+            // 判定表示
+            showResult(isCorrect);
             
             // クライアント側で結果を記録
             clientResults.push({
@@ -897,6 +1061,7 @@
             
             // 状態をリセット
             isAnswered = false;
+            timeLeft = 2;
             
             // 選択肢ボタンをリセットして新しい選択肢を表示
             for (let i = 0; i < 4; i++) {
@@ -913,11 +1078,20 @@
                 }
             }
             
+            // 判定表示を非表示
+            const resultIndicator = document.getElementById('result-indicator');
+            if (resultIndicator) {
+                resultIndicator.style.display = 'none';
+            }
+            
             // 進捗表示を更新
             const progressElement = document.querySelector('.header-section p');
             if (progressElement) {
                 progressElement.textContent = `${currentWordIndex + 1} / ${totalWords} 問目`;
             }
+            
+            // タイマー開始
+            startTimer();
         }
     </script>
 </body>
