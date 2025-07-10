@@ -209,12 +209,6 @@
             text-align: center;
         }
 
-        .choice-number {
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin-bottom: 0.25rem;
-        }
-
         .choice-text {
             font-size: 0.9rem;
             line-height: 1.2;
@@ -498,20 +492,16 @@
                 <!-- 回答ボタン -->
                 <div class="button-section">
                     <div class="choices-container">
-                        <button class="choice-btn" id="choice-0" disabled>
-                            <span class="choice-number">①</span>
+                        <button class="choice-btn" id="choice-0">
                             <span class="choice-text" id="choice-text-0"></span>
                         </button>
-                        <button class="choice-btn" id="choice-1" disabled>
-                            <span class="choice-number">②</span>
+                        <button class="choice-btn" id="choice-1">
                             <span class="choice-text" id="choice-text-1"></span>
                         </button>
-                        <button class="choice-btn" id="choice-2" disabled>
-                            <span class="choice-number">③</span>
+                        <button class="choice-btn" id="choice-2">
                             <span class="choice-text" id="choice-text-2"></span>
                         </button>
-                        <button class="choice-btn" id="choice-3" disabled>
-                            <span class="choice-number">④</span>
+                        <button class="choice-btn" id="choice-3">
                             <span class="choice-text" id="choice-text-3"></span>
                         </button>
                     </div>
@@ -548,9 +538,8 @@
                 return;
             }
             
-            // 初期状態では問題のみを表示（選択肢は非表示）
-            const wordText = document.getElementById('word-text');
-            wordText.style.display = 'block';
+            // 初期状態で選択肢を表示
+            showChoices();
 
             // タッチイベントの設定
             setupTouchEvents();
@@ -585,24 +574,14 @@
             }
         }
 
-        // カードをタップして選択肢を表示
+        // カードをタップして音声を再生
         function toggleCard() {
-            if (isCardFlipped) {
-                // 既に選択肢が表示されている場合は問題に戻す
-                hideChoices();
-            } else {
-                // 問題が表示されている場合は選択肢を表示
-                showChoices();
-            }
+            // 音声を再生
+            autoPronounceCurrentWord();
         }
 
         // 選択肢を表示
         function showChoices() {
-            if (isCardFlipped) {
-                console.log('既に選択肢が表示されています');
-                return;
-            }
-            
             console.log('選択肢を表示中...');
             
             const currentWord = allWords[currentWordIndex];
@@ -622,34 +601,15 @@
                 }
             }
             
-            isCardFlipped = true;
-            
             // 問題クリック時に音声を発音
             autoPronounceCurrentWord();
             
             console.log('選択肢表示完了、ボタン有効化');
         }
 
-        // 選択肢を隠す
+        // 選択肢を隠す（使用しない）
         function hideChoices() {
-            if (!isCardFlipped) {
-                console.log('既に問題が表示されています');
-                return;
-            }
-            
-            console.log('問題に戻す...');
-            
-            // 選択肢ボタンを無効化
-            for (let i = 0; i < 4; i++) {
-                const choiceBtn = document.getElementById(`choice-${i}`);
-                if (choiceBtn) {
-                    choiceBtn.disabled = true;
-                }
-            }
-            
-            isCardFlipped = false;
-            
-            console.log('問題表示完了、ボタン無効化');
+            // この関数は使用しません
         }
 
         // 高速ボタンイベントの設定
@@ -685,8 +645,6 @@
             });
 
             card.addEventListener('touchend', function(e) {
-                if (isCardFlipped) return;
-                
                 const endX = e.changedTouches[0].clientX;
                 const endY = e.changedTouches[0].clientY;
                 const deltaX = Math.abs(endX - startX);
@@ -694,7 +652,7 @@
 
                 // スワイプ判定（水平方向のスワイプが垂直方向より大きい場合）
                 if (deltaX > deltaY && deltaX > 50) {
-                    showChoices();
+                    autoPronounceCurrentWord();
                 }
             });
         }
@@ -725,7 +683,7 @@
                     // 正解・不正解の色分け
                     if (i === currentWord.correct_index) {
                         choiceBtn.classList.add('correct');
-                    } else if (i === selectedIndex) {
+                    } else if (i === selectedIndex && !isCorrect) {
                         choiceBtn.classList.add('incorrect');
                     }
                 }
@@ -912,7 +870,7 @@
                 event.stopPropagation();
                 answer(3, event);
             } else if (event.key === ' ' || event.key === 'Enter') {
-                // スペースキーまたはエンターキーで選択肢を表示
+                // スペースキーまたはエンターキーで音声を再生
                 event.preventDefault();
                 event.stopPropagation();
                 toggleCard();
@@ -939,20 +897,19 @@
             
             // 状態をリセット
             isAnswered = false;
-            isCardFlipped = false;
             
-            // 選択肢ボタンをリセット
+            // 選択肢ボタンをリセットして新しい選択肢を表示
             for (let i = 0; i < 4; i++) {
                 const choiceBtn = document.getElementById(`choice-${i}`);
                 const choiceText = document.getElementById(`choice-text-${i}`);
                 
                 if (choiceBtn) {
-                    choiceBtn.disabled = true;
+                    choiceBtn.disabled = false;
                     choiceBtn.classList.remove('correct', 'incorrect');
                 }
                 
                 if (choiceText) {
-                    choiceText.textContent = '';
+                    choiceText.textContent = nextWord.choices[i];
                 }
             }
             
