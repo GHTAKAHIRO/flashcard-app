@@ -19,7 +19,10 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 0;
-            overflow-x: hidden;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
 
         .container {
@@ -31,9 +34,10 @@
             background: white;
             border-radius: 0;
             margin: 0;
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         /* ヘッダーセクション - モバイル最適化 */
@@ -69,6 +73,7 @@
             justify-content: flex-start;
             align-items: stretch;
             gap: 0.5rem;
+            overflow: hidden;
         }
 
         /* 単語カード - タッチフレンドリー */
@@ -140,41 +145,42 @@
 
         .result-overlay {
             position: absolute;
-            top: -20px;
-            right: -20px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             display: flex;
             align-items: center;
             justify-content: center;
             animation: resultPopIn 0.3s ease-out;
+            border-radius: 20px;
         }
 
         .result-symbol {
-            font-size: 2rem;
+            font-size: 4rem;
             font-weight: bold;
             color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .result-correct-overlay {
-            background: linear-gradient(135deg, #28a745, #20c997);
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.9), rgba(32, 201, 151, 0.9));
+            backdrop-filter: blur(5px);
         }
 
         .result-incorrect-overlay {
-            background: linear-gradient(135deg, #dc3545, #fd7e14);
-            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+            background: linear-gradient(135deg, rgba(220, 53, 69, 0.9), rgba(253, 126, 20, 0.9));
+            backdrop-filter: blur(5px);
         }
 
         @keyframes resultPopIn {
             from {
                 opacity: 0;
-                transform: scale(0.5) rotate(-180deg);
+                transform: scale(0.8);
             }
             to {
                 opacity: 1;
-                transform: scale(1) rotate(0deg);
+                transform: scale(1);
             }
         }
 
@@ -275,12 +281,6 @@
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
         }
 
-        .choice-btn.selected-wrong {
-            background: linear-gradient(135deg, #dc3545, #fd7e14);
-            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
-            transform: scale(1.05);
-        }
-
         .choice-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -331,48 +331,7 @@
             text-align: center;
         }
 
-        /* 判定表示のスタイル */
-        .result-indicator {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin-top: 1rem;
-            padding: 1rem;
-            border-radius: 15px;
-            animation: resultFadeIn 0.3s ease-out;
-        }
 
-        .result-icon {
-            font-size: 3rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .result-text {
-            font-size: 1.2rem;
-            font-weight: bold;
-        }
-
-        .result-correct {
-            background: linear-gradient(135deg, #28a745, #20c997);
-            color: white;
-        }
-
-        .result-incorrect {
-            background: linear-gradient(135deg, #dc3545, #fd7e14);
-            color: white;
-        }
-
-        @keyframes resultFadeIn {
-            from {
-                opacity: 0;
-                transform: scale(0.8);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
         
 
 
@@ -381,7 +340,7 @@
             .main-container {
                 border-radius: 20px;
                 margin: 1rem;
-                min-height: calc(100vh - 2rem);
+                height: calc(100vh - 2rem);
             }
 
             .header-section {
@@ -486,6 +445,12 @@
                 min-height: 35vh;
                 max-height: 45vh;
             }
+        }
+
+        /* スクロール防止 */
+        html, body {
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: auto;
         }
 
         /* モバイル向けの特別な調整 */
@@ -645,11 +610,7 @@
                             <span class="choice-text" id="choice-text-3"></span>
                         </button>
                     </div>
-                    <!-- 判定表示 -->
-                    <div class="result-indicator" id="result-indicator" style="display: none;">
-                        <div class="result-icon" id="result-icon"></div>
-                        <div class="result-text" id="result-text"></div>
-                    </div>
+
                 </div>
             </div>
         </div>
@@ -776,9 +737,7 @@
                     stopTimer();
                     if (!isAnswered) {
                         // 時間切れで不正解として処理
-                        const currentWord = allWords[currentWordIndex];
-                        const randomIndex = Math.floor(Math.random() * 4);
-                        answer(randomIndex, null);
+                        timeUpAnswer();
                     }
                 }
             }, 100);
@@ -821,25 +780,60 @@
             }
         }
 
-        // 判定表示
-        function showResult(isCorrect) {
-            const resultIndicator = document.getElementById('result-indicator');
-            const resultIcon = document.getElementById('result-icon');
-            const resultText = document.getElementById('result-text');
+        // 時間切れ処理
+        function timeUpAnswer() {
+            if (isAnswered) return;
             
-            if (resultIndicator && resultIcon && resultText) {
-                resultIndicator.style.display = 'flex';
-                resultIndicator.className = 'result-indicator ' + (isCorrect ? 'result-correct' : 'result-incorrect');
-                
-                if (isCorrect) {
-                    resultIcon.innerHTML = '✓';
-                    resultText.textContent = '正解！';
-                } else {
-                    resultIcon.innerHTML = '✗';
-                    resultText.textContent = '不正解';
+            isAnswered = true;
+            
+            // タイマーを停止
+            stopTimer();
+            
+            const currentWord = allWords[currentWordIndex];
+            
+            // すべての選択肢ボタンを無効化
+            for (let i = 0; i < 4; i++) {
+                const choiceBtn = document.getElementById(`choice-${i}`);
+                if (choiceBtn) {
+                    choiceBtn.disabled = true;
+                    
+                    // 正解の選択肢のみ緑色で表示
+                    if (i === currentWord.correct_index) {
+                        choiceBtn.classList.add('correct');
+                    }
                 }
             }
+            
+            // 問題に✕を表示（時間切れは不正解）
+            showWordResult(false);
+            
+
+            
+            // クライアント側で結果を記録（時間切れは不正解）
+            clientResults.push({
+                word_id: currentWord.id,
+                word: currentWord.word,
+                meaning: currentWord.meaning,
+                selected_choice: '時間切れ',
+                correct_choice: currentWord.choices[currentWord.correct_index],
+                selected_index: -1,
+                correct_index: currentWord.correct_index,
+                result: 'incorrect'
+            });
+            
+            // 少し待ってから次の問題に進む
+            setTimeout(() => {
+                // 最後の問題の場合は、すべての結果をサーバーに送信
+                if (currentWordIndex + 1 >= totalWords) {
+                    sendAllResults();
+                } else {
+                    // 次の問題に切り替え
+                    switchToNextWord();
+                }
+            }, 1500);
         }
+
+
 
         // 高速ボタンイベントの設定
         function setupFastButtonEvents() {
@@ -912,11 +906,9 @@
                 if (choiceBtn) {
                     choiceBtn.disabled = true;
                     
-                    // 正解・不正解の色分け
+                    // 正解の選択肢のみ色分け
                     if (i === currentWord.correct_index) {
                         choiceBtn.classList.add('correct');
-                    } else if (i === selectedIndex && !isCorrect) {
-                        choiceBtn.classList.add('selected-wrong');
                     }
                 }
             }
@@ -924,8 +916,7 @@
             // 問題に〇✕を表示
             showWordResult(isCorrect);
             
-            // 判定表示
-            showResult(isCorrect);
+
             
             // クライアント側で結果を記録
             clientResults.push({
@@ -1144,7 +1135,7 @@
                 
                 if (choiceBtn) {
                     choiceBtn.disabled = false;
-                    choiceBtn.classList.remove('correct', 'incorrect', 'selected-wrong');
+                    choiceBtn.classList.remove('correct', 'incorrect');
                 }
                 
                 if (choiceText) {
@@ -1152,11 +1143,7 @@
                 }
             }
             
-            // 判定表示を非表示
-            const resultIndicator = document.getElementById('result-indicator');
-            if (resultIndicator) {
-                resultIndicator.style.display = 'none';
-            }
+
             
             // 問題の結果表示を非表示
             const resultOverlay = document.getElementById('result-overlay');
