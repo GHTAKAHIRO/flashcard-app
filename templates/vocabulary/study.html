@@ -177,22 +177,22 @@
             margin-top: 0;
         }
 
-        .button-row {
-            display: flex;
-            gap: 1rem;
+        .choices-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
             margin-bottom: 1rem;
         }
 
-        .answer-btn {
-            flex: 1;
+        .choice-btn {
             background: #667eea;
             border: none;
-            border-radius: 50px;
-            padding: 1.2rem 1rem;
+            border-radius: 15px;
+            padding: 1rem 0.75rem;
             color: white;
             font-weight: bold;
-            font-size: 1.1rem;
-            min-height: 60px;
+            font-size: 1rem;
+            min-height: 70px;
             touch-action: manipulation;
             transition: none;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
@@ -202,29 +202,46 @@
             will-change: transform;
             pointer-events: auto;
             cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
 
-        .answer-btn.known {
+        .choice-number {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .choice-text {
+            font-size: 0.9rem;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+
+        .choice-btn.correct {
             background: linear-gradient(135deg, #28a745, #20c997);
         }
 
-        .answer-btn.unknown {
+        .choice-btn.incorrect {
             background: linear-gradient(135deg, #dc3545, #fd7e14);
         }
 
-        .answer-btn:disabled {
+        .choice-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: scale(0.95);
         }
 
-        .answer-btn:not(:disabled):active {
+        .choice-btn:not(:disabled):active {
             transform: scale(0.85);
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             transition: none;
         }
 
-        .answer-btn:not(:disabled):hover {
+        .choice-btn:not(:disabled):hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
             transition: none;
@@ -269,14 +286,18 @@
 
 
 
-            .button-row {
-                gap: 1.5rem;
+            .choices-container {
+                gap: 1rem;
             }
 
-            .answer-btn {
-                padding: 1.5rem 2rem;
-                font-size: 1.2rem;
-                min-height: 70px;
+            .choice-btn {
+                padding: 1.2rem 1rem;
+                font-size: 1.1rem;
+                min-height: 80px;
+            }
+
+            .choice-text {
+                font-size: 1rem;
             }
         }
 
@@ -302,14 +323,18 @@
 
 
 
-            .button-row {
-                gap: 2rem;
+            .choices-container {
+                gap: 1.5rem;
             }
 
-            .answer-btn {
-                padding: 1.8rem 2.5rem;
-                font-size: 1.3rem;
-                min-height: 80px;
+            .choice-btn {
+                padding: 1.5rem 1.5rem;
+                font-size: 1.2rem;
+                min-height: 90px;
+            }
+
+            .choice-text {
+                font-size: 1.1rem;
             }
         }
 
@@ -382,14 +407,18 @@
                 padding: 0.25rem 0 0.5rem 0;
             }
 
-            .button-row {
+            .choices-container {
                 gap: 0.5rem;
             }
 
-            .answer-btn {
-                padding: 1rem 0.5rem;
-                font-size: 1rem;
-                min-height: 50px;
+            .choice-btn {
+                padding: 0.8rem 0.5rem;
+                font-size: 0.9rem;
+                min-height: 60px;
+            }
+
+            .choice-text {
+                font-size: 0.8rem;
             }
         }
 
@@ -468,12 +497,22 @@
 
                 <!-- 回答ボタン -->
                 <div class="button-section">
-                    <div class="button-row">
-                        <button class="answer-btn known" id="known-btn" disabled>
-                            <i class="fas fa-check me-2"></i>知っている
+                    <div class="choices-container">
+                        <button class="choice-btn" id="choice-0" disabled>
+                            <span class="choice-number">①</span>
+                            <span class="choice-text" id="choice-text-0"></span>
                         </button>
-                        <button class="answer-btn unknown" id="unknown-btn" disabled>
-                            <i class="fas fa-times me-2"></i>知らない
+                        <button class="choice-btn" id="choice-1" disabled>
+                            <span class="choice-number">②</span>
+                            <span class="choice-text" id="choice-text-1"></span>
+                        </button>
+                        <button class="choice-btn" id="choice-2" disabled>
+                            <span class="choice-number">③</span>
+                            <span class="choice-text" id="choice-text-2"></span>
+                        </button>
+                        <button class="choice-btn" id="choice-3" disabled>
+                            <span class="choice-number">④</span>
+                            <span class="choice-text" id="choice-text-3"></span>
                         </button>
                     </div>
                 </div>
@@ -509,11 +548,8 @@
                 return;
             }
             
-            // 初期状態では問題のみを表示（解答は非表示）
-            const meaningElement = document.getElementById('meaning-text');
+            // 初期状態では問題のみを表示（選択肢は非表示）
             const wordText = document.getElementById('word-text');
-            
-            meaningElement.style.display = 'none';
             wordText.style.display = 'block';
 
             // タッチイベントの設定
@@ -549,50 +585,53 @@
             }
         }
 
-        // カードをタップして答えを表示
+        // カードをタップして選択肢を表示
         function toggleCard() {
             if (isCardFlipped) {
-                // 既に解答が表示されている場合は問題に戻す
-                hideAnswer();
+                // 既に選択肢が表示されている場合は問題に戻す
+                hideChoices();
             } else {
-                // 問題が表示されている場合は解答を表示
-                showAnswer();
+                // 問題が表示されている場合は選択肢を表示
+                showChoices();
             }
         }
 
-        // 答えを表示
-        function showAnswer() {
+        // 選択肢を表示
+        function showChoices() {
             if (isCardFlipped) {
-                console.log('既に答えが表示されています');
+                console.log('既に選択肢が表示されています');
                 return;
             }
             
-            console.log('答えを表示中...');
+            console.log('選択肢を表示中...');
             
-            const wordText = document.getElementById('word-text');
-            const meaningElement = document.getElementById('meaning-text');
-            const knownBtn = document.getElementById('known-btn');
-            const unknownBtn = document.getElementById('unknown-btn');
+            const currentWord = allWords[currentWordIndex];
+            if (!currentWord || !currentWord.choices) {
+                console.error('選択肢データが見つかりません');
+                return;
+            }
             
-            // 問題を非表示
-            wordText.style.display = 'none';
+            // 選択肢を各ボタンに設定
+            for (let i = 0; i < 4; i++) {
+                const choiceBtn = document.getElementById(`choice-${i}`);
+                const choiceText = document.getElementById(`choice-text-${i}`);
+                
+                if (choiceBtn && choiceText) {
+                    choiceText.textContent = currentWord.choices[i];
+                    choiceBtn.disabled = false;
+                }
+            }
             
-            // 日本語の意味を表示
-            meaningElement.style.display = 'block';
             isCardFlipped = true;
-            
-            // ボタンを有効化
-            knownBtn.disabled = false;
-            unknownBtn.disabled = false;
             
             // 問題クリック時に音声を発音
             autoPronounceCurrentWord();
             
-            console.log('答え表示完了、ボタン有効化');
+            console.log('選択肢表示完了、ボタン有効化');
         }
 
-        // 答えを隠す
-        function hideAnswer() {
+        // 選択肢を隠す
+        function hideChoices() {
             if (!isCardFlipped) {
                 console.log('既に問題が表示されています');
                 return;
@@ -600,50 +639,38 @@
             
             console.log('問題に戻す...');
             
-            const wordText = document.getElementById('word-text');
-            const meaningElement = document.getElementById('meaning-text');
-            const knownBtn = document.getElementById('known-btn');
-            const unknownBtn = document.getElementById('unknown-btn');
+            // 選択肢ボタンを無効化
+            for (let i = 0; i < 4; i++) {
+                const choiceBtn = document.getElementById(`choice-${i}`);
+                if (choiceBtn) {
+                    choiceBtn.disabled = true;
+                }
+            }
             
-            // 問題を表示
-            wordText.style.display = 'block';
-            
-            // 日本語の意味を非表示
-            meaningElement.style.display = 'none';
             isCardFlipped = false;
-            
-            // ボタンを無効化
-            knownBtn.disabled = true;
-            unknownBtn.disabled = true;
             
             console.log('問題表示完了、ボタン無効化');
         }
 
         // 高速ボタンイベントの設定
         function setupFastButtonEvents() {
-            const knownBtn = document.getElementById('known-btn');
-            const unknownBtn = document.getElementById('unknown-btn');
-            
-            // 既存のイベントリスナーを削除
-            knownBtn.replaceWith(knownBtn.cloneNode(true));
-            unknownBtn.replaceWith(unknownBtn.cloneNode(true));
-            
-            // 新しい要素を取得
-            const newKnownBtn = document.getElementById('known-btn');
-            const newUnknownBtn = document.getElementById('unknown-btn');
-            
-            // 即座に実行されるイベントリスナー
-            newKnownBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                answer('known', e);
-            }, { passive: false });
-            
-            newUnknownBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                answer('unknown', e);
-            }, { passive: false });
+            // 4つの選択肢ボタンのイベントリスナーを設定
+            for (let i = 0; i < 4; i++) {
+                const choiceBtn = document.getElementById(`choice-${i}`);
+                
+                // 既存のイベントリスナーを削除
+                choiceBtn.replaceWith(choiceBtn.cloneNode(true));
+                
+                // 新しい要素を取得
+                const newChoiceBtn = document.getElementById(`choice-${i}`);
+                
+                // 即座に実行されるイベントリスナー
+                newChoiceBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    answer(i, e);
+                }, { passive: false });
+            }
         }
 
         // タッチイベントの設定
@@ -667,46 +694,65 @@
 
                 // スワイプ判定（水平方向のスワイプが垂直方向より大きい場合）
                 if (deltaX > deltaY && deltaX > 50) {
-                    showAnswer();
+                    showChoices();
                 }
             });
         }
 
         // 回答処理
-        function answer(result, event) {
+        function answer(selectedIndex, event) {
             if (isAnswered) return;
             
             isAnswered = true;
             
             // 即座に視覚的フィードバック
-            const clickedBtn = event ? event.target.closest('.answer-btn') : null;
+            const clickedBtn = event ? event.target.closest('.choice-btn') : null;
             if (clickedBtn) {
                 clickedBtn.style.transform = 'scale(0.9)';
                 clickedBtn.style.transition = 'none';
             }
             
-            // ボタンを即座に無効化
-            const knownBtn = document.getElementById('known-btn');
-            const unknownBtn = document.getElementById('unknown-btn');
-            knownBtn.disabled = true;
-            unknownBtn.disabled = true;
+            // 正解・不正解の表示
+            const currentWord = allWords[currentWordIndex];
+            const isCorrect = selectedIndex === currentWord.correct_index;
+            
+            // すべての選択肢ボタンを無効化
+            for (let i = 0; i < 4; i++) {
+                const choiceBtn = document.getElementById(`choice-${i}`);
+                if (choiceBtn) {
+                    choiceBtn.disabled = true;
+                    
+                    // 正解・不正解の色分け
+                    if (i === currentWord.correct_index) {
+                        choiceBtn.classList.add('correct');
+                    } else if (i === selectedIndex) {
+                        choiceBtn.classList.add('incorrect');
+                    }
+                }
+            }
             
             // クライアント側で結果を記録
-            const currentWord = allWords[currentWordIndex];
             clientResults.push({
                 word_id: currentWord.id,
                 word: currentWord.word,
                 meaning: currentWord.meaning,
-                result: result
+                selected_choice: currentWord.choices[selectedIndex],
+                correct_choice: currentWord.choices[currentWord.correct_index],
+                selected_index: selectedIndex,
+                correct_index: currentWord.correct_index,
+                result: isCorrect ? 'correct' : 'incorrect'
             });
             
-            // 最後の問題の場合は、すべての結果をサーバーに送信
-            if (currentWordIndex + 1 >= totalWords) {
-                sendAllResults();
-            } else {
-                // 次の問題に切り替え
-                switchToNextWord();
-            }
+            // 少し待ってから次の問題に進む（正解・不正解の表示を見せるため）
+            setTimeout(() => {
+                // 最後の問題の場合は、すべての結果をサーバーに送信
+                if (currentWordIndex + 1 >= totalWords) {
+                    sendAllResults();
+                } else {
+                    // 次の問題に切り替え
+                    switchToNextWord();
+                }
+            }, 1500);
         }
         
         // すべての結果をサーバーに送信
@@ -849,16 +895,24 @@
         document.addEventListener('keydown', function(event) {
             if (isAnswered) return;
             
-            if (event.key === 'j' || event.key === 'J') {
+            if (event.key === '1') {
                 event.preventDefault();
                 event.stopPropagation();
-                answer('known', event);
-            } else if (event.key === 'f' || event.key === 'F') {
+                answer(0, event);
+            } else if (event.key === '2') {
                 event.preventDefault();
                 event.stopPropagation();
-                answer('unknown', event);
+                answer(1, event);
+            } else if (event.key === '3') {
+                event.preventDefault();
+                event.stopPropagation();
+                answer(2, event);
+            } else if (event.key === '4') {
+                event.preventDefault();
+                event.stopPropagation();
+                answer(3, event);
             } else if (event.key === ' ' || event.key === 'Enter') {
-                // スペースキーまたはエンターキーでカードを切り替え
+                // スペースキーまたはエンターキーで選択肢を表示
                 event.preventDefault();
                 event.stopPropagation();
                 toggleCard();
@@ -880,33 +934,33 @@
             // 次の問題を表示
             const nextWord = allWords[currentWordIndex];
             const wordText = document.getElementById('word-text');
-            const meaningText = document.getElementById('meaning-text');
             
             wordText.textContent = nextWord.word;
-            meaningText.textContent = nextWord.meaning;
-            
-            // 問題を表示、解答を非表示
-            wordText.style.display = 'block';
-            meaningText.style.display = 'none';
             
             // 状態をリセット
             isAnswered = false;
             isCardFlipped = false;
             
-            // ボタンをリセット
-            const knownBtn = document.getElementById('known-btn');
-            const unknownBtn = document.getElementById('unknown-btn');
-            
-            knownBtn.disabled = true;
-            unknownBtn.disabled = true;
+            // 選択肢ボタンをリセット
+            for (let i = 0; i < 4; i++) {
+                const choiceBtn = document.getElementById(`choice-${i}`);
+                const choiceText = document.getElementById(`choice-text-${i}`);
+                
+                if (choiceBtn) {
+                    choiceBtn.disabled = true;
+                    choiceBtn.classList.remove('correct', 'incorrect');
+                }
+                
+                if (choiceText) {
+                    choiceText.textContent = '';
+                }
+            }
             
             // 進捗表示を更新
             const progressElement = document.querySelector('.header-section p');
             if (progressElement) {
                 progressElement.textContent = `${currentWordIndex + 1} / ${totalWords} 問目`;
             }
-            
-
         }
     </script>
 </body>

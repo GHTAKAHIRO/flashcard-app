@@ -2266,6 +2266,33 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
             flash("データベース接続エラーが発生しました")
             return redirect(url_for('vocabulary_home'))
         
+        # 4択問題の選択肢を生成
+        words_with_choices = []
+        for word in words:
+            # 正解の選択肢
+            correct_choice = word['meaning']
+            
+            # 他の単語から3つの選択肢をランダムに選択
+            other_meanings = [w['meaning'] for w in words if w['id'] != word['id']]
+            import random
+            wrong_choices = random.sample(other_meanings, min(3, len(other_meanings)))
+            
+            # 4つの選択肢を作成（正解を含む）
+            all_choices = [correct_choice] + wrong_choices
+            random.shuffle(all_choices)
+            
+            # 正解のインデックスを記録
+            correct_index = all_choices.index(correct_choice)
+            
+            words_with_choices.append({
+                'id': word['id'],
+                'word': word['word'],
+                'meaning': word['meaning'],
+                'example': word['example_sentence'],
+                'choices': all_choices,
+                'correct_index': correct_index
+            })
+        
         # セッションに学習情報を保存
         session_id = str(datetime.now().timestamp())
         vocabulary_session = {
@@ -2273,7 +2300,7 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
             'chapter_id': chapter_id,
             'chunk_number': chunk_number,
             'mode': mode,  # 'review' または 'retest' または None
-            'words': [{'id': w['id'], 'word': w['word'], 'meaning': w['meaning'], 'example': w['example_sentence']} for w in words],
+            'words': words_with_choices,
             'current_index': 0,
             'results': [],
             'start_time': datetime.now().isoformat(),
@@ -2363,7 +2390,7 @@ def vocabulary_answer():
     """英単語の回答処理"""
     try:
         data = request.get_json()
-        result = data.get('result')  # 'known' or 'unknown'
+        selected_index = data.get('selected_index')  # 選択された選択肢のインデックス（0-3）
         
         vocabulary_session = session.get('vocabulary_session')
         if not vocabulary_session:
@@ -2377,10 +2404,17 @@ def vocabulary_answer():
         
         # 結果を記録
         current_word = words[current_index]
+        is_correct = selected_index == current_word['correct_index']
+        result = 'correct' if is_correct else 'incorrect'
+        
         vocabulary_session['results'].append({
             'word_id': current_word['id'],
             'word': current_word['word'],
             'meaning': current_word['meaning'],
+            'selected_choice': current_word['choices'][selected_index],
+            'correct_choice': current_word['choices'][current_word['correct_index']],
+            'selected_index': selected_index,
+            'correct_index': current_word['correct_index'],
             'result': result
         })
         
