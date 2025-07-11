@@ -100,6 +100,7 @@
         }
         .word-item.correct {
             border-left: 4px solid #28a745;
+            /* background: #e6f9ed; 削除 */
         }
         .word-item.incorrect {
             border-left: 4px solid #dc3545;
@@ -366,6 +367,35 @@
         }
         .breadcrumb-item.active {
             color: #6c757d;
+        }
+
+        /* 〇✕マーク用スタイル */
+        .result-mark {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0.5rem 0 0.5rem 0;
+        }
+        .maru, .batsu {
+            font-size: 2.5rem;
+            font-weight: bold;
+            line-height: 1;
+            display: inline-block;
+            width: 50%;
+            text-align: center;
+        }
+        .maru {
+            color: #28a745;
+            border: 3px solid #28a745;
+            border-radius: 50%;
+            background: none;
+        }
+        .batsu {
+            color: #dc3545;
+            border: 3px solid #dc3545;
+            border-radius: 50%;
+            background: none;
         }
 
         /* === ここからスマホ用CSS === */
@@ -694,6 +724,13 @@
                                         </button>
                                     </div>
                                 </div>
+                                <div class="result-mark">
+                                    {% if word.result == 'known' %}
+                                        <span class="maru">〇</span>
+                                    {% else %}
+                                        <span class="batsu">✕</span>
+                                    {% endif %}
+                                </div>
                                 <div class="word-meaning" id="meaning-{{ loop.index }}">
                                     {{ word.meaning }}
                                 </div>
@@ -881,11 +918,16 @@
                     if (e.target.closest('.pronunciation-btn')) {
                         return;
                     }
-                    
                     const wordHeader = item.querySelector('.word-header');
                     const meaningElement = item.querySelector('.word-meaning');
-                    
+                    const now = Date.now();
                     if (meaningElement.classList.contains('show')) {
+                        // 直近の表示時刻を取得
+                        const shownAt = parseInt(item.getAttribute('data-shown-at') || '0', 10);
+                        if (now - shownAt < 1000) {
+                            // 1秒未満なら非表示にしない
+                            return;
+                        }
                         // 解答が表示されている場合は問題に戻す
                         meaningElement.classList.remove('show');
                         wordHeader.style.display = 'flex';
@@ -895,6 +937,8 @@
                         meaningElement.classList.add('show');
                         wordHeader.style.display = 'none';
                         item.style.flexDirection = 'column';
+                        // 表示時刻を記録
+                        item.setAttribute('data-shown-at', now.toString());
                     }
                 });
             });
