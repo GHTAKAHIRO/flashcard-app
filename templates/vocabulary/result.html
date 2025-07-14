@@ -724,13 +724,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div class="result-mark">
-                                    {% if word.result == 'correct' %}
-                                        <span class="maru">〇</span>
-                                    {% else %}
-                                        <span class="batsu">✕</span>
-                                    {% endif %}
-                                </div>
+
                                 <div class="word-meaning" id="meaning-{{ loop.index }}">
                                     {{ word.meaning }}
                                 </div>
