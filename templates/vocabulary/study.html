@@ -153,7 +153,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            animation: resultPopIn 0.3s ease-out;
+
             border-radius: 20px;
             z-index: 10;
             overflow: visible;
@@ -183,16 +183,7 @@
             backdrop-filter: blur(5px);
         }
 
-        @keyframes resultPopIn {
-            from {
-                opacity: 0;
-                transform: scale(0.8);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
+
 
         .word-text {
             font-size: 2.5rem;
@@ -216,11 +207,7 @@
 
 
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
+
 
 
 
@@ -1021,7 +1008,6 @@
             // 即座に視覚的フィードバック
             const clickedBtn = event ? event.target.closest('.choice-btn') : null;
             if (clickedBtn) {
-                clickedBtn.style.transform = 'scale(0.9)';
                 clickedBtn.style.transition = 'none';
             }
             
