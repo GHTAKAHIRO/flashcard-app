@@ -27,6 +27,14 @@ import re
 # ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
 
+# 環境変数の確認とログ出力
+print("🔍 環境変数チェック:")
+print(f"DB_HOST: {os.getenv('DB_HOST', 'Not set')}")
+print(f"DB_PORT: {os.getenv('DB_PORT', 'Not set')}")
+print(f"DB_NAME: {os.getenv('DB_NAME', 'Not set')}")
+print(f"DB_USER: {os.getenv('DB_USER', 'Not set')}")
+print(f"DB_PASSWORD: {'Set' if os.getenv('DB_PASSWORD') else 'Not set'}")
+
 app = Flask(__name__)
 CORS(app)
 app.secret_key = 'your_secret_key'
@@ -151,12 +159,21 @@ def get_db_connection():
     """プール化された接続を取得（最適化版）"""
     global db_pool
     if db_pool is None:
-        init_connection_pool()
+        try:
+            init_connection_pool()
+        except Exception as e:
+            app.logger.error(f"接続プール初期化エラー: {e}")
+            # フォールバック：直接接続
+            pass
     
     conn = None
     try:
         if db_pool:  # 🔥 追加: プールが存在するかチェック
-            conn = db_pool.getconn()
+            try:
+                conn = db_pool.getconn()
+            except Exception as e:
+                app.logger.error(f"プールから接続取得エラー: {e}")
+                conn = None
         
         if conn:
             conn.autocommit = False
@@ -171,8 +188,12 @@ def get_db_connection():
             yield conn
     except Exception as e:
         if conn:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except:
+                pass
         app.logger.error(f"DB接続エラー: {e}")
+        app.logger.error(f"接続情報: host={DB_HOST}, port={DB_PORT}, dbname={DB_NAME}, user={DB_USER}")
         raise
     finally:
         if conn and db_pool:
@@ -1590,8 +1611,32 @@ def favicon():
 @login_required
 def dashboard():
     try:
+        # データベース接続テスト
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # まず基本的な接続テスト
+                cur.execute('SELECT 1')
+                test_result = cur.fetchone()
+                app.logger.info(f"データベース接続テスト成功: {test_result}")
+                
+                # imageテーブルの存在確認
+                cur.execute("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = 'image'
+                    )
+                """)
+                table_exists = cur.fetchone()[0]
+                app.logger.info(f"imageテーブル存在確認: {table_exists}")
+                
+                if not table_exists:
+                    app.logger.warning("imageテーブルが存在しません")
+                    return render_template('dashboard.html', 
+                                         sources=[], 
+                                         saved_ranges={}, 
+                                         saved_difficulties={},
+                                         settings_locked={})
+                
                 cur.execute('SELECT DISTINCT source, subject, grade FROM image ORDER BY source')
                 rows = cur.fetchall()
                 sources = [{"source": r[0], "subject": r[1], "grade": r[2]} for r in rows]
@@ -1618,6 +1663,8 @@ def dashboard():
                              settings_locked=settings_locked)  # ロック状態を渡す
     except Exception as e:
         app.logger.error(f"ダッシュボードエラー: {e}")
+        import traceback
+        app.logger.error(f"詳細エラー: {traceback.format_exc()}")
         flash("教材一覧の取得に失敗しました")
         return redirect(url_for('login'))
 
@@ -2997,5 +3044,23 @@ def admin():
         return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
+    # データベース接続プールを初期化
+    try:
+        init_connection_pool()
+        print("✅ データベース接続プール初期化完了")
+        
+        # データベース接続テスト
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('SELECT 1')
+                    result = cur.fetchone()
+                    print(f"✅ データベース接続テスト成功: {result}")
+        except Exception as e:
+            print(f"❌ データベース接続テスト失敗: {e}")
+            
+    except Exception as e:
+        print(f"❌ データベース接続プール初期化エラー: {e}")
+    
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
