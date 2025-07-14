@@ -154,6 +154,8 @@
             justify-content: center;
             animation: resultPopIn 0.3s ease-out;
             border-radius: 20px;
+            z-index: 10;
+            overflow: visible;
         }
 
         .result-symbol {
@@ -161,6 +163,13 @@
             font-weight: bold;
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        /* 〇×表示を無効化 */
+        .result-overlay {
+            display: none !important;
         }
 
         .result-correct-overlay {
@@ -585,10 +594,6 @@
                                 <div class="word-text" id="word-text">
                                     {{ word.word }}
                                 </div>
-                                <!-- 結果表示エリア -->
-                                <div class="result-overlay" id="result-overlay" style="display: none;">
-                                    <div class="result-symbol" id="result-symbol"></div>
-                                </div>
                             </div>
                             <div class="meaning-text" id="meaning-text" style="display: none;">{{ word.meaning }}</div>
                         </div>
@@ -769,22 +774,7 @@
             }
         }
 
-        // 問題に〇✕を表示
-        function showWordResult(isCorrect) {
-            const resultOverlay = document.getElementById('result-overlay');
-            const resultSymbol = document.getElementById('result-symbol');
-            
-            if (resultOverlay && resultSymbol) {
-                resultOverlay.style.display = 'flex';
-                resultOverlay.className = 'result-overlay ' + (isCorrect ? 'result-correct-overlay' : 'result-incorrect-overlay');
-                
-                if (isCorrect) {
-                    resultSymbol.innerHTML = '〇';
-                } else {
-                    resultSymbol.innerHTML = '✕';
-                }
-            }
-        }
+
 
         // 時間切れ処理
         function timeUpAnswer() {
@@ -810,8 +800,7 @@
                 }
             }
             
-            // 問題に✕を表示（時間切れは不正解）
-            showWordResult(false);
+
             
 
             
@@ -919,8 +908,7 @@
                 }
             }
             
-            // 問題に〇✕を表示
-            showWordResult(isCorrect);
+
             
 
             
