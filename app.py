@@ -2584,8 +2584,8 @@ def vocabulary_result(source):
         
         app.logger.info(f"結果ページ表示: user={current_user.id}, source={source}, results_count={len(results)}")
         
-        unknown_words = [r for r in results if r['result'] == 'unknown']
-        known_count = len([r for r in results if r['result'] == 'known'])
+        unknown_words = [r for r in results if r['result'] == 'incorrect']
+        known_count = len([r for r in results if r['result'] == 'correct'])
         unknown_count = len(unknown_words)
         all_words = results  # 全問題の結果
         
@@ -2606,7 +2606,7 @@ def vocabulary_result(source):
             app.logger.info(f"学習完了更新結果: {update_success}")
             
             # 全問正解の場合、合格ステータスも更新
-            if unknown_count == 0 and mode != 'retest':
+            if known_count == len(results) and mode != 'retest':
                 app.logger.info(f"全問正解判定: 合格ステータスを更新")
                 update_success = update_vocabulary_chunk_progress(
                     str(current_user.id), source, chapter_id, chunk_number,
