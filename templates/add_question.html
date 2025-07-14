@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}問題追加 - 社会科一問一答アプリ{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold">
+                <i class="fas fa-plus-circle me-2"></i>問題追加
+            </h2>
+            <p class="text-muted">新しい問題を追加して学習コンテンツを充実させましょう</p>
+        </div>
+
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">
+                            <i class="fas fa-book me-1"></i>科目
+                        </label>
+                        <select class="form-control" id="subject" name="subject" required>
+                            <option value="">科目を選択してください</option>
+                            <option value="地理">地理</option>
+                            <option value="歴史">歴史</option>
+                            <option value="公民">公民</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="question" class="form-label">
+                            <i class="fas fa-question-circle me-1"></i>問題文
+                        </label>
+                        <textarea class="form-control" id="question" name="question" rows="3" 
+                                  placeholder="問題文を入力してください..." required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="correct_answer" class="form-label">
+                            <i class="fas fa-check me-1"></i>正解
+                        </label>
+                        <input type="text" class="form-control" id="correct_answer" name="correct_answer" 
+                               placeholder="正解を入力してください..." required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="acceptable_answers" class="form-label">
+                            <i class="fas fa-list me-1"></i>許容回答（オプション）
+                        </label>
+                        <textarea class="form-control" id="acceptable_answers" name="acceptable_answers" rows="2" 
+                                  placeholder="カンマ区切りで複数の許容回答を入力してください（例: 東京都, Tokyo）"></textarea>
+                        <div class="form-text">
+                            複数の正解や表記ゆれがある場合は、カンマ区切りで入力してください
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="explanation" class="form-label">
+                            <i class="fas fa-lightbulb me-1"></i>解説（オプション）
+                        </label>
+                        <textarea class="form-control" id="explanation" name="explanation" rows="3" 
+                                  placeholder="問題の解説や補足説明を入力してください..."></textarea>
+                        <div class="form-text">
+                            学習者が理解を深められるような解説を入力してください
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>問題を追加
+                        </button>
+                        <a href="{{ url_for('admin_questions') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>問題一覧に戻る
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 入力例 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>入力例
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>地理の例</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>問題:</strong> 日本の首都はどこですか？</li>
+                            <li><strong>正解:</strong> 東京</li>
+                            <li><strong>許容回答:</strong> 東京都, Tokyo</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>歴史の例</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>問題:</strong> 江戸幕府を開いた人物は誰ですか？</li>
+                            <li><strong>正解:</strong> 徳川家康</li>
+                            <li><strong>許容回答:</strong> 徳川家康公, Tokugawa Ieyasu</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

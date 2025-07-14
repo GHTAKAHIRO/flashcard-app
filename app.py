@@ -2730,6 +2730,240 @@ def vocabulary_upload():
 
 
 
+# ========== 社会科一問一答機能 ==========
+
+def normalize_answer(answer):
+    """回答を正規化（空白除去、小文字化など）"""
+    if not answer:
+        return ""
+    # 空白を除去し、小文字に変換
+    normalized = re.sub(r'\s+', '', answer.lower())
+    # 全角数字を半角に変換
+    normalized = normalized.translate(str.maketrans('０１２３４５６７８９', '0123456789'))
+    return normalized
+
+def check_answer(user_answer, correct_answer, acceptable_answers=None):
+    """回答をチェックする"""
+    user_norm = normalize_answer(user_answer)
+    correct_norm = normalize_answer(correct_answer)
+    
+    # 完全一致
+    if user_norm == correct_norm:
+        return True, "完全一致"
+    
+    # 許容回答のチェック
+    if acceptable_answers:
+        for acceptable in acceptable_answers:
+            if user_norm == normalize_answer(acceptable):
+                return True, "許容回答"
+    
+    # 部分一致（キーワードチェック）
+    correct_words = set(correct_norm.split())
+    user_words = set(user_norm.split())
+    
+    if len(correct_words) > 0:
+        match_ratio = len(correct_words.intersection(user_words)) / len(correct_words)
+        if match_ratio >= 0.7:  # 70%以上のキーワードが一致
+            return True, f"部分一致 ({match_ratio:.1%})"
+    
+    return False, "不正解"
+
+@app.route('/social_studies')
+@login_required
+def social_studies_home():
+    """社会科一問一答ホーム画面"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 科目一覧の取得
+                cur.execute('SELECT DISTINCT subject FROM social_studies_questions ORDER BY subject')
+                subjects = [row['subject'] for row in cur.fetchall()]
+                
+                # 学習履歴の取得
+                cur.execute('''
+                    SELECT 
+                        subject,
+                        COUNT(*) as total_questions,
+                        COUNT(CASE WHEN is_correct THEN 1 END) as correct_answers,
+                        MAX(created_at) as last_studied
+                    FROM social_studies_study_log 
+                    WHERE user_id = %s 
+                    GROUP BY subject
+                    ORDER BY last_studied DESC
+                ''', (current_user.id,))
+                study_history = cur.fetchall()
+                
+                return render_template('social_studies/home.html', 
+                                     subjects=subjects, 
+                                     study_history=study_history)
+    except Exception as e:
+        app.logger.error(f"社会科ホーム画面エラー: {e}")
+        flash('データの取得に失敗しました', 'error')
+        return render_template('social_studies/home.html', subjects=[], study_history=[])
+
+@app.route('/social_studies/quiz/<subject>')
+@login_required
+def social_studies_quiz(subject):
+    """社会科クイズ画面"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 指定された科目の問題を取得
+                cur.execute('''
+                    SELECT id, question, correct_answer, acceptable_answers, explanation
+                    FROM social_studies_questions 
+                    WHERE subject = %s 
+                    ORDER BY RANDOM() 
+                    LIMIT 10
+                ''', (subject,))
+                questions = cur.fetchall()
+                
+                if not questions:
+                    flash('この科目の問題が見つかりません', 'error')
+                    return redirect(url_for('social_studies_home'))
+                
+                return render_template('social_studies/quiz.html', 
+                                     questions=questions, 
+                                     subject=subject)
+    except Exception as e:
+        app.logger.error(f"社会科クイズ画面エラー: {e}")
+        flash('問題の取得に失敗しました', 'error')
+        return redirect(url_for('social_studies_home'))
+
+@app.route('/social_studies/submit_answer', methods=['POST'])
+@login_required
+def social_studies_submit_answer():
+    """社会科問題の回答送信"""
+    try:
+        data = request.get_json()
+        question_id = data.get('question_id')
+        user_answer = data.get('answer')
+        
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 問題の正解を取得
+                cur.execute('''
+                    SELECT correct_answer, acceptable_answers, subject 
+                    FROM social_studies_questions 
+                    WHERE id = %s
+                ''', (question_id,))
+                question_data = cur.fetchone()
+                
+                if not question_data:
+                    return jsonify({'error': '問題が見つかりません'}), 404
+                
+                # 許容回答をパース
+                acceptable_answers = []
+                if question_data['acceptable_answers']:
+                    try:
+                        acceptable_answers = json.loads(question_data['acceptable_answers'])
+                    except:
+                        pass
+                
+                # 回答をチェック
+                is_correct, result_message = check_answer(
+                    user_answer, 
+                    question_data['correct_answer'], 
+                    acceptable_answers
+                )
+                
+                # 学習ログを記録
+                cur.execute('''
+                    INSERT INTO social_studies_study_log (user_id, question_id, user_answer, is_correct, subject)
+                    VALUES (%s, %s, %s, %s, %s)
+                ''', (current_user.id, question_id, user_answer, is_correct, question_data['subject']))
+                conn.commit()
+                
+                return jsonify({
+                    'is_correct': is_correct,
+                    'message': result_message,
+                    'correct_answer': question_data['correct_answer']
+                })
+                
+    except Exception as e:
+        app.logger.error(f"社会科回答送信エラー: {e}")
+        return jsonify({'error': '回答の処理に失敗しました'}), 500
+
+@app.route('/social_studies/admin')
+@login_required
+def social_studies_admin():
+    """社会科管理画面（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('social_studies_home'))
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 統計情報を取得
+                cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions')
+                total_questions = cur.fetchone()['total_questions']
+                
+                cur.execute('SELECT COUNT(*) as total_study_logs FROM social_studies_study_log')
+                total_study_logs = cur.fetchone()['total_study_logs']
+                
+                return render_template('social_studies/admin.html',
+                                     total_questions=total_questions,
+                                     total_study_logs=total_study_logs)
+    except Exception as e:
+        app.logger.error(f"社会科管理画面エラー: {e}")
+        flash('管理者画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('social_studies_home'))
+
+@app.route('/social_studies/admin/questions')
+@login_required
+def social_studies_admin_questions():
+    """社会科問題一覧（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('social_studies_home'))
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT id, subject, question, correct_answer, acceptable_answers, created_at
+                    FROM social_studies_questions 
+                    ORDER BY created_at DESC
+                ''')
+                questions = cur.fetchall()
+                return render_template('social_studies/admin_questions.html', questions=questions)
+    except Exception as e:
+        app.logger.error(f"社会科問題一覧エラー: {e}")
+        flash('問題一覧の取得に失敗しました', 'error')
+        return redirect(url_for('social_studies_admin'))
+
+@app.route('/social_studies/admin/add_question', methods=['GET', 'POST'])
+@login_required
+def social_studies_add_question():
+    """社会科問題追加（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('social_studies_home'))
+    
+    if request.method == 'POST':
+        subject = request.form['subject']
+        question = request.form['question']
+        correct_answer = request.form['correct_answer']
+        acceptable_answers = request.form.get('acceptable_answers', '')
+        explanation = request.form.get('explanation', '')
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        INSERT INTO social_studies_questions (subject, question, correct_answer, acceptable_answers, explanation)
+                        VALUES (%s, %s, %s, %s, %s)
+                    ''', (subject, question, correct_answer, acceptable_answers, explanation))
+                    conn.commit()
+                    flash('問題が追加されました', 'success')
+                    return redirect(url_for('social_studies_admin_questions'))
+        except Exception as e:
+            app.logger.error(f"社会科問題追加エラー: {e}")
+            flash('問題の追加に失敗しました', 'error')
+    
+    return render_template('social_studies/add_question.html')
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)

@@ -1,259 +1,196 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <title>教材を選ぶ</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/large-display.css') }}">
-    <style>
-        .source-card {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .source-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #495057;
-            margin-bottom: 15px;
-        }
-        .page-range-section {
-            background: white;
-            border: 1px solid #ced4da;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        .page-range-input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-        .page-range-input:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-        }
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .start-button {
-            background: linear-gradient(135deg, #007bff, #0056b3);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .start-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,123,255,0.3);
-        }
-        .reset-button {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-        .reset-button:hover {
-            background: #c82333;
-        }
-        .help-text {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 5px;
-        }
-        .error-message {
-            color: #dc3545;
-            font-size: 12px;
-            margin-top: 5px;
-            display: none;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <p>ようこそ、{{ current_user.username }} さん</p>
-        <a href="{{ url_for('logout') }}">ログアウト</a>
-    </div>
+{% extends "base.html" %}
 
-    <!-- 英単語学習へのリンク -->
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
-        <h3 style="margin: 0 0 10px 0;">
-            <i class="fas fa-book-open me-2"></i>新しい英単語学習システム
+{% block title %}ダッシュボード - フラッシュカードアプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold">
+        <i class="fas fa-tachometer-alt me-2"></i>ダッシュボード
+    </h2>
+    <p class="text-muted">こんにちは、{{ current_user.full_name }}さん！</p>
+</div>
+
+<!-- 学習システム選択 -->
+<div class="row g-4 mb-5">
+    <div class="col-12">
+        <h3 class="h4 mb-3">
+            <i class="fas fa-graduation-cap me-2"></i>学習システムを選択
         </h3>
-        <p style="margin: 0 0 15px 0;">1秒自動表示・100語出題・間違えた単語の復習機能</p>
-        <a href="{{ url_for('vocabulary_home') }}" style="background: white; color: #667eea; padding: 10px 20px; border-radius: 25px; text-decoration: none; font-weight: bold; display: inline-block;">
-            <i class="fas fa-play me-2"></i>英単語学習を開始
-        </a>
     </div>
-
-    <h2>📚 学習する教材を選んでください</h2>
-
-    {% for s in sources %}
-    <div class="source-card">
-        <div class="source-title" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>📘 {{ s.source }}（{{ s.subject }} {{ s.grade }}）</span>
-            <button type="button" 
-                    class="reset-button"
-                    onclick="deleteHistory('{{ s.source }}')"
-                    style="margin-left: 15px;">
-                🗑 履歴削除
-            </button>
+    
+    <!-- フラッシュカード学習 -->
+    <div class="col-md-6">
+        <div class="card h-100 border-primary">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-images fa-3x text-primary"></i>
+                </div>
+                <h5 class="card-title">フラッシュカード学習</h5>
+                <p class="card-text">画像ベースのフラッシュカードで効率的に学習できます。</p>
+                <a href="#flashcard-section" class="btn btn-primary">
+                    <i class="fas fa-play me-1"></i>学習開始
+                </a>
+            </div>
         </div>
-        
-        <form method="POST" action="{{ url_for('set_page_range_and_prepare', source=s.source) }}" class="page-range-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="page-range-section">
-                <label for="page_range_{{ loop.index }}"><strong>📖 学習するページ範囲:</strong></label>
-                <input type="text" 
-                       id="page_range_{{ loop.index }}" 
-                       name="page_range" 
-                       class="page-range-input"
-                       placeholder="例: 1-10, 15, 20-25"
-                       value="{{ saved_ranges.get(s.source, '') if saved_ranges else '' }}">
-                <div class="help-text">
-                    空欄の場合は全ページが対象になります。複数範囲はカンマ区切りで入力してください。
+    </div>
+    
+    <!-- 社会科一問一答 -->
+    <div class="col-md-6">
+        <div class="card h-100 border-success">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-globe-asia fa-3x text-success"></i>
                 </div>
-                <div class="error-message" id="error_{{ loop.index }}"></div>
+                <h5 class="card-title">社会科一問一答</h5>
+                <p class="card-text">地理・歴史・公民の知識を入力形式で学習できます。</p>
+                <a href="{{ url_for('social_studies_home') }}" class="btn btn-success">
+                    <i class="fas fa-play me-1"></i>学習開始
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- フラッシュカード教材一覧 -->
+<div id="flashcard-section" class="row g-4 mb-5">
+    <div class="col-12">
+        <h3 class="h4 mb-3">
+            <i class="fas fa-images me-2"></i>フラッシュカード教材
+        </h3>
+    </div>
+    
+    {% for source in sources %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ source.source }}</h5>
+                <p class="card-text">
+                    <small class="text-muted">
+                        {{ source.subject }} {{ source.grade }}
+                    </small>
+                </p>
                 
-                <div style="margin-top: 15px;">
-                    <label for="difficulty_{{ loop.index }}"><strong>🎯 難易度選択:</strong></label>
-                    <div style="display: flex; gap: 15px; margin-top: 8px; align-items: center;">
-                        <label style="display: flex; align-items: center; font-size: 14px;">
-                            <input type="checkbox" name="difficulty" value="A" style="margin-right: 5px;"
-                                   {% if saved_difficulties and 'A' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
-                            A（基礎）
-                        </label>
-                        <label style="display: flex; align-items: center; font-size: 14px;">
-                            <input type="checkbox" name="difficulty" value="B" style="margin-right: 5px;"
-                                   {% if saved_difficulties and 'B' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
-                            B（標準）
-                        </label>
-                        <label style="display: flex; align-items: center; font-size: 14px;">
-                            <input type="checkbox" name="difficulty" value="C" style="margin-right: 5px;"
-                                   {% if saved_difficulties and 'C' in saved_difficulties.get(s.source, '') %}checked{% endif %}>
-                            C（発展）
-                        </label>
+                <!-- 設定フォーム -->
+                <form method="POST" action="{{ url_for('set_page_range_and_prepare', source=source.source) }}" class="mb-3">
+                    <div class="mb-2">
+                        <label for="page_range_{{ source.source }}" class="form-label small">ページ範囲</label>
+                        <input type="text" class="form-control form-control-sm" 
+                               id="page_range_{{ source.source }}" 
+                               name="page_range" 
+                               value="{{ saved_ranges.get(source.source, '') }}"
+                               placeholder="例: 1-10, 15, 20-25"
+                               {% if settings_locked.get(source.source, False) %}readonly{% endif %}>
                     </div>
-                    <div class="help-text">
-                        何も選択しない場合は全難易度が対象になります。
+                    
+                    <div class="mb-3">
+                        <label class="form-label small">難易度</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="difficulty" value="basic" 
+                                   id="basic_{{ source.source }}"
+                                   {% if 'basic' in saved_difficulties.get(source.source, '').split(',') %}checked{% endif %}
+                                   {% if settings_locked.get(source.source, False) %}disabled{% endif %}>
+                            <label class="form-check-label small" for="basic_{{ source.source }}">基本</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="difficulty" value="intermediate" 
+                                   id="intermediate_{{ source.source }}"
+                                   {% if 'intermediate' in saved_difficulties.get(source.source, '').split(',') %}checked{% endif %}
+                                   {% if settings_locked.get(source.source, False) %}disabled{% endif %}>
+                            <label class="form-check-label small" for="intermediate_{{ source.source }}">中級</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="difficulty" value="advanced" 
+                                   id="advanced_{{ source.source }}"
+                                   {% if 'advanced' in saved_difficulties.get(source.source, '').split(',') %}checked{% endif %}
+                                   {% if settings_locked.get(source.source, False) %}disabled{% endif %}>
+                            <label class="form-check-label small" for="advanced_{{ source.source }}">上級</label>
+                        </div>
                     </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-cog me-1"></i>設定して学習開始
+                    </button>
+                </form>
+                
+                {% if settings_locked.get(source.source, False) %}
+                <div class="alert alert-warning alert-sm">
+                    <i class="fas fa-lock me-1"></i>学習開始後は設定変更できません
                 </div>
+                {% endif %}
             </div>
-            
-            <div class="action-buttons">
-                <button type="submit" class="start-button">🚀 この設定で学習開始</button>
-            </div>
-        </form>
-        
-        <!-- 履歴削除用の独立したフォーム -->
-        <form id="deleteForm-{{ s.source }}" method="POST" action="{{ url_for('reset_history', source=s.source) }}" style="display: none;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        </form>
+        </div>
     </div>
     {% endfor %}
+</div>
 
-    <script>
-        function deleteHistory(source) {
-            if (confirm(source + ' の学習履歴をすべて削除します。よろしいですか？')) {
-                // CSRFトークンを取得
-                const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-                
-                // フォームを作成して送信
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '/reset_history/' + source;
-                
-                // CSRFトークンを追加
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = 'csrf_token';
-                csrfInput.value = csrfToken;
-                form.appendChild(csrfInput);
-                
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const forms = document.querySelectorAll('.page-range-form');
-            
-            forms.forEach((form, index) => {
-                const input = form.querySelector('.page-range-input');
-                const errorDiv = document.getElementById(`error_${index + 1}`);
-                
-                function validatePageRange(value) {
-                    if (!value.trim()) return { valid: true }; // 空欄は許可
-                    
-                    const parts = value.split(',');
-                    const rangePattern = /^\d+\s*-\s*\d+$/;
-                    const numberPattern = /^\d+$/;
-                    
-                    for (let part of parts) {
-                        part = part.trim();
-                        if (!(rangePattern.test(part) || numberPattern.test(part))) {
-                            return {
-                                valid: false,
-                                message: "ページ範囲は「1-10,15,20-25」のように入力してください"
-                            };
-                        }
-                        
-                        if (rangePattern.test(part)) {
-                            const [start, end] = part.split('-').map(s => parseInt(s.trim(), 10));
-                            if (start > end) {
-                                return {
-                                    valid: false,
-                                    message: `「${part}」は開始ページ ≦ 終了ページにしてください`
-                                };
-                            }
-                        }
-                    }
-                    return { valid: true };
-                }
-                
-                // リアルタイムバリデーション
-                input.addEventListener('input', function() {
-                    const validation = validatePageRange(this.value);
-                    if (!validation.valid) {
-                        errorDiv.textContent = validation.message;
-                        errorDiv.style.display = 'block';
-                        input.style.borderColor = '#dc3545';
-                    } else {
-                        errorDiv.style.display = 'none';
-                        input.style.borderColor = '#ced4da';
-                    }
-                });
-                
-                // フォーム送信時のバリデーション
-                form.addEventListener('submit', function(e) {
-                    const validation = validatePageRange(input.value);
-                    if (!validation.valid) {
-                        e.preventDefault();
-                        errorDiv.textContent = validation.message;
-                        errorDiv.style.display = 'block';
-                        input.style.borderColor = '#dc3545';
-                        input.focus();
-                    }
-                });
-            });
-        });
-    </script>
-</body>
-</html>
+<!-- 英単語学習セクション -->
+<div class="row g-4 mb-5">
+    <div class="col-12">
+        <h3 class="h4 mb-3">
+            <i class="fas fa-language me-2"></i>英単語学習
+        </h3>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card h-100 border-info">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-language fa-3x text-info"></i>
+                </div>
+                <h5 class="card-title">英単語学習</h5>
+                <p class="card-text">基本単語からTOEIC、大学受験まで幅広く学習できます。</p>
+                <a href="{{ url_for('vocabulary_home') }}" class="btn btn-info">
+                    <i class="fas fa-play me-1"></i>学習開始
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 管理者メニュー -->
+{% if current_user.is_admin %}
+<div class="row g-4 mb-5">
+    <div class="col-12">
+        <h3 class="h4 mb-3">
+            <i class="fas fa-cog me-2"></i>管理者メニュー
+        </h3>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-users-cog fa-2x text-warning mb-2"></i>
+                <h6 class="card-title">システム管理</h6>
+                <a href="{{ url_for('admin') }}" class="btn btn-warning btn-sm">
+                    <i class="fas fa-cog me-1"></i>管理画面
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-globe-asia fa-2x text-success mb-2"></i>
+                <h6 class="card-title">社会科管理</h6>
+                <a href="{{ url_for('social_studies_admin') }}" class="btn btn-success btn-sm">
+                    <i class="fas fa-cog me-1"></i>社会科管理
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-language fa-2x text-info mb-2"></i>
+                <h6 class="card-title">英単語管理</h6>
+                <a href="{{ url_for('vocabulary_admin') }}" class="btn btn-info btn-sm">
+                    <i class="fas fa-cog me-1"></i>英単語管理
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

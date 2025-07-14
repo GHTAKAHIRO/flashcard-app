@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}問題一覧 - 社会科一問一答アプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-list me-2"></i>問題一覧
+            </h2>
+            <p class="text-muted">登録されている問題を管理できます</p>
+        </div>
+        <a href="{{ url_for('add_question') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>新規追加
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>科目</th>
+                        <th>問題文</th>
+                        <th>正解</th>
+                        <th>登録日</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for question in questions %}
+                    <tr>
+                        <td>{{ question.id }}</td>
+                        <td>
+                            <span class="subject-badge">{{ question.subject }}</span>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 300px;" title="{{ question.question }}">
+                                {{ question.question }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 150px;" title="{{ question.correct_answer }}">
+                                {{ question.correct_answer }}
+                            </div>
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                {{ question.created_at.strftime('%Y/%m/%d') if question.created_at else '不明' }}
+                            </small>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-info" onclick="viewQuestion({{ question.id }})" title="詳細表示">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-outline-warning" onclick="editQuestion({{ question.id }})" title="編集">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="deleteQuestion({{ question.id }})" title="削除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not questions %}
+        <div class="text-center py-5">
+            <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">まだ問題が登録されていません</h4>
+            <p class="text-muted">新しい問題を追加して学習コンテンツを充実させましょう</p>
+            <a href="{{ url_for('add_question') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>問題を追加
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 問題詳細モーダル -->
+<div class="modal fade" id="questionDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">問題詳細</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="questionDetailContent">
+                <!-- 問題詳細がここに動的に挿入されます -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function viewQuestion(questionId) {
+    // 問題詳細を取得してモーダルに表示
+    // この機能は開発中
+    alert('問題詳細表示機能は開発中です');
+}
+
+function editQuestion(questionId) {
+    // 問題編集ページに遷移
+    // この機能は開発中
+    alert('問題編集機能は開発中です');
+}
+
+function deleteQuestion(questionId) {
+    if (confirm('この問題を削除してもよろしいですか？\nこの操作は取り消せません。')) {
+        // 問題削除処理
+        // この機能は開発中
+        alert('問題削除機能は開発中です');
+    }
+}
+</script>
+{% endblock %} 
