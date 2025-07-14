@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}社会科管理 - 管理者画面{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-cog me-2"></i>社会科管理画面
+            </h2>
+            <p class="text-muted">社会科一問一答システムの管理を行います</p>
+        </div>
+        <a href="{{ url_for('social_studies_home') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>ホームに戻る
+        </a>
+    </div>
+</div>
+
+<!-- 統計カード -->
+<div class="row g-4 mb-5">
+    <div class="col-md-6">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-question-circle fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">登録問題数</h5>
+                <p class="card-text h2">{{ total_questions }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-chart-line fa-3x text-info mb-3"></i>
+                <h5 class="card-title">学習ログ数</h5>
+                <p class="card-text h2">{{ total_study_logs }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 管理メニュー -->
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-list me-2"></i>問題管理
+                </h5>
+                <p class="card-text">登録されている問題の一覧表示と編集を行います。</p>
+                <a href="{{ url_for('social_studies_admin_questions') }}" class="btn btn-primary">
+                    <i class="fas fa-list me-1"></i>問題一覧
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-plus me-2"></i>問題追加
+                </h5>
+                <p class="card-text">新しい問題を追加します。</p>
+                <a href="{{ url_for('social_studies_add_question') }}" class="btn btn-success">
+                    <i class="fas fa-plus me-1"></i>新規追加
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 最近の学習ログ -->
+<div class="row mt-5">
+    <div class="col-12">
+        <h3 class="h4 mb-3">
+            <i class="fas fa-history me-2"></i>最近の学習ログ
+        </h3>
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted">学習ログの詳細表示機能は開発中です。</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -2964,6 +2964,38 @@ def social_studies_add_question():
     
     return render_template('social_studies/add_question.html')
 
+# ========== メイン管理画面 ==========
+
+@app.route('/admin')
+@login_required
+def admin():
+    """メイン管理画面（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('dashboard'))
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 統計情報を取得
+                cur.execute('SELECT COUNT(*) as total_users FROM users')
+                total_users = cur.fetchone()['total_users']
+                
+                cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions')
+                total_questions = cur.fetchone()['total_questions']
+                
+                cur.execute('SELECT COUNT(*) as total_study_logs FROM social_studies_study_log')
+                total_study_logs = cur.fetchone()['total_study_logs']
+                
+                return render_template('admin.html',
+                                     total_users=total_users,
+                                     total_questions=total_questions,
+                                     total_study_logs=total_study_logs)
+    except Exception as e:
+        app.logger.error(f"管理画面エラー: {e}")
+        flash('管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('dashboard'))
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)

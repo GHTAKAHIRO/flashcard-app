@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}{{ subject }} - 社会科一問一答{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-globe-asia me-2"></i>{{ subject }}クイズ
+            </h2>
+            <p class="text-muted">問題に答えて知識を確認しましょう！</p>
+        </div>
+        <a href="{{ url_for('social_studies_home') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>ホームに戻る
+        </a>
+    </div>
+</div>
+
+<!-- 進捗表示 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="progress" style="height: 25px;">
+            <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%">
+                <span id="progress-text">0 / {{ questions|length }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 問題表示エリア -->
+<div id="question-container">
+    {% for question in questions %}
+    <div class="question-card" id="question-{{ question.id }}" style="display: {% if loop.first %}block{% else %}none{% endif %};">
+        <div class="card">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <h4 class="fw-bold">{{ loop.index }}. {{ question.question }}</h4>
+                </div>
+                
+                <div class="answer-section">
+                    <div class="form-group">
+                        <label for="answer-{{ question.id }}" class="form-label">あなたの答え：</label>
+                        <input type="text" class="form-control form-control-lg" 
+                               id="answer-{{ question.id }}" 
+                               placeholder="答えを入力してください"
+                               data-question-id="{{ question.id }}">
+                    </div>
+                    
+                    <div class="text-center mt-3">
+                        <button class="btn btn-primary btn-lg" onclick="submitAnswer({{ question.id }})">
+                            <i class="fas fa-check me-2"></i>回答する
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="result-section" id="result-{{ question.id }}" style="display: none;">
+                    <div class="alert" id="alert-{{ question.id }}">
+                        <div class="text-center">
+                            <i class="fas fa-check-circle fa-2x mb-2" id="icon-{{ question.id }}"></i>
+                            <h5 id="result-text-{{ question.id }}"></h5>
+                            <p id="correct-answer-{{ question.id }}" class="mb-3"></p>
+                            <button class="btn btn-primary" onclick="nextQuestion({{ question.id }})">
+                                <i class="fas fa-arrow-right me-1"></i>次の問題
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 完了メッセージ -->
+<div id="completion-message" class="text-center" style="display: none;">
+    <div class="card">
+        <div class="card-body">
+            <i class="fas fa-trophy fa-3x text-warning mb-3"></i>
+            <h3 class="fw-bold">クイズ完了！</h3>
+            <p class="lead">お疲れさまでした！</p>
+            <div class="row text-center mb-4">
+                <div class="col-md-4">
+                    <div class="h4 text-success" id="final-correct">0</div>
+                    <small class="text-muted">正答数</small>
+                </div>
+                <div class="col-md-4">
+                    <div class="h4 text-danger" id="final-incorrect">0</div>
+                    <small class="text-muted">誤答数</small>
+                </div>
+                <div class="col-md-4">
+                    <div class="h4 text-info" id="final-accuracy">0%</div>
+                    <small class="text-muted">正答率</small>
+                </div>
+            </div>
+            <a href="{{ url_for('social_studies_home') }}" class="btn btn-primary me-2">
+                <i class="fas fa-home me-1"></i>ホームに戻る
+            </a>
+            <a href="{{ url_for('social_studies_quiz', subject=subject) }}" class="btn btn-outline-primary">
+                <i class="fas fa-redo me-1"></i>もう一度挑戦
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentQuestionIndex = 1;
+let totalQuestions = {{ questions|length }};
+let correctCount = 0;
+let incorrectCount = 0;
+let answeredQuestions = new Set();
+
+// 問題データ
+const questions = {{ questions|tojson|safe }};
+
+// 進捗更新
+function updateProgress() {
+    const progress = (currentQuestionIndex - 1) / totalQuestions * 100;
+    document.getElementById('progress-bar').style.width = progress + '%';
+    document.getElementById('progress-text').textContent = (currentQuestionIndex - 1) + ' / ' + totalQuestions;
+}
+
+// 回答送信
+function submitAnswer(questionId) {
+    const answerInput = document.getElementById('answer-' + questionId);
+    const userAnswer = answerInput.value.trim();
+    
+    if (!userAnswer) {
+        alert('答えを入力してください。');
+        return;
+    }
+    
+    if (answeredQuestions.has(questionId)) {
+        return; // 既に回答済み
+    }
+    
+    // 回答ボタンを無効化
+    const submitBtn = answerInput.parentElement.nextElementSibling.querySelector('button');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>送信中...';
+    
+    // APIに回答を送信
+    fetch('{{ url_for("social_studies_submit_answer") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            question_id: questionId,
+            answer: userAnswer
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラーが発生しました: ' + data.error);
+            return;
+        }
+        
+        // 結果表示
+        showResult(questionId, data);
+        answeredQuestions.add(questionId);
+        
+        // カウント更新
+        if (data.is_correct) {
+            correctCount++;
+        } else {
+            incorrectCount++;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('通信エラーが発生しました。');
+    })
+    .finally(() => {
+        // ボタンを元に戻す
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>回答する';
+    });
+}
+
+// 結果表示
+function showResult(questionId, data) {
+    const resultSection = document.getElementById('result-' + questionId);
+    const alert = document.getElementById('alert-' + questionId);
+    const icon = document.getElementById('icon-' + questionId);
+    const resultText = document.getElementById('result-text-' + questionId);
+    const correctAnswer = document.getElementById('correct-answer-' + questionId);
+    
+    if (data.is_correct) {
+        alert.className = 'alert alert-success';
+        icon.className = 'fas fa-check-circle fa-2x mb-2 text-success';
+        resultText.textContent = '正解！';
+        resultText.className = 'text-success';
+    } else {
+        alert.className = 'alert alert-danger';
+        icon.className = 'fas fa-times-circle fa-2x mb-2 text-danger';
+        resultText.textContent = '不正解';
+        resultText.className = 'text-danger';
+    }
+    
+    correctAnswer.innerHTML = '<strong>正解:</strong> ' + data.correct_answer;
+    resultSection.style.display = 'block';
+}
+
+// 次の問題へ
+function nextQuestion(questionId) {
+    const currentQuestion = document.getElementById('question-' + questionId);
+    currentQuestion.style.display = 'none';
+    
+    currentQuestionIndex++;
+    updateProgress();
+    
+    if (currentQuestionIndex > totalQuestions) {
+        // クイズ完了
+        showCompletion();
+    } else {
+        // 次の問題を表示
+        const nextQuestion = document.getElementById('question-' + questions[currentQuestionIndex - 1].id);
+        nextQuestion.style.display = 'block';
+    }
+}
+
+// 完了画面表示
+function showCompletion() {
+    document.getElementById('question-container').style.display = 'none';
+    document.getElementById('completion-message').style.display = 'block';
+    
+    document.getElementById('final-correct').textContent = correctCount;
+    document.getElementById('final-incorrect').textContent = incorrectCount;
+    
+    const accuracy = totalQuestions > 0 ? (correctCount / totalQuestions * 100).toFixed(1) : 0;
+    document.getElementById('final-accuracy').textContent = accuracy + '%';
+}
+
+// Enterキーで回答
+document.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.id && activeElement.id.startsWith('answer-')) {
+            const questionId = activeElement.id.replace('answer-', '');
+            submitAnswer(questionId);
+        }
+    }
+});
+
+// 初期化
+updateProgress();
+</script>
+{% endblock %} 

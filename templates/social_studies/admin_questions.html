@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}問題一覧 - 社会科管理{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-list me-2"></i>問題一覧
+            </h2>
+            <p class="text-muted">登録されている問題を管理できます</p>
+        </div>
+        <div>
+            <a href="{{ url_for('social_studies_add_question') }}" class="btn btn-success me-2">
+                <i class="fas fa-plus me-2"></i>新規追加
+            </a>
+            <a href="{{ url_for('social_studies_admin') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>管理画面に戻る
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>科目</th>
+                        <th>問題文</th>
+                        <th>正解</th>
+                        <th>許容回答</th>
+                        <th>登録日</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for question in questions %}
+                    <tr>
+                        <td>{{ question.id }}</td>
+                        <td>
+                            <span class="badge bg-primary">{{ question.subject }}</span>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 300px;" title="{{ question.question }}">
+                                {{ question.question }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 150px;" title="{{ question.correct_answer }}">
+                                {{ question.correct_answer }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 150px;" title="{{ question.acceptable_answers or 'なし' }}">
+                                {{ question.acceptable_answers or 'なし' }}
+                            </div>
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                {{ question.created_at.strftime('%Y/%m/%d') if question.created_at else '不明' }}
+                            </small>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editQuestion({{ question.id }})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteQuestion({{ question.id }})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not questions %}
+        <div class="text-center py-5">
+            <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">まだ問題が登録されていません</h4>
+            <p class="text-muted">新しい問題を追加してください</p>
+            <a href="{{ url_for('social_studies_add_question') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>問題を追加
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">問題編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <div class="mb-3">
+                        <label for="edit-subject" class="form-label">科目</label>
+                        <select class="form-select" id="edit-subject" name="subject" required>
+                            <option value="地理">地理</option>
+                            <option value="歴史">歴史</option>
+                            <option value="公民">公民</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-question" class="form-label">問題文</label>
+                        <textarea class="form-control" id="edit-question" name="question" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-correct-answer" class="form-label">正解</label>
+                        <input type="text" class="form-control" id="edit-correct-answer" name="correct_answer" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-acceptable-answers" class="form-label">許容回答（カンマ区切り）</label>
+                        <input type="text" class="form-control" id="edit-acceptable-answers" name="acceptable_answers" placeholder="例: 東京都, Tokyo">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-explanation" class="form-label">解説</label>
+                        <textarea class="form-control" id="edit-explanation" name="explanation" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentEditId = null;
+
+function editQuestion(questionId) {
+    // 問題データを取得してモーダルに設定
+    // 実際の実装ではAPIからデータを取得
+    currentEditId = questionId;
+    
+    // モーダルを表示
+    const modal = new bootstrap.Modal(document.getElementById('editModal'));
+    modal.show();
+}
+
+function saveEdit() {
+    // 編集内容を保存
+    // 実際の実装ではAPIに送信
+    alert('編集機能は開発中です');
+}
+
+function deleteQuestion(questionId) {
+    if (confirm('この問題を削除しますか？')) {
+        // 削除処理
+        // 実際の実装ではAPIに送信
+        alert('削除機能は開発中です');
+    }
+}
+</script>
+{% endblock %} 

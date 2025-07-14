@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}問題追加 - 社会科管理{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-plus me-2"></i>問題追加
+            </h2>
+            <p class="text-muted">新しい社会科問題を追加します</p>
+        </div>
+        <a href="{{ url_for('social_studies_admin_questions') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>問題一覧に戻る
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">科目 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="subject" name="subject" required>
+                            <option value="">科目を選択してください</option>
+                            <option value="地理">地理</option>
+                            <option value="歴史">歴史</option>
+                            <option value="公民">公民</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="question" class="form-label">問題文 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="question" name="question" rows="3" 
+                                  placeholder="例: 日本の首都はどこですか？" required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="correct_answer" class="form-label">正解 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="correct_answer" name="correct_answer" 
+                               placeholder="例: 東京" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="acceptable_answers" class="form-label">許容回答</label>
+                        <input type="text" class="form-control" id="acceptable_answers" name="acceptable_answers" 
+                               placeholder="例: 東京都, Tokyo（カンマ区切りで複数入力可能）">
+                        <div class="form-text">正解以外でも正解として扱いたい回答があれば入力してください</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="explanation" class="form-label">解説</label>
+                        <textarea class="form-control" id="explanation" name="explanation" rows="2" 
+                                  placeholder="問題の解説や補足情報があれば入力してください"></textarea>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('social_studies_admin_questions') }}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i>キャンセル
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i>問題を追加
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 入力例 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>入力例
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>地理の例</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>問題:</strong> 日本の首都はどこですか？</li>
+                            <li><strong>正解:</strong> 東京</li>
+                            <li><strong>許容回答:</strong> 東京都, Tokyo</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>歴史の例</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>問題:</strong> 江戸幕府を開いた人物は誰ですか？</li>
+                            <li><strong>正解:</strong> 徳川家康</li>
+                            <li><strong>許容回答:</strong> 徳川家康公, Tokugawa Ieyasu</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
