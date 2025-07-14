@@ -713,7 +713,7 @@
                         
                         <div id="word-container">
                             {% for word in all_words %}
-                            <div class="word-item {{ 'correct' if word.result == 'known' else 'incorrect' }}" 
+                            <div class="word-item {{ 'correct' if word.result == 'correct' else 'incorrect' }}" 
                                  data-result="{{ word.result }}" 
                                  data-word="{{ word.word }}">
                                 <div class="word-header">
@@ -725,7 +725,7 @@
                                     </div>
                                 </div>
                                 <div class="result-mark">
-                                    {% if word.result == 'known' %}
+                                    {% if word.result == 'correct' %}
                                         <span class="maru">〇</span>
                                     {% else %}
                                         <span class="batsu">✕</span>
@@ -773,9 +773,9 @@
 
                 if (filter === 'all') {
                     shouldShow = true;
-                } else if (filter === 'correct' && result === 'known') {
+                } else if (filter === 'correct' && result === 'correct') {
                     shouldShow = true;
-                } else if (filter === 'incorrect' && result === 'unknown') {
+                } else if (filter === 'incorrect' && result === 'incorrect') {
                     shouldShow = true;
                 }
 
