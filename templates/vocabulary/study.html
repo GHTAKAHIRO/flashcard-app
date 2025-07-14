@@ -621,7 +621,7 @@
         let isAnswered = false;
         let isCardFlipped = false;
         let timer = null;
-        let timeLeft = 2; // 2秒の制限時間
+        let timeLeft = 2.5; // 2.5秒の制限時間
         
         // 全問題データを事前に準備
         const allWords = JSON.parse('{{ vocabulary_session.words|tojson|safe if vocabulary_session and vocabulary_session.words else "[]" }}');
@@ -725,7 +725,7 @@
 
         // タイマー開始
         function startTimer() {
-            timeLeft = 2;
+            timeLeft = 2.5;
             updateTimerDisplay();
             
             timer = setInterval(() => {
@@ -757,9 +757,9 @@
             const timerText = document.getElementById('timer-text');
             
             if (timerFill && timerText) {
-                const percentage = Math.max(0, (timeLeft / 2) * 100);
+                const percentage = Math.max(0, (timeLeft / 2.5) * 100);
                 timerFill.style.width = percentage + '%';
-                timerText.textContent = Math.ceil(timeLeft);
+                timerText.textContent = (timeLeft > 0 ? timeLeft.toFixed(1) : '0.0');
             }
         }
 
@@ -1126,7 +1126,7 @@
             
             // 状態をリセット
             isAnswered = false;
-            timeLeft = 2;
+            timeLeft = 2.5;
             
             // 選択肢ボタンをリセットして新しい選択肢を表示
             for (let i = 0; i < 4; i++) {
