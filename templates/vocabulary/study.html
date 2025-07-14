@@ -901,9 +901,13 @@
                 if (choiceBtn) {
                     choiceBtn.disabled = true;
                     
-                    // 正解の選択肢のみ色分け
+                    // 正解の選択肢を緑色で表示
                     if (i === currentWord.correct_index) {
                         choiceBtn.classList.add('correct');
+                    }
+                    // 間違えた選択肢を選択した場合は赤色で表示
+                    else if (i === selectedIndex && !isCorrect) {
+                        choiceBtn.classList.add('incorrect');
                     }
                 }
             }
