@@ -70,7 +70,7 @@
             padding: 0.5rem;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
+            justify-content: space-between;
             align-items: stretch;
             gap: 0.5rem;
             overflow: hidden;
@@ -94,6 +94,7 @@
             box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             cursor: pointer;
             touch-action: manipulation;
+            flex-shrink: 0;
         }
 
         .card-inner {
@@ -231,6 +232,9 @@
             padding: 0.5rem 0 0.5rem 0;
             flex-shrink: 0;
             margin-top: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
         }
 
         .choices-container {
@@ -410,13 +414,89 @@
         /* デスクトップ向けスタイル */
         @media (min-width: 1024px) {
             .container {
-                max-width: 800px;
+                max-width: 1000px;
                 margin: 0 auto;
             }
 
+            .main-container {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .header-section {
+                flex-shrink: 0;
+                padding: 1rem 2rem;
+            }
+
+            .content-section {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                padding: 1rem 2rem;
+                gap: 1rem;
+            }
+
             .word-card {
-                min-height: 400px;
-                padding: 4rem 3rem;
+                min-height: 300px;
+                max-height: 400px;
+                padding: 2rem;
+                flex-shrink: 0;
+            }
+
+            .word-text {
+                font-size: 3rem;
+            }
+
+            .meaning-text {
+                font-size: 2rem;
+            }
+
+            .button-section {
+                flex-shrink: 0;
+                padding: 1rem 0;
+            }
+
+            .choices-container {
+                gap: 1rem;
+                aspect-ratio: 2/1;
+                max-height: 200px;
+            }
+
+            .choice-btn {
+                padding: 1rem;
+                font-size: 1.1rem;
+            }
+
+            .choice-text {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* 大きなデスクトップ向け */
+        @media (min-width: 1400px) {
+            .container {
+                max-width: 1200px;
+            }
+
+            .main-container {
+                height: 100vh;
+            }
+
+            .header-section {
+                padding: 1.5rem 3rem;
+            }
+
+            .content-section {
+                padding: 1.5rem 3rem;
+                gap: 1.5rem;
+            }
+
+            .word-card {
+                min-height: 350px;
+                max-height: 450px;
+                padding: 3rem;
             }
 
             .word-text {
@@ -427,30 +507,66 @@
                 font-size: 2.2rem;
             }
 
-
-
             .choices-container {
                 gap: 1.5rem;
+                max-height: 250px;
             }
 
             .choice-btn {
-                padding: 1.5rem 1.5rem;
+                padding: 1.2rem;
                 font-size: 1.2rem;
             }
 
             .choice-text {
-                font-size: 1.7rem;
+                font-size: 1.6rem;
             }
         }
 
-        /* 大きなデスクトップ向け */
-        @media (min-width: 1400px) {
+        /* 超大型デスクトップ向け */
+        @media (min-width: 1920px) {
             .container {
-                max-width: 1000px;
+                max-width: 1400px;
+            }
+
+            .main-container {
+                height: 100vh;
+            }
+
+            .header-section {
+                padding: 2rem 4rem;
+            }
+
+            .content-section {
+                padding: 2rem 4rem;
+                gap: 2rem;
             }
 
             .word-card {
-                min-height: 500px;
+                min-height: 400px;
+                max-height: 500px;
+                padding: 4rem;
+            }
+
+            .word-text {
+                font-size: 4rem;
+            }
+
+            .meaning-text {
+                font-size: 2.5rem;
+            }
+
+            .choices-container {
+                gap: 2rem;
+                max-height: 300px;
+            }
+
+            .choice-btn {
+                padding: 1.5rem;
+                font-size: 1.3rem;
+            }
+
+            .choice-text {
+                font-size: 1.8rem;
             }
         }
 
