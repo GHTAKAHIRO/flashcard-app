@@ -22,6 +22,7 @@ import atexit
 from flask_wtf.csrf import CSRFProtect
 import io
 import csv
+import re
 
 # ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
