@@ -249,7 +249,7 @@
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
-            will-change: transform;
+
             pointer-events: auto;
             cursor: pointer;
             display: flex;
@@ -295,13 +295,11 @@
         .choice-btn.correct:disabled {
             opacity: 1;
             cursor: not-allowed;
-            transform: none;
         }
 
         .choice-btn.incorrect:disabled {
             opacity: 1;
             cursor: not-allowed;
-            transform: none;
         }
 
         .choice-btn:not(:disabled):active {
@@ -310,7 +308,6 @@
         }
 
         .choice-btn:not(:disabled):hover {
-            transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
             transition: none;
         }
@@ -1020,6 +1017,8 @@
                 const choiceBtn = document.getElementById(`choice-${i}`);
                 if (choiceBtn) {
                     choiceBtn.disabled = true;
+                    // transformをリセットしてサイズを一定に保つ
+                    choiceBtn.style.transform = 'none';
                     
                     // 正解の選択肢を緑色で表示
                     if (i === currentWord.correct_index) {
@@ -1254,6 +1253,8 @@
                 if (choiceBtn) {
                     choiceBtn.disabled = false;
                     choiceBtn.classList.remove('correct', 'incorrect');
+                    // transformをリセットしてサイズを一定に保つ
+                    choiceBtn.style.transform = 'none';
                 }
                 
                 if (choiceText) {
