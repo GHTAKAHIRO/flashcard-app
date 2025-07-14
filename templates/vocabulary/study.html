@@ -249,7 +249,7 @@
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
-
+            position: relative;
             pointer-events: auto;
             cursor: pointer;
             display: flex;
@@ -300,6 +300,44 @@
         .choice-btn.incorrect:disabled {
             opacity: 1;
             cursor: not-allowed;
+        }
+
+        /* 選択肢の上に〇✕表示 */
+        .choice-result-indicator {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            z-index: 20;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            animation: resultPopIn 0.3s ease-out;
+        }
+
+        .choice-result-correct {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .choice-result-incorrect {
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
+        }
+
+        @keyframes resultPopIn {
+            from {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         .choice-btn:not(:disabled):active {
@@ -993,6 +1031,23 @@
             });
         }
 
+        // 〇✕表示を追加する関数
+        function addResultIndicator(button, symbol, type) {
+            // 既存のインジケーターを削除
+            const existingIndicator = button.querySelector('.choice-result-indicator');
+            if (existingIndicator) {
+                existingIndicator.remove();
+            }
+            
+            // 新しいインジケーターを作成
+            const indicator = document.createElement('div');
+            indicator.className = `choice-result-indicator choice-result-${type}`;
+            indicator.textContent = symbol;
+            
+            // ボタンに追加
+            button.appendChild(indicator);
+        }
+
         // 回答処理
         function answer(selectedIndex, event) {
             if (isAnswered) return;
@@ -1023,10 +1078,14 @@
                     // 正解の選択肢を緑色で表示
                     if (i === currentWord.correct_index) {
                         choiceBtn.classList.add('correct');
+                        // 正解の選択肢に〇表示を追加
+                        addResultIndicator(choiceBtn, '〇', 'correct');
                     }
                     // 間違えた選択肢を選択した場合は赤色で表示
                     else if (i === selectedIndex && !isCorrect) {
                         choiceBtn.classList.add('incorrect');
+                        // 間違えた選択肢に✕表示を追加
+                        addResultIndicator(choiceBtn, '✕', 'incorrect');
                     }
                 }
             }
@@ -1255,6 +1314,11 @@
                     choiceBtn.classList.remove('correct', 'incorrect');
                     // transformをリセットしてサイズを一定に保つ
                     choiceBtn.style.transform = 'none';
+                    // 〇✕表示を削除
+                    const indicator = choiceBtn.querySelector('.choice-result-indicator');
+                    if (indicator) {
+                        indicator.remove();
+                    }
                 }
                 
                 if (choiceText) {
