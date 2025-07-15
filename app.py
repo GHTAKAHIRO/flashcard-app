@@ -3780,9 +3780,12 @@ def social_studies_upload_questions_csv():
         registered_count = 0
         skipped_count = 0
         
+        app.logger.info(f"CSVアップロード開始: {len(csv_data)}行のデータ")
+        
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                for row in reader:
+                for row_num, row in enumerate(reader, 1):
+                    app.logger.info(f"行{row_num}を処理中: {row}")
                     try:
                         # 必須フィールドの取得
                         subject = row.get('subject', '').strip() or default_subject
@@ -3791,6 +3794,7 @@ def social_studies_upload_questions_csv():
                         
                         # バリデーション
                         if not subject or not question or not correct_answer:
+                            app.logger.warning(f"行{row_num}: 必須フィールドが不足 - subject: '{subject}', question: '{question}', correct_answer: '{correct_answer}'")
                             skipped_count += 1
                             continue
                         
@@ -3842,6 +3846,7 @@ def social_studies_upload_questions_csv():
                         ''', (question, correct_answer))
                         
                         if cur.fetchone():
+                            app.logger.warning(f"行{row_num}: 重複データ - question: '{question}', correct_answer: '{correct_answer}'")
                             skipped_count += 1
                             continue
                         
@@ -3852,14 +3857,17 @@ def social_studies_upload_questions_csv():
                             VALUES (%s, %s, %s, %s, %s, %s, %s)
                         ''', (subject, question, correct_answer, acceptable_answers, explanation, textbook_id, unit_id))
                         
+                        app.logger.info(f"行{row_num}: 問題を登録しました - subject: '{subject}', question: '{question}'")
                         registered_count += 1
                         
                     except Exception as e:
-                        app.logger.error(f"CSV行処理エラー: {e}, 行: {row}")
+                        app.logger.error(f"行{row_num}処理エラー: {e}, データ: {row}")
                         skipped_count += 1
                         continue
                 
                 conn.commit()
+                
+                app.logger.info(f"CSVアップロード完了: 登録{registered_count}件, スキップ{skipped_count}件")
                 
                 return jsonify({
                     'success': True, 
