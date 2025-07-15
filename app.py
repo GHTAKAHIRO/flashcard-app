@@ -2825,8 +2825,62 @@ def vocabulary_admin():
 @login_required
 def vocabulary_upload():
     """英単語データのアップロード（管理者のみ）"""
-    # CSVアップロード機能を無効化
-    return jsonify({'error': 'CSVアップロード機能は現在無効化されています'}), 403
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        source = request.form.get('source', 'default')
+        
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        # CSVファイルを読み込み（複数エンコーディング対応）
+        file_content = file.read()
+        csv_data = None
+        
+        # 複数のエンコーディングを試行
+        encodings = ['utf-8-sig', 'utf-8', 'shift_jis', 'cp932', 'euc-jp', 'iso-2022-jp']
+        for encoding in encodings:
+            try:
+                csv_data = file_content.decode(encoding).splitlines()
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if csv_data is None:
+            return jsonify({'error': 'CSVファイルのエンコーディングを認識できませんでした。UTF-8、Shift_JIS、CP932、EUC-JP、ISO-2022-JPのいずれかで保存してください。'}), 400
+        
+        reader = csv.DictReader(csv_data)
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for row in reader:
+                    cur.execute('''
+                        INSERT INTO vocabulary_words (word, meaning, example_sentence, source)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (word, source) DO UPDATE SET
+                        meaning = EXCLUDED.meaning,
+                        example_sentence = EXCLUDED.example_sentence
+                    ''', (
+                        row.get('word', '').strip(),
+                        row.get('meaning', '').strip(),
+                        row.get('example', '').strip(),
+                        source
+                    ))
+                conn.commit()
+        
+        return jsonify({'success': True, 'message': f'{len(csv_data)-1}個の単語を登録しました'})
+        
+    except Exception as e:
+        app.logger.error(f"英単語アップロードエラー: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 
@@ -3683,8 +3737,148 @@ def admin():
 @login_required
 def social_studies_upload_questions_csv():
     """社会科問題CSV一括登録（管理者のみ）"""
-    # CSVアップロード機能を無効化
-    return jsonify({'error': 'CSVアップロード機能は現在無効化されています'}), 403
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        default_subject = request.form.get('default_subject', '').strip()
+        default_textbook_id = request.form.get('default_textbook_id', '').strip()
+        
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        # CSVファイルを読み込み（複数エンコーディング対応）
+        file_content = file.read()
+        csv_data = None
+        
+        # 複数のエンコーディングを試行
+        encodings = ['utf-8-sig', 'utf-8', 'shift_jis', 'cp932', 'euc-jp', 'iso-2022-jp']
+        for encoding in encodings:
+            try:
+                csv_data = file_content.decode(encoding).splitlines()
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if csv_data is None:
+            return jsonify({'error': 'CSVファイルのエンコーディングを認識できませんでした。UTF-8、Shift_JIS、CP932、EUC-JP、ISO-2022-JPのいずれかで保存してください。'}), 400
+        
+        if len(csv_data) < 2:  # ヘッダー行 + データ行が最低1行必要
+            return jsonify({'error': 'CSVファイルにデータが含まれていません'}), 400
+        
+        if len(csv_data) > 1001:  # ヘッダー行 + 最大1000行
+            return jsonify({'error': 'CSVファイルは最大1000行までです'}), 400
+        
+        reader = csv.DictReader(csv_data)
+        registered_count = 0
+        skipped_count = 0
+        
+        app.logger.info(f"CSVアップロード開始: {len(csv_data)}行のデータ")
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for row_num, row in enumerate(reader, 1):
+                    app.logger.info(f"行{row_num}を処理中: {row}")
+                    try:
+                        # 必須フィールドの取得
+                        subject = row.get('subject', '').strip() or default_subject
+                        question = row.get('question', '').strip()
+                        correct_answer = row.get('correct_answer', '').strip()
+                        
+                        # バリデーション
+                        if not subject or not question or not correct_answer:
+                            app.logger.warning(f"行{row_num}: 必須フィールドが不足 - subject: '{subject}', question: '{question}', correct_answer: '{correct_answer}'")
+                            skipped_count += 1
+                            continue
+                        
+                        # オプションフィールドの取得
+                        acceptable_answers = row.get('acceptable_answers', '').strip()
+                        explanation = row.get('explanation', '').strip()
+                        
+                        # 教材IDと単元IDの処理
+                        textbook_id = None
+                        unit_id = None
+                        
+                        # CSVファイルの教材IDを優先、なければデフォルト値を使用
+                        csv_textbook_id = row.get('textbook_id', '').strip()
+                        if csv_textbook_id:
+                            try:
+                                textbook_id = int(csv_textbook_id)
+                                # 教材IDが存在するかチェック
+                                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                                if not cur.fetchone():
+                                    textbook_id = None
+                            except ValueError:
+                                textbook_id = None
+                        elif default_textbook_id:
+                            try:
+                                textbook_id = int(default_textbook_id)
+                                # 教材IDが存在するかチェック
+                                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                                if not cur.fetchone():
+                                    textbook_id = None
+                            except ValueError:
+                                textbook_id = None
+                        
+                        # 単元IDの処理
+                        csv_unit_id = row.get('unit_id', '').strip()
+                        if csv_unit_id:
+                            try:
+                                unit_id = int(csv_unit_id)
+                                # 単元IDが存在するかチェック
+                                cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                                if not cur.fetchone():
+                                    unit_id = None
+                            except ValueError:
+                                unit_id = None
+                        
+                        # 重複チェック（同じ問題文と正解の組み合わせ）
+                        cur.execute('''
+                            SELECT id FROM social_studies_questions 
+                            WHERE question = %s AND correct_answer = %s
+                        ''', (question, correct_answer))
+                        
+                        if cur.fetchone():
+                            app.logger.warning(f"行{row_num}: 重複データ - question: '{question}', correct_answer: '{correct_answer}'")
+                            skipped_count += 1
+                            continue
+                        
+                        # 問題を登録
+                        cur.execute('''
+                            INSERT INTO social_studies_questions 
+                            (subject, question, correct_answer, acceptable_answers, explanation, textbook_id, unit_id)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ''', (subject, question, correct_answer, acceptable_answers, explanation, textbook_id, unit_id))
+                        
+                        app.logger.info(f"行{row_num}: 問題を登録しました - subject: '{subject}', question: '{question}'")
+                        registered_count += 1
+                        
+                    except Exception as e:
+                        app.logger.error(f"行{row_num}処理エラー: {e}, データ: {row}")
+                        skipped_count += 1
+                        continue
+                
+                conn.commit()
+                
+                app.logger.info(f"CSVアップロード完了: 登録{registered_count}件, スキップ{skipped_count}件")
+                
+                return jsonify({
+                    'success': True, 
+                    'message': f'{registered_count}件の問題を登録しました',
+                    'registered_count': registered_count,
+                    'skipped_count': skipped_count
+                })
+                
+    except Exception as e:
+        app.logger.error(f"CSVアップロードエラー: {e}")
+        return jsonify({'error': f'CSVアップロードに失敗しました: {str(e)}'}), 500
 
 @app.route('/social_studies/admin/upload_image/<int:question_id>', methods=['POST'])
 @login_required
