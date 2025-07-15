@@ -2748,8 +2748,22 @@ def vocabulary_upload():
         if not file.filename.endswith('.csv'):
             return jsonify({'error': 'CSVファイルを選択してください'}), 400
         
-        # CSVファイルを読み込み
-        csv_data = file.read().decode('utf-8').splitlines()
+        # CSVファイルを読み込み（複数エンコーディング対応）
+        file_content = file.read()
+        csv_data = None
+        
+        # 複数のエンコーディングを試行
+        encodings = ['utf-8-sig', 'utf-8', 'shift_jis', 'cp932', 'euc-jp', 'iso-2022-jp']
+        for encoding in encodings:
+            try:
+                csv_data = file_content.decode(encoding).splitlines()
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if csv_data is None:
+            return jsonify({'error': 'CSVファイルのエンコーディングを認識できませんでした。UTF-8、Shift_JIS、CP932、EUC-JP、ISO-2022-JPのいずれかで保存してください。'}), 400
+        
         reader = csv.DictReader(csv_data)
         
         with get_db_connection() as conn:
@@ -3647,8 +3661,22 @@ def social_studies_upload_questions_csv():
         if not file.filename.endswith('.csv'):
             return jsonify({'error': 'CSVファイルを選択してください'}), 400
         
-        # CSVファイルを読み込み
-        csv_data = file.read().decode('utf-8').splitlines()
+        # CSVファイルを読み込み（複数エンコーディング対応）
+        file_content = file.read()
+        csv_data = None
+        
+        # 複数のエンコーディングを試行
+        encodings = ['utf-8-sig', 'utf-8', 'shift_jis', 'cp932', 'euc-jp', 'iso-2022-jp']
+        for encoding in encodings:
+            try:
+                csv_data = file_content.decode(encoding).splitlines()
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if csv_data is None:
+            return jsonify({'error': 'CSVファイルのエンコーディングを認識できませんでした。UTF-8、Shift_JIS、CP932、EUC-JP、ISO-2022-JPのいずれかで保存してください。'}), 400
+        
         if len(csv_data) < 2:  # ヘッダー行 + データ行が最低1行必要
             return jsonify({'error': 'CSVファイルにデータが含まれていません'}), 400
         
