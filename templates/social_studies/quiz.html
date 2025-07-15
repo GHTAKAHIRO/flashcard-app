@@ -249,5 +249,49 @@ document.addEventListener('keypress', function(e) {
 
 // 初期化
 updateProgress();
+
+// 全角文字を半角に自動変換する機能
+function normalizeInput(input) {
+    let value = input.value;
+    
+    // 全角数字を半角に変換
+    value = value.replace(/[０-９]/g, function(s) {
+        return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    });
+    
+    // 全角英字を半角に変換
+    value = value.replace(/[Ａ-Ｚａ-ｚ]/g, function(s) {
+        return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+    });
+    
+    // 全角記号を半角に変換
+    const fullwidthSymbols = {
+        '！': '!', '＠': '@', '＃': '#', '＄': '$', '％': '%', '＾': '^', '＆': '&', '＊': '*',
+        '（': '(', '）': ')', '＿': '_', '＋': '+', '－': '-', '＝': '=', '｛': '{', '｝': '}',
+        '｜': '|', '：': ':', '；': ';', '＂': '"', '＇': "'", '＜': '<', '＞': '>', '？': '?',
+        '、': ',', '。': '.', '・': '·', '～': '~', '　': ' '
+    };
+    
+    for (let full in fullwidthSymbols) {
+        value = value.replace(new RegExp(full, 'g'), fullwidthSymbols[full]);
+    }
+    
+    input.value = value;
+}
+
+// すべての入力フィールドに変換機能を追加
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = document.querySelectorAll('input[type="text"]');
+    inputs.forEach(input => {
+        input.addEventListener('input', function() {
+            normalizeInput(this);
+        });
+        
+        // フォーカス時にも変換
+        input.addEventListener('focus', function() {
+            normalizeInput(this);
+        });
+    });
+});
 </script>
 {% endblock %} 

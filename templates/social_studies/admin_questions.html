@@ -15,6 +15,9 @@
             <a href="{{ url_for('social_studies_add_question') }}" class="btn btn-success me-2">
                 <i class="fas fa-plus me-2"></i>新規追加
             </a>
+            <button class="btn btn-info me-2" onclick="showCsvUpload()">
+                <i class="fas fa-upload me-2"></i>CSV一括登録
+            </button>
             <a href="{{ url_for('social_studies_admin') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i>管理画面に戻る
             </a>
@@ -153,6 +156,79 @@
         </div>
     </div>
 </div>
+
+<!-- CSV一括登録モーダル -->
+<div class="modal fade" id="csvUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">CSV一括登録</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle me-2"></i>CSVファイル形式</h6>
+                    <p class="mb-2">以下の列を含むCSVファイルをアップロードしてください：</p>
+                    <ul class="mb-0">
+                        <li><strong>subject</strong>: 科目（地理、歴史、公民）</li>
+                        <li><strong>question</strong>: 問題文</li>
+                        <li><strong>correct_answer</strong>: 正解</li>
+                        <li><strong>acceptable_answers</strong>: 許容回答（カンマ区切り、オプション）</li>
+                        <li><strong>explanation</strong>: 解説（オプション）</li>
+                        <li><strong>textbook_id</strong>: 教材ID（オプション）</li>
+                        <li><strong>unit_id</strong>: 単元ID（オプション）</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="csv-file" class="form-label">CSVファイル <span class="text-danger">*</span></label>
+                    <input type="file" class="form-control" id="csv-file" accept=".csv" required>
+                    <div class="form-text">UTF-8エンコーディングのCSVファイルを選択してください</div>
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downloadSampleCsv()">
+                            <i class="fas fa-download me-1"></i>サンプルCSVをダウンロード
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="csv-subject" class="form-label">デフォルト科目</label>
+                    <select class="form-select" id="csv-subject">
+                        <option value="">CSVファイルの科目を使用</option>
+                        <option value="地理">地理</option>
+                        <option value="歴史">歴史</option>
+                        <option value="公民">公民</option>
+                    </select>
+                    <div class="form-text">CSVファイルに科目が含まれていない場合のデフォルト科目を設定</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="csv-textbook" class="form-label">デフォルト教材</label>
+                    <select class="form-select" id="csv-textbook">
+                        <option value="">CSVファイルの教材IDを使用</option>
+                    </select>
+                    <div class="form-text">CSVファイルに教材IDが含まれていない場合のデフォルト教材を設定</div>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h6><i class="fas fa-exclamation-triangle me-2"></i>注意事項</h6>
+                    <ul class="mb-0">
+                        <li>1行目はヘッダー行として扱われます</li>
+                        <li>同じ問題文と正解の組み合わせは重複登録されません</li>
+                        <li>教材IDや単元IDが存在しない場合は無視されます</li>
+                        <li>最大1000件まで一括登録できます</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="uploadCsv()">
+                    <i class="fas fa-upload me-1"></i>アップロード
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -278,6 +354,150 @@ function deleteQuestion(questionId) {
             alert('削除に失敗しました');
         });
     }
+}
+
+// CSV一括登録機能
+function showCsvUpload() {
+    // 教材一覧を取得してセレクトボックスに設定
+    loadTextbooksForCsv();
+    
+    // モーダルを表示
+    const modal = new bootstrap.Modal(document.getElementById('csvUploadModal'));
+    modal.show();
+}
+
+function loadTextbooksForCsv() {
+    const textbookSelect = document.getElementById('csv-textbook');
+    
+    // 教材を取得
+    fetch('/social_studies/api/textbooks')
+        .then(response => response.json())
+        .then(data => {
+            textbookSelect.innerHTML = '<option value="">CSVファイルの教材IDを使用</option>';
+            data.forEach(textbook => {
+                const option = document.createElement('option');
+                option.value = textbook.id;
+                option.textContent = `${textbook.name} (${textbook.subject})`;
+                textbookSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('教材取得エラー:', error);
+        });
+}
+
+function uploadCsv() {
+    const fileInput = document.getElementById('csv-file');
+    const defaultSubject = document.getElementById('csv-subject').value;
+    const defaultTextbook = document.getElementById('csv-textbook').value;
+    
+    // ファイルチェック
+    if (!fileInput.files[0]) {
+        alert('CSVファイルを選択してください');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    if (!file.name.endsWith('.csv')) {
+        alert('CSVファイルを選択してください');
+        return;
+    }
+    
+    // アップロードボタンを無効化
+    const uploadButton = document.querySelector('#csvUploadModal .btn-primary');
+    const originalText = uploadButton.textContent;
+    uploadButton.disabled = true;
+    uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>アップロード中...';
+    
+    // FormDataを作成
+    const formData = new FormData();
+    formData.append('file', file);
+    if (defaultSubject) {
+        formData.append('default_subject', defaultSubject);
+    }
+    if (defaultTextbook) {
+        formData.append('default_textbook_id', defaultTextbook);
+    }
+    
+    // APIに送信
+    fetch('/social_studies/admin/upload_questions_csv', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 成功時はモーダルを閉じてページを再読み込み
+            const modal = bootstrap.Modal.getInstance(document.getElementById('csvUploadModal'));
+            modal.hide();
+            alert(`✅ ${data.message}\n登録件数: ${data.registered_count}件\nスキップ件数: ${data.skipped_count}件`);
+            location.reload();
+        } else {
+            // エラーメッセージを表示
+            alert(data.error || 'アップロードに失敗しました');
+        }
+    })
+    .catch(error => {
+        console.error('アップロードエラー:', error);
+        alert('アップロードに失敗しました');
+    })
+    .finally(() => {
+        // ボタンを元に戻す
+        uploadButton.disabled = false;
+        uploadButton.innerHTML = originalText;
+    });
+}
+
+function downloadSampleCsv() {
+    // サンプルCSVデータを作成
+    const sampleData = [
+        {
+            subject: '地理',
+            question: '日本の首都はどこですか？',
+            correct_answer: '東京',
+            acceptable_answers: '東京都,Tokyo',
+            explanation: '日本の首都は東京都です。',
+            textbook_id: '',
+            unit_id: ''
+        },
+        {
+            subject: '歴史',
+            question: '織田信長が本能寺の変で倒れた年は？',
+            correct_answer: '1582年',
+            acceptable_answers: '天正10年',
+            explanation: '1582年（天正10年）に本能寺の変が起こりました。',
+            textbook_id: '',
+            unit_id: ''
+        },
+        {
+            subject: '公民',
+            question: '日本の国会は何院制ですか？',
+            correct_answer: '二院制',
+            acceptable_answers: '2院制,両院制',
+            explanation: '衆議院と参議院の二院制です。',
+            textbook_id: '',
+            unit_id: ''
+        }
+    ];
+    
+    // CSVヘッダー
+    let csvContent = 'subject,question,correct_answer,acceptable_answers,explanation,textbook_id,unit_id\n';
+    
+    // サンプルデータをCSV形式に変換
+    sampleData.forEach(row => {
+        csvContent += `"${row.subject}","${row.question}","${row.correct_answer}","${row.acceptable_answers}","${row.explanation}","${row.textbook_id}","${row.unit_id}"\n`;
+    });
+    
+    // ファイルをダウンロード
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'social_studies_questions_sample.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 </script>
 {% endblock %} 

@@ -2780,13 +2780,35 @@ def vocabulary_upload():
 # ========== 社会科一問一答機能 ==========
 
 def normalize_answer(answer):
-    """回答を正規化（空白除去、小文字化など）"""
+    """回答を正規化（空白除去、小文字化、全角→半角変換など）"""
     if not answer:
         return ""
+    
     # 空白を除去し、小文字に変換
     normalized = re.sub(r'\s+', '', answer.lower())
+    
     # 全角数字を半角に変換
     normalized = normalized.translate(str.maketrans('０１２３４５６７８９', '0123456789'))
+    
+    # 全角英字を半角に変換
+    fullwidth_chars = 'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ'
+    halfwidth_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    normalized = normalized.translate(str.maketrans(fullwidth_chars, halfwidth_chars))
+    
+    # 全角記号を半角に変換
+    fullwidth_symbols = '！＠＃＄％＾＆＊（）＿＋－＝｛｝｜：；＂＇＜＞？、。・～'
+    halfwidth_symbols = '!@#$%^&*()_+-={}|:;"\'<>?,./~'
+    normalized = normalized.translate(str.maketrans(fullwidth_symbols, halfwidth_symbols))
+    
+    # 全角スペースを半角スペースに変換
+    normalized = normalized.replace('　', ' ')
+    
+    # 連続するスペースを単一のスペースに変換
+    normalized = re.sub(r'\s+', ' ', normalized)
+    
+    # 前後のスペースを除去
+    normalized = normalized.strip()
+    
     return normalized
 
 def check_answer(user_answer, correct_answer, acceptable_answers=None):
@@ -2804,6 +2826,11 @@ def check_answer(user_answer, correct_answer, acceptable_answers=None):
             if user_norm == normalize_answer(acceptable):
                 return True, "許容回答"
     
+    # 数字のみの場合は数値として比較
+    if user_norm.isdigit() and correct_norm.isdigit():
+        if int(user_norm) == int(correct_norm):
+            return True, "数値一致"
+    
     # 部分一致（キーワードチェック）
     correct_words = set(correct_norm.split())
     user_words = set(user_norm.split())
@@ -2813,7 +2840,51 @@ def check_answer(user_answer, correct_answer, acceptable_answers=None):
         if match_ratio >= 0.7:  # 70%以上のキーワードが一致
             return True, f"部分一致 ({match_ratio:.1%})"
     
+    # 文字列の類似度チェック（編集距離ベース）
+    if len(correct_norm) > 0:
+        similarity = calculate_similarity(user_norm, correct_norm)
+        if similarity >= 0.8:  # 80%以上の類似度
+            return True, f"類似一致 ({similarity:.1%})"
+    
     return False, "不正解"
+
+def calculate_similarity(str1, str2):
+    """文字列の類似度を計算（編集距離ベース）"""
+    if not str1 or not str2:
+        return 0.0
+    
+    # 短い方の文字列を基準にする
+    if len(str1) > len(str2):
+        str1, str2 = str2, str1
+    
+    # 編集距離を計算
+    distance = levenshtein_distance(str1, str2)
+    max_len = max(len(str1), len(str2))
+    
+    if max_len == 0:
+        return 1.0
+    
+    return 1.0 - (distance / max_len)
+
+def levenshtein_distance(str1, str2):
+    """レーベンシュタイン距離を計算"""
+    if len(str1) < len(str2):
+        return levenshtein_distance(str2, str1)
+    
+    if len(str2) == 0:
+        return len(str1)
+    
+    previous_row = list(range(len(str2) + 1))
+    for i, c1 in enumerate(str1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(str2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    
+    return previous_row[-1]
 
 @app.route('/social_studies')
 @login_required
@@ -3554,6 +3625,131 @@ def admin():
         app.logger.error(f"管理画面エラー: {e}")
         flash('管理画面の読み込みに失敗しました', 'error')
         return redirect(url_for('dashboard'))
+
+@app.route('/social_studies/admin/upload_questions_csv', methods=['POST'])
+@login_required
+def social_studies_upload_questions_csv():
+    """社会科問題CSV一括登録（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        default_subject = request.form.get('default_subject', '').strip()
+        default_textbook_id = request.form.get('default_textbook_id', '').strip()
+        
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        # CSVファイルを読み込み
+        csv_data = file.read().decode('utf-8').splitlines()
+        if len(csv_data) < 2:  # ヘッダー行 + データ行が最低1行必要
+            return jsonify({'error': 'CSVファイルにデータが含まれていません'}), 400
+        
+        if len(csv_data) > 1001:  # ヘッダー行 + 最大1000行
+            return jsonify({'error': 'CSVファイルは最大1000行までです'}), 400
+        
+        reader = csv.DictReader(csv_data)
+        registered_count = 0
+        skipped_count = 0
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for row in reader:
+                    try:
+                        # 必須フィールドの取得
+                        subject = row.get('subject', '').strip() or default_subject
+                        question = row.get('question', '').strip()
+                        correct_answer = row.get('correct_answer', '').strip()
+                        
+                        # バリデーション
+                        if not subject or not question or not correct_answer:
+                            skipped_count += 1
+                            continue
+                        
+                        # オプションフィールドの取得
+                        acceptable_answers = row.get('acceptable_answers', '').strip()
+                        explanation = row.get('explanation', '').strip()
+                        
+                        # 教材IDと単元IDの処理
+                        textbook_id = None
+                        unit_id = None
+                        
+                        # CSVファイルの教材IDを優先、なければデフォルト値を使用
+                        csv_textbook_id = row.get('textbook_id', '').strip()
+                        if csv_textbook_id:
+                            try:
+                                textbook_id = int(csv_textbook_id)
+                                # 教材IDが存在するかチェック
+                                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                                if not cur.fetchone():
+                                    textbook_id = None
+                            except ValueError:
+                                textbook_id = None
+                        elif default_textbook_id:
+                            try:
+                                textbook_id = int(default_textbook_id)
+                                # 教材IDが存在するかチェック
+                                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                                if not cur.fetchone():
+                                    textbook_id = None
+                            except ValueError:
+                                textbook_id = None
+                        
+                        # 単元IDの処理
+                        csv_unit_id = row.get('unit_id', '').strip()
+                        if csv_unit_id:
+                            try:
+                                unit_id = int(csv_unit_id)
+                                # 単元IDが存在するかチェック
+                                cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                                if not cur.fetchone():
+                                    unit_id = None
+                            except ValueError:
+                                unit_id = None
+                        
+                        # 重複チェック（同じ問題文と正解の組み合わせ）
+                        cur.execute('''
+                            SELECT id FROM social_studies_questions 
+                            WHERE question = %s AND correct_answer = %s
+                        ''', (question, correct_answer))
+                        
+                        if cur.fetchone():
+                            skipped_count += 1
+                            continue
+                        
+                        # 問題を登録
+                        cur.execute('''
+                            INSERT INTO social_studies_questions 
+                            (subject, question, correct_answer, acceptable_answers, explanation, textbook_id, unit_id)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ''', (subject, question, correct_answer, acceptable_answers, explanation, textbook_id, unit_id))
+                        
+                        registered_count += 1
+                        
+                    except Exception as e:
+                        app.logger.error(f"CSV行処理エラー: {e}, 行: {row}")
+                        skipped_count += 1
+                        continue
+                
+                conn.commit()
+                
+                return jsonify({
+                    'success': True, 
+                    'message': f'{registered_count}件の問題を登録しました',
+                    'registered_count': registered_count,
+                    'skipped_count': skipped_count
+                })
+                
+    except Exception as e:
+        app.logger.error(f"CSVアップロードエラー: {e}")
+        return jsonify({'error': f'CSVアップロードに失敗しました: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # データベース接続プールを初期化
