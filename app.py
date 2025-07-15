@@ -3144,9 +3144,17 @@ def social_studies_admin_questions():
         return redirect(url_for('social_studies_home'))
     
     try:
+        # フィルターパラメータを取得
+        subject = request.args.get('subject', '').strip()
+        textbook_id = request.args.get('textbook_id', '').strip()
+        unit_id = request.args.get('unit_id', '').strip()
+        difficulty = request.args.get('difficulty', '').strip()
+        search = request.args.get('search', '').strip()
+        
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute('''
+                # 基本クエリ
+                query = '''
                     SELECT 
                         q.id, q.subject, q.question, q.correct_answer, q.acceptable_answers, 
                         q.difficulty_level, q.created_at,
@@ -3154,9 +3162,44 @@ def social_studies_admin_questions():
                     FROM social_studies_questions q
                     LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
                     LEFT JOIN social_studies_units u ON q.unit_id = u.id
-                    ORDER BY q.created_at DESC
-                ''')
+                '''
+                
+                # WHERE句の条件を構築
+                conditions = []
+                params = []
+                
+                if subject:
+                    conditions.append('q.subject = %s')
+                    params.append(subject)
+                
+                if textbook_id:
+                    conditions.append('q.textbook_id = %s')
+                    params.append(int(textbook_id))
+                
+                if unit_id:
+                    conditions.append('q.unit_id = %s')
+                    params.append(int(unit_id))
+                
+                if difficulty:
+                    conditions.append('q.difficulty_level = %s')
+                    params.append(difficulty)
+                
+                if search:
+                    conditions.append('(q.question ILIKE %s OR q.correct_answer ILIKE %s)')
+                    search_param = f'%{search}%'
+                    params.extend([search_param, search_param])
+                
+                # WHERE句を追加
+                if conditions:
+                    query += ' WHERE ' + ' AND '.join(conditions)
+                
+                # ORDER BY句を追加
+                query += ' ORDER BY q.created_at DESC'
+                
+                # クエリを実行
+                cur.execute(query, params)
                 questions = cur.fetchall()
+                
                 return render_template('social_studies/admin_questions.html', questions=questions)
     except Exception as e:
         app.logger.error(f"社会科問題一覧エラー: {e}")
@@ -3225,6 +3268,54 @@ def social_studies_delete_question(question_id):
     except Exception as e:
         app.logger.error(f"社会科問題削除エラー: {e}")
         return jsonify({'error': '問題の削除に失敗しました'}), 500
+
+@app.route('/social_studies/admin/bulk_delete_questions', methods=['POST'])
+@login_required
+def social_studies_bulk_delete_questions():
+    """社会科問題一括削除（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        data = request.get_json()
+        question_ids = data.get('question_ids', [])
+        
+        if not question_ids:
+            return jsonify({'error': '削除する問題が選択されていません'}), 400
+        
+        # 数値のリストに変換
+        try:
+            question_ids = [int(qid) for qid in question_ids]
+        except (ValueError, TypeError):
+            return jsonify({'error': '無効な問題IDが含まれています'}), 400
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 問題が存在するかチェック
+                placeholders = ','.join(['%s'] * len(question_ids))
+                cur.execute(f'SELECT id FROM social_studies_questions WHERE id IN ({placeholders})', question_ids)
+                existing_questions = cur.fetchall()
+                
+                if len(existing_questions) != len(question_ids):
+                    return jsonify({'error': '一部の問題が見つかりません'}), 404
+                
+                # 関連する学習ログを削除
+                cur.execute(f'DELETE FROM social_studies_study_log WHERE question_id IN ({placeholders})', question_ids)
+                
+                # 問題を削除
+                cur.execute(f'DELETE FROM social_studies_questions WHERE id IN ({placeholders})', question_ids)
+                deleted_count = cur.rowcount
+                conn.commit()
+                
+                return jsonify({
+                    'success': True, 
+                    'message': f'{deleted_count}件の問題が削除されました',
+                    'deleted_count': deleted_count
+                })
+                
+    except Exception as e:
+        app.logger.error(f"社会科問題一括削除エラー: {e}")
+        return jsonify({'error': '問題の一括削除に失敗しました'}), 500
 
 @app.route('/social_studies/admin/edit_question/<int:question_id>', methods=['GET', 'POST'])
 @login_required

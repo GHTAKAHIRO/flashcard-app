@@ -775,6 +775,66 @@ document.getElementById('csv-file').addEventListener('change', function(e) {
     }
 });
 
+// 一括削除機能
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const questionCheckboxes = document.querySelectorAll('.question-checkbox');
+    
+    questionCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateBulkDeleteButton();
+}
+
+function updateBulkDeleteButton() {
+    const selectedCheckboxes = document.querySelectorAll('.question-checkbox:checked');
+    const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+    
+    if (selectedCheckboxes.length > 0) {
+        bulkDeleteBtn.style.display = 'inline-block';
+        bulkDeleteBtn.textContent = `選択削除 (${selectedCheckboxes.length}件)`;
+    } else {
+        bulkDeleteBtn.style.display = 'none';
+    }
+}
+
+function bulkDeleteQuestions() {
+    const selectedCheckboxes = document.querySelectorAll('.question-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('削除する問題を選択してください');
+        return;
+    }
+    
+    const questionIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+    
+    if (confirm(`選択された${questionIds.length}件の問題を削除しますか？\nこの操作は取り消せません。`)) {
+        fetch('/social_studies/admin/bulk_delete_questions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                question_ids: questionIds
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.error || '一括削除に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('一括削除エラー:', error);
+            alert('一括削除に失敗しました');
+        });
+    }
+}
+
 // ページ読み込み時の初期化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoadedイベントが発火しました');
