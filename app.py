@@ -2892,12 +2892,12 @@ def vocabulary_upload():
 # ========== 社会科一問一答機能 ==========
 
 def normalize_answer(answer):
-    """回答を正規化（空白除去、小文字化、全角→半角変換など）"""
+    """回答を正規化（空白除去、全角→半角変換など）"""
     if not answer:
         return ""
     
-    # 空白を除去し、小文字に変換
-    normalized = re.sub(r'\s+', '', answer.lower())
+    # 空白を除去（日本語の場合は小文字化しない）
+    normalized = re.sub(r'\s+', '', answer)
     
     # 全角数字を半角に変換
     normalized = normalized.translate(str.maketrans('０１２３４５６７８９', '0123456789'))
@@ -3106,17 +3106,11 @@ def social_studies_submit_answer():
                 
                 app.logger.info(f"問題ID: {question_id}, 正解: {question_data['correct_answer']}, 許容回答: {acceptable_answers}")
                 
-                # 補足情報を考慮した回答をチェック
-                # ユーザーの回答に補足情報を追加して比較
-                full_user_answer = user_answer
-                if question_data['answer_suffix']:
-                    full_user_answer = full_user_answer + question_data['answer_suffix']
+                # 回答をチェック（answer_suffixは表示用の補足情報なので、比較には使用しない）
+                app.logger.info(f"回答チェック: ユーザー回答='{user_answer}', 正解='{question_data['correct_answer']}'")
                 
-                app.logger.info(f"補足情報考慮: ユーザー回答='{user_answer}' -> 完全回答='{full_user_answer}'")
-                
-                # 回答をチェック
                 is_correct, result_message = check_answer(
-                    full_user_answer, 
+                    user_answer, 
                     question_data['correct_answer'], 
                     acceptable_answers
                 )
