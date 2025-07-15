@@ -161,9 +161,9 @@
 </div>
 
 <!-- CSV一括登録モーダル -->
-<div class="modal fade" id="csvUploadModal" tabindex="-1" style="z-index: 1050;">
-    <div class="modal-dialog modal-lg" style="z-index: 1055;">
-        <div class="modal-content" style="z-index: 1060;">
+<div class="modal fade" id="csvUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">CSV一括登録</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -223,9 +223,9 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6; padding: 1rem;">
+            <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-primary" onclick="uploadCsv();" id="csv-upload-btn" style="cursor: pointer; position: relative; z-index: 1000;">
+                <button type="button" class="btn btn-primary" id="csv-upload-btn">
                     <i class="fas fa-upload me-1"></i>アップロード
                 </button>
             </div>
@@ -675,16 +675,33 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // アップロードボタンのイベントリスナー
-    const uploadBtn = document.getElementById('csv-upload-btn');
-    if (uploadBtn) {
-        uploadBtn.addEventListener('click', function(e) {
-            console.log('アップロードボタンがクリックされました');
-            e.preventDefault();
-            e.stopPropagation();
-            uploadCsv();
-        });
+    // アップロードボタンのイベントリスナー（複数の方法で設定）
+    function setupUploadButton() {
+        const uploadBtn = document.getElementById('csv-upload-btn');
+        if (uploadBtn) {
+            console.log('アップロードボタンにイベントリスナーを設定');
+            
+            // 既存のイベントリスナーを削除
+            uploadBtn.replaceWith(uploadBtn.cloneNode(true));
+            const newUploadBtn = document.getElementById('csv-upload-btn');
+            
+            // 新しいイベントリスナーを追加
+            newUploadBtn.addEventListener('click', function(e) {
+                console.log('アップロードボタンがクリックされました');
+                e.preventDefault();
+                e.stopPropagation();
+                uploadCsv();
+            });
+            
+            // ボタンが確実にクリック可能な状態にする
+            newUploadBtn.disabled = false;
+            newUploadBtn.style.pointerEvents = 'auto';
+            newUploadBtn.style.cursor = 'pointer';
+        }
     }
+    
+    // 初期設定
+    setupUploadButton();
     
     // モーダル表示時の処理
     const csvModal = document.getElementById('csvUploadModal');
@@ -696,8 +713,27 @@ document.addEventListener('DOMContentLoaded', function() {
             if (fileInput) {
                 fileInput.value = '';
             }
+            // モーダル表示後にボタンを再設定
+            setTimeout(setupUploadButton, 100);
         });
     }
+    
+    // 緊急用：ボタンを強制的に有効化
+    window.enableUploadButton = function() {
+        const uploadBtn = document.getElementById('csv-upload-btn');
+        if (uploadBtn) {
+            uploadBtn.disabled = false;
+            uploadBtn.style.pointerEvents = 'auto';
+            uploadBtn.style.cursor = 'pointer';
+            uploadBtn.onclick = function(e) {
+                console.log('緊急用アップロードボタンがクリックされました');
+                e.preventDefault();
+                e.stopPropagation();
+                uploadCsv();
+            };
+            console.log('緊急用ボタン有効化完了');
+        }
+    };
 });
 </script>
 
