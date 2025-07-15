@@ -30,9 +30,10 @@
                     <tr>
                         <th>ID</th>
                         <th>科目</th>
+                        <th>教材・単元</th>
                         <th>問題文</th>
                         <th>正解</th>
-                        <th>許容回答</th>
+                        <th>難易度</th>
                         <th>登録日</th>
                         <th>操作</th>
                     </tr>
@@ -45,19 +46,37 @@
                             <span class="badge bg-primary">{{ question.subject }}</span>
                         </td>
                         <td>
-                            <div class="text-truncate" style="max-width: 300px;" title="{{ question.question }}">
+                            {% if question.textbook_name %}
+                                <div class="small">
+                                    <strong>{{ question.textbook_name }}</strong>
+                                    {% if question.unit_name %}
+                                        <br><span class="text-muted">{{ question.unit_name }}</span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted">未設定</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 250px;" title="{{ question.question }}">
                                 {{ question.question }}
                             </div>
                         </td>
                         <td>
-                            <div class="text-truncate" style="max-width: 150px;" title="{{ question.correct_answer }}">
+                            <div class="text-truncate" style="max-width: 120px;" title="{{ question.correct_answer }}">
                                 {{ question.correct_answer }}
                             </div>
                         </td>
                         <td>
-                            <div class="text-truncate" style="max-width: 150px;" title="{{ question.acceptable_answers or 'なし' }}">
-                                {{ question.acceptable_answers or 'なし' }}
-                            </div>
+                            {% if question.difficulty_level == 'basic' %}
+                                <span class="badge bg-success">基本</span>
+                            {% elif question.difficulty_level == 'intermediate' %}
+                                <span class="badge bg-warning">中級</span>
+                            {% elif question.difficulty_level == 'advanced' %}
+                                <span class="badge bg-danger">上級</span>
+                            {% else %}
+                                <span class="badge bg-secondary">未設定</span>
+                            {% endif %}
                         </td>
                         <td>
                             <small class="text-muted">
@@ -157,10 +176,28 @@ function saveEdit() {
 }
 
 function deleteQuestion(questionId) {
-    if (confirm('この問題を削除しますか？')) {
-        // 削除処理
-        // 実際の実装ではAPIに送信
-        alert('削除機能は開発中です');
+    if (confirm('この問題を削除しますか？\nこの操作は取り消せません。')) {
+        // 削除APIを呼び出し
+        fetch(`/social_studies/admin/delete_question/${questionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 成功時はページを再読み込み
+                location.reload();
+            } else {
+                // エラーメッセージを表示
+                alert(data.error || '削除に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('削除エラー:', error);
+            alert('削除に失敗しました');
+        });
     }
 }
 </script>

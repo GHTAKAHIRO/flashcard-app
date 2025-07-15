@@ -41,7 +41,21 @@
 
 <!-- 管理メニュー -->
 <div class="row g-4">
-    <div class="col-md-6">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-book me-2"></i>教材管理
+                </h5>
+                <p class="card-text">教材と単元の管理を行います。</p>
+                <a href="{{ url_for('social_studies_admin_textbooks') }}" class="btn btn-info">
+                    <i class="fas fa-book me-1"></i>教材一覧
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">
@@ -55,7 +69,7 @@
         </div>
     </div>
     
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">

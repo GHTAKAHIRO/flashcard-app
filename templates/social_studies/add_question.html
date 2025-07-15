@@ -24,11 +24,34 @@
                 <form method="POST">
                     <div class="mb-3">
                         <label for="subject" class="form-label">科目 <span class="text-danger">*</span></label>
-                        <select class="form-select" id="subject" name="subject" required>
+                        <select class="form-select" id="subject" name="subject" required onchange="loadTextbooks()">
                             <option value="">科目を選択してください</option>
                             <option value="地理">地理</option>
                             <option value="歴史">歴史</option>
                             <option value="公民">公民</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="textbook_id" class="form-label">教材</label>
+                        <select class="form-select" id="textbook_id" name="textbook_id" onchange="loadUnits()">
+                            <option value="">教材を選択してください（オプション）</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="unit_id" class="form-label">単元</label>
+                        <select class="form-select" id="unit_id" name="unit_id">
+                            <option value="">単元を選択してください（オプション）</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="difficulty_level" class="form-label">難易度</label>
+                        <select class="form-select" id="difficulty_level" name="difficulty_level">
+                            <option value="basic">基本</option>
+                            <option value="intermediate">中級</option>
+                            <option value="advanced">上級</option>
                         </select>
                     </div>
                     
@@ -99,4 +122,62 @@
         </div>
     </div>
 </div>
+
+<script>
+function loadTextbooks() {
+    const subject = document.getElementById('subject').value;
+    const textbookSelect = document.getElementById('textbook_id');
+    const unitSelect = document.getElementById('unit_id');
+    
+    // 単元セレクトをリセット
+    unitSelect.innerHTML = '<option value="">単元を選択してください（オプション）</option>';
+    
+    if (!subject) {
+        textbookSelect.innerHTML = '<option value="">教材を選択してください（オプション）</option>';
+        return;
+    }
+    
+    // 教材を取得
+    fetch(`/social_studies/api/textbooks?subject=${subject}`)
+        .then(response => response.json())
+        .then(data => {
+            textbookSelect.innerHTML = '<option value="">教材を選択してください（オプション）</option>';
+            data.forEach(textbook => {
+                const option = document.createElement('option');
+                option.value = textbook.id;
+                option.textContent = textbook.name;
+                textbookSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('教材取得エラー:', error);
+        });
+}
+
+function loadUnits() {
+    const textbookId = document.getElementById('textbook_id').value;
+    const unitSelect = document.getElementById('unit_id');
+    
+    if (!textbookId) {
+        unitSelect.innerHTML = '<option value="">単元を選択してください（オプション）</option>';
+        return;
+    }
+    
+    // 単元を取得
+    fetch(`/social_studies/api/units?textbook_id=${textbookId}`)
+        .then(response => response.json())
+        .then(data => {
+            unitSelect.innerHTML = '<option value="">単元を選択してください（オプション）</option>';
+            data.forEach(unit => {
+                const option = document.createElement('option');
+                option.value = unit.id;
+                option.textContent = `${unit.chapter_number}. ${unit.name}`;
+                unitSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('単元取得エラー:', error);
+        });
+}
+</script>
 {% endblock %} 

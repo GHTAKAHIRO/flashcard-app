@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}教材追加 - 社会科管理{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-plus me-2"></i>教材追加
+            </h2>
+            <p class="text-muted">新しい社会科教材を追加します</p>
+        </div>
+        <a href="{{ url_for('social_studies_admin_textbooks') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>教材一覧に戻る
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">教材名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               placeholder="例: 中学社会 地理的分野" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">科目 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="subject" name="subject" required>
+                            <option value="">科目を選択してください</option>
+                            <option value="地理">地理</option>
+                            <option value="歴史">歴史</option>
+                            <option value="公民">公民</option>
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="grade" class="form-label">学年</label>
+                                <input type="text" class="form-control" id="grade" name="grade" 
+                                       placeholder="例: 中学1年">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="publisher" class="form-label">出版社</label>
+                                <input type="text" class="form-control" id="publisher" name="publisher" 
+                                       placeholder="例: 東京書籍">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">説明</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" 
+                                  placeholder="教材の説明や特徴を入力してください"></textarea>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('social_studies_admin_textbooks') }}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i>キャンセル
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i>教材を追加
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 入力例 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>入力例
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>地理</h6>
+                        <ul class="list-unstyled">
+                            <li>• 教材名: 中学社会 地理的分野</li>
+                            <li>• 科目: 地理</li>
+                            <li>• 学年: 中学1年</li>
+                            <li>• 出版社: 東京書籍</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>歴史</h6>
+                        <ul class="list-unstyled">
+                            <li>• 教材名: 中学社会 歴史的分野</li>
+                            <li>• 科目: 歴史</li>
+                            <li>• 学年: 中学2年</li>
+                            <li>• 出版社: 東京書籍</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}教材管理 - 社会科管理{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-book me-2"></i>教材管理
+            </h2>
+            <p class="text-muted">登録されている教材を管理できます</p>
+        </div>
+        <div>
+            <a href="{{ url_for('social_studies_add_textbook') }}" class="btn btn-success me-2">
+                <i class="fas fa-plus me-2"></i>新規追加
+            </a>
+            <a href="{{ url_for('social_studies_admin') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>管理画面に戻る
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>教材名</th>
+                        <th>科目</th>
+                        <th>学年</th>
+                        <th>出版社</th>
+                        <th>単元数</th>
+                        <th>問題数</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for textbook in textbooks %}
+                    <tr>
+                        <td>{{ textbook.id }}</td>
+                        <td>
+                            <div class="fw-bold">{{ textbook.name }}</div>
+                            {% if textbook.description %}
+                            <small class="text-muted">{{ textbook.description[:50] }}{% if textbook.description|length > 50 %}...{% endif %}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ textbook.subject }}</span>
+                        </td>
+                        <td>{{ textbook.grade or '未設定' }}</td>
+                        <td>{{ textbook.publisher or '未設定' }}</td>
+                        <td>
+                            <span class="badge bg-info">{{ textbook.unit_count or 0 }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-success">{{ textbook.question_count or 0 }}</span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('social_studies_admin_units', textbook_id=textbook.id) }}" 
+                                   class="btn btn-outline-info" title="単元管理">
+                                    <i class="fas fa-list"></i>
+                                </a>
+                                <button class="btn btn-outline-primary" onclick="editTextbook({{ textbook.id }})" title="編集">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="deleteTextbook({{ textbook.id }})" title="削除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not textbooks %}
+        <div class="text-center py-5">
+            <i class="fas fa-book fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">まだ教材が登録されていません</h4>
+            <p class="text-muted">新しい教材を追加してください</p>
+            <a href="{{ url_for('social_studies_add_textbook') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>教材を追加
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">教材編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <div class="mb-3">
+                        <label for="edit-name" class="form-label">教材名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-subject" class="form-label">科目 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="edit-subject" name="subject" required>
+                            <option value="地理">地理</option>
+                            <option value="歴史">歴史</option>
+                            <option value="公民">公民</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit-grade" class="form-label">学年</label>
+                                <input type="text" class="form-control" id="edit-grade" name="grade" placeholder="例: 中学1年">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit-publisher" class="form-label">出版社</label>
+                                <input type="text" class="form-control" id="edit-publisher" name="publisher" placeholder="例: 東京書籍">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-description" class="form-label">説明</label>
+                        <textarea class="form-control" id="edit-description" name="description" rows="3" placeholder="教材の説明を入力してください"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentEditId = null;
+
+function editTextbook(textbookId) {
+    // 教材データを取得してモーダルに設定
+    // 実際の実装ではAPIからデータを取得
+    currentEditId = textbookId;
+    
+    // モーダルを表示
+    const modal = new bootstrap.Modal(document.getElementById('editModal'));
+    modal.show();
+}
+
+function saveEdit() {
+    // 編集内容を保存
+    // 実際の実装ではAPIに送信
+    alert('編集機能は開発中です');
+}
+
+function deleteTextbook(textbookId) {
+    if (confirm('この教材を削除しますか？\n関連する単元と問題も削除されます。\nこの操作は取り消せません。')) {
+        // 削除APIを呼び出し
+        fetch(`/social_studies/admin/delete_textbook/${textbookId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 成功時はページを再読み込み
+                location.reload();
+            } else {
+                // エラーメッセージを表示
+                alert(data.error || '削除に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('削除エラー:', error);
+            alert('削除に失敗しました');
+        });
+    }
+}
+</script>
+{% endblock %} 
