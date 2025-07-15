@@ -3047,7 +3047,7 @@ def social_studies_quiz(subject):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 指定された科目の問題を取得
                 cur.execute('''
-                    SELECT id, question, correct_answer, acceptable_answers, explanation
+                    SELECT id, question, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation
                     FROM social_studies_questions 
                     WHERE subject = %s 
                     ORDER BY RANDOM() 
@@ -3106,9 +3106,19 @@ def social_studies_submit_answer():
                 
                 app.logger.info(f"問題ID: {question_id}, 正解: {question_data['correct_answer']}, 許容回答: {acceptable_answers}")
                 
+                # 補足情報を考慮した回答をチェック
+                # ユーザーの回答に補足情報を追加して比較
+                full_user_answer = user_answer
+                if question_data['answer_prefix']:
+                    full_user_answer = question_data['answer_prefix'] + full_user_answer
+                if question_data['answer_suffix']:
+                    full_user_answer = full_user_answer + question_data['answer_suffix']
+                
+                app.logger.info(f"補足情報考慮: ユーザー回答='{user_answer}' -> 完全回答='{full_user_answer}'")
+                
                 # 回答をチェック
                 is_correct, result_message = check_answer(
-                    user_answer, 
+                    full_user_answer, 
                     question_data['correct_answer'], 
                     acceptable_answers
                 )
@@ -3242,6 +3252,8 @@ def social_studies_add_question():
         question = request.form['question']
         correct_answer = request.form['correct_answer']
         acceptable_answers = request.form.get('acceptable_answers', '')
+        answer_prefix = request.form.get('answer_prefix', '')
+        answer_suffix = request.form.get('answer_suffix', '')
         explanation = request.form.get('explanation', '')
         difficulty_level = request.form.get('difficulty_level', 'basic')
         
@@ -3250,9 +3262,9 @@ def social_studies_add_question():
                 with conn.cursor() as cur:
                     cur.execute('''
                         INSERT INTO social_studies_questions 
-                        (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, difficulty_level)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, difficulty_level))
+                        (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation, difficulty_level)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation, difficulty_level))
                     conn.commit()
                     flash('問題が追加されました', 'success')
                     return redirect(url_for('social_studies_admin_questions'))

@@ -40,14 +40,24 @@
                 
                 <div class="answer-section">
                     <div class="form-group">
-                        <input type="text" class="form-control form-control-lg" 
-                               id="answer-{{ question.id }}" 
-                               placeholder="答えを入力してください"
-                               data-question-id="{{ question.id }}"
-                               autocomplete="off"
-                               autocorrect="off"
-                               autocapitalize="off"
-                               spellcheck="false">
+                        <div class="input-group input-group-lg">
+                            {% if question.answer_prefix %}
+                            <span class="input-group-text">{{ question.answer_prefix }}</span>
+                            {% endif %}
+                            <input type="text" class="form-control" 
+                                   id="answer-{{ question.id }}" 
+                                   placeholder="答えを入力してください"
+                                   data-question-id="{{ question.id }}"
+                                   data-prefix="{{ question.answer_prefix or '' }}"
+                                   data-suffix="{{ question.answer_suffix or '' }}"
+                                   autocomplete="off"
+                                   autocorrect="off"
+                                   autocapitalize="off"
+                                   spellcheck="false">
+                            {% if question.answer_suffix %}
+                            <span class="input-group-text">{{ question.answer_suffix }}</span>
+                            {% endif %}
+                        </div>
                     </div>
                     
                     <div class="text-center mt-3">
