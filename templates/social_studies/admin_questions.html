@@ -285,6 +285,8 @@
 
 {% block extra_js %}
 <script>
+// CSRFトークンを設定
+window.csrfToken = '{{ csrf_token() }}';
 let currentEditId = null;
 
 function editQuestion(questionId) {
@@ -439,9 +441,15 @@ function loadTextbooksForCsv() {
 }
 
 function uploadCsv() {
+    console.log('uploadCsv関数が呼び出されました');
+    
     const fileInput = document.getElementById('csv-file');
     const defaultSubject = document.getElementById('csv-subject').value;
     const defaultTextbook = document.getElementById('csv-textbook').value;
+    
+    console.log('ファイル入力:', fileInput);
+    console.log('デフォルト科目:', defaultSubject);
+    console.log('デフォルト教材:', defaultTextbook);
     
     // ファイルチェック
     if (!fileInput.files[0]) {
@@ -450,6 +458,8 @@ function uploadCsv() {
     }
     
     const file = fileInput.files[0];
+    console.log('選択されたファイル:', file.name, file.size, file.type);
+    
     if (!file.name.endsWith('.csv')) {
         alert('CSVファイルを選択してください');
         return;
@@ -471,13 +481,23 @@ function uploadCsv() {
         formData.append('default_textbook_id', defaultTextbook);
     }
     
+    console.log('FormDataを作成:', formData);
+    
     // APIに送信
+    console.log('APIリクエストを送信中...');
     fetch('/social_studies/admin/upload_questions_csv', {
         method: 'POST',
+        headers: {
+            'X-CSRFToken': window.csrfToken || ''
+        },
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('レスポンス受信:', response.status, response.statusText);
+        return response.json();
+    })
     .then(data => {
+        console.log('レスポンスデータ:', data);
         if (data.success) {
             // 成功時はモーダルを閉じてページを再読み込み
             const modal = bootstrap.Modal.getInstance(document.getElementById('csvUploadModal'));
@@ -665,6 +685,15 @@ document.getElementById('image-file').addEventListener('change', function(e) {
             <p class="mb-2"><strong>${file.name}</strong></p>
             <p class="text-muted">画像が選択されました</p>
         `;
+    }
+});
+
+// CSVファイル選択時の処理
+document.getElementById('csv-file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    console.log('CSVファイルが選択されました:', file);
+    if (file) {
+        console.log('ファイル詳細:', file.name, file.size, file.type);
     }
 });
 </script>
