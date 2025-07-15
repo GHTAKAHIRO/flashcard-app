@@ -160,19 +160,86 @@
 let currentEditId = null;
 
 function editUnit(unitId) {
-    // 単元データを取得してモーダルに設定
-    // 実際の実装ではAPIからデータを取得
     currentEditId = unitId;
     
-    // モーダルを表示
-    const modal = new bootstrap.Modal(document.getElementById('editModal'));
-    modal.show();
+    // 単元データを取得
+    fetch(`/social_studies/admin/edit_unit/${unitId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            
+            // モーダルのフォームにデータを設定
+            document.getElementById('edit-name').value = data.name || '';
+            document.getElementById('edit-chapter-number').value = data.chapter_number || '';
+            document.getElementById('edit-description').value = data.description || '';
+            
+            // モーダルを表示
+            const modal = new bootstrap.Modal(document.getElementById('editModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('単元データ取得エラー:', error);
+            alert('単元データの取得に失敗しました');
+        });
 }
 
 function saveEdit() {
-    // 編集内容を保存
-    // 実際の実装ではAPIに送信
-    alert('編集機能は開発中です');
+    if (!currentEditId) {
+        alert('編集する単元が選択されていません');
+        return;
+    }
+    
+    // フォームデータを取得
+    const formData = {
+        name: document.getElementById('edit-name').value.trim(),
+        chapter_number: document.getElementById('edit-chapter-number').value.trim(),
+        description: document.getElementById('edit-description').value.trim()
+    };
+    
+    // バリデーション
+    if (!formData.name) {
+        alert('単元名を入力してください');
+        return;
+    }
+    
+    // 保存ボタンを無効化
+    const saveButton = document.querySelector('#editModal .btn-primary');
+    const originalText = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = '保存中...';
+    
+    // APIに送信
+    fetch(`/social_studies/admin/edit_unit/${currentEditId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 成功時はモーダルを閉じてページを再読み込み
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            // エラーメッセージを表示
+            alert(data.error || '保存に失敗しました');
+        }
+    })
+    .catch(error => {
+        console.error('保存エラー:', error);
+        alert('保存に失敗しました');
+    })
+    .finally(() => {
+        // ボタンを元に戻す
+        saveButton.disabled = false;
+        saveButton.textContent = originalText;
+    });
 }
 
 function deleteUnit(unitId) {

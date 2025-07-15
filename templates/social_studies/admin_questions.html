@@ -160,19 +160,98 @@
 let currentEditId = null;
 
 function editQuestion(questionId) {
-    // 問題データを取得してモーダルに設定
-    // 実際の実装ではAPIからデータを取得
     currentEditId = questionId;
     
-    // モーダルを表示
-    const modal = new bootstrap.Modal(document.getElementById('editModal'));
-    modal.show();
+    // 問題データを取得
+    fetch(`/social_studies/admin/edit_question/${questionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            
+            // モーダルのフォームにデータを設定
+            document.getElementById('edit-subject').value = data.subject || '';
+            document.getElementById('edit-question').value = data.question || '';
+            document.getElementById('edit-correct-answer').value = data.correct_answer || '';
+            document.getElementById('edit-acceptable-answers').value = data.acceptable_answers || '';
+            document.getElementById('edit-explanation').value = data.explanation || '';
+            
+            // モーダルを表示
+            const modal = new bootstrap.Modal(document.getElementById('editModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('問題データ取得エラー:', error);
+            alert('問題データの取得に失敗しました');
+        });
 }
 
 function saveEdit() {
-    // 編集内容を保存
-    // 実際の実装ではAPIに送信
-    alert('編集機能は開発中です');
+    if (!currentEditId) {
+        alert('編集する問題が選択されていません');
+        return;
+    }
+    
+    // フォームデータを取得
+    const formData = {
+        subject: document.getElementById('edit-subject').value,
+        question: document.getElementById('edit-question').value.trim(),
+        correct_answer: document.getElementById('edit-correct-answer').value.trim(),
+        acceptable_answers: document.getElementById('edit-acceptable-answers').value.trim(),
+        explanation: document.getElementById('edit-explanation').value.trim()
+    };
+    
+    // バリデーション
+    if (!formData.subject) {
+        alert('科目を選択してください');
+        return;
+    }
+    if (!formData.question) {
+        alert('問題文を入力してください');
+        return;
+    }
+    if (!formData.correct_answer) {
+        alert('正解を入力してください');
+        return;
+    }
+    
+    // 保存ボタンを無効化
+    const saveButton = document.querySelector('#editModal .btn-primary');
+    const originalText = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = '保存中...';
+    
+    // APIに送信
+    fetch(`/social_studies/admin/edit_question/${currentEditId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 成功時はモーダルを閉じてページを再読み込み
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            // エラーメッセージを表示
+            alert(data.error || '保存に失敗しました');
+        }
+    })
+    .catch(error => {
+        console.error('保存エラー:', error);
+        alert('保存に失敗しました');
+    })
+    .finally(() => {
+        // ボタンを元に戻す
+        saveButton.disabled = false;
+        saveButton.textContent = originalText;
+    });
 }
 
 function deleteQuestion(questionId) {

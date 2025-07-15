@@ -3035,7 +3035,7 @@ def social_studies_delete_question(question_id):
                 if not cur.fetchone():
                     return jsonify({'error': '問題が見つかりません'}), 404
                 
-                # 関連する学習ログも削除（CASCADE制約により自動削除されるはずだが、念のため）
+                # 関連する学習ログを削除
                 cur.execute('DELETE FROM social_studies_study_log WHERE question_id = %s', (question_id,))
                 
                 # 問題を削除
@@ -3047,6 +3047,69 @@ def social_studies_delete_question(question_id):
     except Exception as e:
         app.logger.error(f"社会科問題削除エラー: {e}")
         return jsonify({'error': '問題の削除に失敗しました'}), 500
+
+@app.route('/social_studies/admin/edit_question/<int:question_id>', methods=['GET', 'POST'])
+@login_required
+def social_studies_edit_question(question_id):
+    """社会科問題編集（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    if request.method == 'GET':
+        # 問題データを取得
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('''
+                        SELECT id, subject, question, correct_answer, acceptable_answers, explanation
+                        FROM social_studies_questions 
+                        WHERE id = %s
+                    ''', (question_id,))
+                    question = cur.fetchone()
+                    
+                    if not question:
+                        return jsonify({'error': '問題が見つかりません'}), 404
+                    
+                    return jsonify(dict(question))
+        except Exception as e:
+            app.logger.error(f"問題取得エラー: {e}")
+            return jsonify({'error': '問題の取得に失敗しました'}), 500
+    
+    elif request.method == 'POST':
+        # 問題データを更新
+        try:
+            data = request.get_json()
+            subject = data.get('subject', '').strip()
+            question_text = data.get('question', '').strip()
+            correct_answer = data.get('correct_answer', '').strip()
+            acceptable_answers = data.get('acceptable_answers', '').strip()
+            explanation = data.get('explanation', '').strip()
+            
+            # バリデーション
+            if not subject or not question_text or not correct_answer:
+                return jsonify({'error': '科目、問題文、正解は必須です'}), 400
+            
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # 問題が存在するかチェック
+                    cur.execute('SELECT id FROM social_studies_questions WHERE id = %s', (question_id,))
+                    if not cur.fetchone():
+                        return jsonify({'error': '問題が見つかりません'}), 404
+                    
+                    # 問題を更新
+                    cur.execute('''
+                        UPDATE social_studies_questions 
+                        SET subject = %s, question = %s, correct_answer = %s, 
+                            acceptable_answers = %s, explanation = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    ''', (subject, question_text, correct_answer, acceptable_answers, explanation, question_id))
+                    conn.commit()
+                    
+                    return jsonify({'success': True, 'message': '問題が更新されました'})
+                    
+        except Exception as e:
+            app.logger.error(f"問題更新エラー: {e}")
+            return jsonify({'error': '問題の更新に失敗しました'}), 500
 
 # ========== 教材管理 ==========
 
@@ -3110,6 +3173,68 @@ def social_studies_add_textbook():
             flash('教材の追加に失敗しました', 'error')
     
     return render_template('social_studies/add_textbook.html')
+
+@app.route('/social_studies/admin/edit_textbook/<int:textbook_id>', methods=['GET', 'POST'])
+@login_required
+def social_studies_edit_textbook(textbook_id):
+    """教材編集（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    if request.method == 'GET':
+        # 教材データを取得
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('''
+                        SELECT id, name, subject, grade, publisher, description
+                        FROM social_studies_textbooks 
+                        WHERE id = %s
+                    ''', (textbook_id,))
+                    textbook = cur.fetchone()
+                    
+                    if not textbook:
+                        return jsonify({'error': '教材が見つかりません'}), 404
+                    
+                    return jsonify(dict(textbook))
+        except Exception as e:
+            app.logger.error(f"教材取得エラー: {e}")
+            return jsonify({'error': '教材の取得に失敗しました'}), 500
+    
+    elif request.method == 'POST':
+        # 教材データを更新
+        try:
+            data = request.get_json()
+            name = data.get('name', '').strip()
+            subject = data.get('subject', '').strip()
+            grade = data.get('grade', '').strip()
+            publisher = data.get('publisher', '').strip()
+            description = data.get('description', '').strip()
+            
+            # バリデーション
+            if not name or not subject:
+                return jsonify({'error': '教材名と科目は必須です'}), 400
+            
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # 教材が存在するかチェック
+                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                    if not cur.fetchone():
+                        return jsonify({'error': '教材が見つかりません'}), 404
+                    
+                    # 教材を更新
+                    cur.execute('''
+                        UPDATE social_studies_textbooks 
+                        SET name = %s, subject = %s, grade = %s, publisher = %s, description = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    ''', (name, subject, grade, publisher, description, textbook_id))
+                    conn.commit()
+                    
+                    return jsonify({'success': True, 'message': '教材が更新されました'})
+                    
+        except Exception as e:
+            app.logger.error(f"教材更新エラー: {e}")
+            return jsonify({'error': '教材の更新に失敗しました'}), 500
 
 @app.route('/social_studies/admin/delete_textbook/<int:textbook_id>', methods=['POST'])
 @login_required
@@ -3275,6 +3400,74 @@ def social_studies_delete_unit(unit_id):
     except Exception as e:
         app.logger.error(f"単元削除エラー: {e}")
         return jsonify({'error': '単元の削除に失敗しました'}), 500
+
+@app.route('/social_studies/admin/edit_unit/<int:unit_id>', methods=['GET', 'POST'])
+@login_required
+def social_studies_edit_unit(unit_id):
+    """単元編集（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    if request.method == 'GET':
+        # 単元データを取得
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('''
+                        SELECT id, name, chapter_number, description
+                        FROM social_studies_units 
+                        WHERE id = %s
+                    ''', (unit_id,))
+                    unit = cur.fetchone()
+                    
+                    if not unit:
+                        return jsonify({'error': '単元が見つかりません'}), 404
+                    
+                    return jsonify(dict(unit))
+        except Exception as e:
+            app.logger.error(f"単元取得エラー: {e}")
+            return jsonify({'error': '単元の取得に失敗しました'}), 500
+    
+    elif request.method == 'POST':
+        # 単元データを更新
+        try:
+            data = request.get_json()
+            name = data.get('name', '').strip()
+            chapter_number = data.get('chapter_number', '').strip()
+            description = data.get('description', '').strip()
+            
+            # バリデーション
+            if not name:
+                return jsonify({'error': '単元名は必須です'}), 400
+            
+            # chapter_numberを数値に変換（空の場合はNULL）
+            chapter_number_int = None
+            if chapter_number:
+                try:
+                    chapter_number_int = int(chapter_number)
+                except ValueError:
+                    return jsonify({'error': '章番号は数値で入力してください'}), 400
+            
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # 単元が存在するかチェック
+                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                    if not cur.fetchone():
+                        return jsonify({'error': '単元が見つかりません'}), 404
+                    
+                    # 単元を更新
+                    cur.execute('''
+                        UPDATE social_studies_units 
+                        SET name = %s, chapter_number = %s, description = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    ''', (name, chapter_number_int, description, unit_id))
+                    conn.commit()
+                    
+                    return jsonify({'success': True, 'message': '単元が更新されました'})
+                    
+        except Exception as e:
+            app.logger.error(f"単元更新エラー: {e}")
+            return jsonify({'error': '単元の更新に失敗しました'}), 500
 
 # ========== API エンドポイント ==========
 
