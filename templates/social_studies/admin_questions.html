@@ -227,7 +227,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-primary" onclick="uploadCsv()">
+                <button type="button" class="btn btn-primary" onclick="alert('ボタンがクリックされました'); uploadCsv();" id="csv-upload-btn">
                     <i class="fas fa-upload me-1"></i>アップロード
                 </button>
             </div>
@@ -410,12 +410,23 @@ function deleteQuestion(questionId) {
 
 // CSV一括登録機能
 function showCsvUpload() {
+    console.log('showCsvUpload関数が呼び出されました');
+    
     // 教材一覧を取得してセレクトボックスに設定
     loadTextbooksForCsv();
     
     // モーダルを表示
-    const modal = new bootstrap.Modal(document.getElementById('csvUploadModal'));
-    modal.show();
+    const modalElement = document.getElementById('csvUploadModal');
+    console.log('モーダル要素:', modalElement);
+    
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        console.log('Bootstrapモーダルインスタンス:', modal);
+        modal.show();
+        console.log('モーダルを表示しました');
+    } else {
+        console.error('モーダル要素が見つかりません');
+    }
 }
 
 function loadTextbooksForCsv() {
@@ -440,6 +451,7 @@ function loadTextbooksForCsv() {
 
 function uploadCsv() {
     console.log('uploadCsv関数が呼び出されました');
+    console.log('uploadCsv関数の呼び出し元:', new Error().stack);
     
     const fileInput = document.getElementById('csv-file');
     const defaultSubject = document.getElementById('csv-subject').value;
@@ -690,6 +702,33 @@ document.getElementById('csv-file').addEventListener('change', function(e) {
     if (file) {
         console.log('ファイル詳細:', file.name, file.size, file.type);
     }
+});
+
+// アップロードボタンのクリックイベントを追加
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoadedイベントが発火しました');
+    const uploadBtn = document.getElementById('csv-upload-btn');
+    console.log('アップロードボタン要素:', uploadBtn);
+    
+    if (uploadBtn) {
+        console.log('アップロードボタンにイベントリスナーを追加します');
+        uploadBtn.addEventListener('click', function(e) {
+            console.log('アップロードボタンがクリックされました');
+            e.preventDefault();
+            e.stopPropagation();
+            uploadCsv();
+        });
+        
+        // 追加のデバッグ: ボタンの状態を確認
+        console.log('ボタンのdisabled状態:', uploadBtn.disabled);
+        console.log('ボタンのinnerHTML:', uploadBtn.innerHTML);
+    } else {
+        console.error('アップロードボタンが見つかりません');
+    }
+    
+    // モーダル内のボタンも確認
+    const modalUploadBtn = document.querySelector('#csvUploadModal .btn-primary');
+    console.log('モーダル内のアップロードボタン:', modalUploadBtn);
 });
 </script>
 {% endblock %} 
