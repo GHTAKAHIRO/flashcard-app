@@ -154,7 +154,7 @@ def init_wasabi_client():
         return None
 
 # 画像アップロード関数
-def upload_image_to_wasabi(image_file, question_id):
+def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
     """画像をWasabiにアップロード"""
     try:
         s3_client = init_wasabi_client()
@@ -181,7 +181,22 @@ def upload_image_to_wasabi(image_file, question_id):
         if file_extension == 'jpeg':
             file_extension = 'jpg'
         
-        filename = f"question_images/{question_id}/{uuid.uuid4()}.{file_extension}"
+        # 教材のWasabiフォルダパスを取得
+        folder_path = 'question_images'  # デフォルト値
+        if textbook_id:
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                        result = cur.fetchone()
+                        if result and result[0]:
+                            folder_path = result[0]
+            except Exception as e:
+                app.logger.warning(f"教材フォルダパス取得エラー: {e}")
+                # エラーの場合はデフォルト値を使用
+                pass
+        
+        filename = f"{folder_path}/{question_id}/{uuid.uuid4()}.{file_extension}"
         
         # Wasabiにアップロード
         bucket_name = os.getenv('WASABI_BUCKET')
@@ -3047,7 +3062,7 @@ def social_studies_quiz(subject):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 指定された科目の問題を取得
                 cur.execute('''
-                    SELECT id, question, correct_answer, acceptable_answers, answer_suffix, explanation
+                    SELECT id, question, correct_answer, acceptable_answers, answer_suffix, explanation, image_url
                     FROM social_studies_questions 
                     WHERE subject = %s 
                     ORDER BY RANDOM() 
@@ -3452,14 +3467,19 @@ def social_studies_add_textbook():
         grade = request.form.get('grade', '')
         publisher = request.form.get('publisher', '')
         description = request.form.get('description', '')
+        wasabi_folder_path = request.form.get('wasabi_folder_path', 'question_images').strip()
+        
+        # フォルダパスが空の場合はデフォルト値を使用
+        if not wasabi_folder_path:
+            wasabi_folder_path = 'question_images'
         
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute('''
-                        INSERT INTO social_studies_textbooks (name, subject, grade, publisher, description)
-                        VALUES (%s, %s, %s, %s, %s)
-                    ''', (name, subject, grade, publisher, description))
+                        INSERT INTO social_studies_textbooks (name, subject, grade, publisher, description, wasabi_folder_path)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    ''', (name, subject, grade, publisher, description, wasabi_folder_path))
                     conn.commit()
                     flash('教材が追加されました', 'success')
                     return redirect(url_for('social_studies_admin_textbooks'))
@@ -3482,7 +3502,7 @@ def social_studies_edit_textbook(textbook_id):
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute('''
-                        SELECT id, name, subject, grade, publisher, description
+                        SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
                         FROM social_studies_textbooks 
                         WHERE id = %s
                     ''', (textbook_id,))
@@ -3505,6 +3525,11 @@ def social_studies_edit_textbook(textbook_id):
             grade = data.get('grade', '').strip()
             publisher = data.get('publisher', '').strip()
             description = data.get('description', '').strip()
+            wasabi_folder_path = data.get('wasabi_folder_path', 'question_images').strip()
+            
+            # フォルダパスが空の場合はデフォルト値を使用
+            if not wasabi_folder_path:
+                wasabi_folder_path = 'question_images'
             
             # バリデーション
             if not name or not subject:
@@ -3520,9 +3545,9 @@ def social_studies_edit_textbook(textbook_id):
                     # 教材を更新
                     cur.execute('''
                         UPDATE social_studies_textbooks 
-                        SET name = %s, subject = %s, grade = %s, publisher = %s, description = %s, updated_at = CURRENT_TIMESTAMP
+                        SET name = %s, subject = %s, grade = %s, publisher = %s, description = %s, wasabi_folder_path = %s, updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
-                    ''', (name, subject, grade, publisher, description, textbook_id))
+                    ''', (name, subject, grade, publisher, description, wasabi_folder_path, textbook_id))
                     conn.commit()
                     
                     return jsonify({'success': True, 'message': '教材が更新されました'})
@@ -3918,6 +3943,7 @@ def social_studies_upload_questions_csv():
                         # オプションフィールドの取得
                         acceptable_answers = row.get('acceptable_answers', '').strip()
                         explanation = row.get('explanation', '').strip()
+                        answer_suffix = row.get('answer_suffix', '').strip()
                         
                         # 教材IDと単元IDの処理
                         textbook_id = None
@@ -3970,9 +3996,9 @@ def social_studies_upload_questions_csv():
                         # 問題を登録
                         cur.execute('''
                             INSERT INTO social_studies_questions 
-                            (subject, question, correct_answer, acceptable_answers, explanation, textbook_id, unit_id)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ''', (subject, question, correct_answer, acceptable_answers, explanation, textbook_id, unit_id))
+                            (subject, question, correct_answer, acceptable_answers, explanation, answer_suffix, textbook_id, unit_id)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ''', (subject, question, correct_answer, acceptable_answers, explanation, answer_suffix, textbook_id, unit_id))
                         
                         app.logger.info(f"行{row_num}: 問題を登録しました - subject: '{subject}', question: '{question}'")
                         registered_count += 1
@@ -4013,15 +4039,18 @@ def social_studies_upload_image(question_id):
         if image_file.filename == '':
             return jsonify({'error': '画像ファイルが選択されていません'}), 400
         
-        # 問題が存在するかチェック
+        # 問題と教材IDを取得
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT id FROM social_studies_questions WHERE id = %s', (question_id,))
-                if not cur.fetchone():
+                cur.execute('SELECT id, textbook_id FROM social_studies_questions WHERE id = %s', (question_id,))
+                result = cur.fetchone()
+                if not result:
                     return jsonify({'error': '指定された問題が見つかりません'}), 404
+                
+                textbook_id = result[1]
         
         # 画像をWasabiにアップロード
-        image_url, error = upload_image_to_wasabi(image_file, question_id)
+        image_url, error = upload_image_to_wasabi(image_file, question_id, textbook_id)
         
         if error:
             return jsonify({'error': error}), 500

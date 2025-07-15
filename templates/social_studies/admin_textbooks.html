@@ -33,6 +33,7 @@
                         <th>科目</th>
                         <th>学年</th>
                         <th>出版社</th>
+                        <th>Wasabiフォルダ</th>
                         <th>単元数</th>
                         <th>問題数</th>
                         <th>操作</th>
@@ -53,6 +54,9 @@
                         </td>
                         <td>{{ textbook.grade or '未設定' }}</td>
                         <td>{{ textbook.publisher or '未設定' }}</td>
+                        <td>
+                            <small class="text-muted">{{ textbook.wasabi_folder_path or 'question_images' }}</small>
+                        </td>
                         <td>
                             <span class="badge bg-info">{{ textbook.unit_count or 0 }}</span>
                         </td>
@@ -132,6 +136,15 @@
                         <label for="edit-description" class="form-label">説明</label>
                         <textarea class="form-control" id="edit-description" name="description" rows="3" placeholder="教材の説明を入力してください"></textarea>
                     </div>
+                    <div class="mb-3">
+                        <label for="edit-wasabi-folder-path" class="form-label">Wasabi保存フォルダ</label>
+                        <input type="text" class="form-control" id="edit-wasabi-folder-path" name="wasabi_folder_path" 
+                               placeholder="例: question_images/geography">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            この教材の問題画像を保存するWasabiのフォルダパスを指定します。
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -165,6 +178,7 @@ function editTextbook(textbookId) {
             document.getElementById('edit-grade').value = data.grade || '';
             document.getElementById('edit-publisher').value = data.publisher || '';
             document.getElementById('edit-description').value = data.description || '';
+            document.getElementById('edit-wasabi-folder-path').value = data.wasabi_folder_path || 'question_images';
             
             // モーダルを表示
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
@@ -188,7 +202,8 @@ function saveEdit() {
         subject: document.getElementById('edit-subject').value,
         grade: document.getElementById('edit-grade').value.trim(),
         publisher: document.getElementById('edit-publisher').value.trim(),
-        description: document.getElementById('edit-description').value.trim()
+        description: document.getElementById('edit-description').value.trim(),
+        wasabi_folder_path: document.getElementById('edit-wasabi-folder-path').value.trim() || 'question_images'
     };
     
     // バリデーション
