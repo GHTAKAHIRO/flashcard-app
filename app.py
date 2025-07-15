@@ -38,7 +38,7 @@ print(f"DB_PASSWORD: {'Set' if os.getenv('DB_PASSWORD') else 'Not set'}")
 app = Flask(__name__)
 CORS(app)
 app.secret_key = 'your_secret_key'
-csrf = CSRFProtect(app)
+# csrf = CSRFProtect(app)  # 一時的にCSRF保護を無効化
 logging.basicConfig(level=logging.DEBUG)
 
 app.config.update(
