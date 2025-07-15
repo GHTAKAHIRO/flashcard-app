@@ -51,7 +51,7 @@
                         <div class="input-group input-group-lg">
                             <input type="text" class="form-control" 
                                    id="answer-{{ question.id }}" 
-                                   placeholder="答えを入力してください"
+                                   placeholder=""
                                    data-question-id="{{ question.id }}"
                                    data-suffix="{{ question.answer_suffix or '' }}"
                                    autocomplete="off"
@@ -65,7 +65,7 @@
                     </div>
                     
                     <div class="text-center mt-3">
-                        <button class="btn btn-primary btn-lg" onclick="submitAnswer({{ question.id }})">
+                        <button class="btn btn-primary btn-lg" id="submit-btn-{{ question.id }}" onclick="submitAnswer({{ question.id }})">
                             <i class="fas fa-check me-2"></i>回答する
                         </button>
                     </div>
@@ -142,6 +142,7 @@ function updateProgress() {
 // 回答送信
 function submitAnswer(questionId) {
     console.log('submitAnswer関数が呼び出されました。問題ID:', questionId);
+    console.log('現在のDOM状態:', document.readyState);
     
     const answerInput = document.getElementById('answer-' + questionId);
     if (!answerInput) {
@@ -163,9 +164,17 @@ function submitAnswer(questionId) {
     }
     
     // 回答ボタンを無効化
-    const submitBtn = answerInput.parentElement.nextElementSibling.querySelector('button');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>送信中...';
+    const submitBtn = document.querySelector(`button[onclick="submitAnswer(${questionId})"]`);
+    console.log('回答ボタン:', submitBtn);
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>送信中...';
+    } else {
+        console.error('回答ボタンが見つかりません:', `button[onclick="submitAnswer(${questionId})"]`);
+        // 代替方法でボタンを探す
+        const allButtons = document.querySelectorAll('button');
+        console.log('ページ内のすべてのボタン:', allButtons);
+    }
     
     // APIに回答を送信
     fetch('{{ url_for("social_studies_submit_answer") }}', {
@@ -203,8 +212,12 @@ function submitAnswer(questionId) {
     })
     .finally(() => {
         // ボタンを元に戻す
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>回答する';
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>回答する';
+        } else {
+            console.error('finallyブロックで回答ボタンが見つかりません');
+        }
     });
 }
 
@@ -279,8 +292,6 @@ document.addEventListener('keypress', function(e) {
 
 // 初期化
 updateProgress();
-
-// 文字変換機能は削除（文字重複問題の解決のため）
 
 // 入力フィールドの初期化（最小限の設定）
 document.addEventListener('DOMContentLoaded', function() {
