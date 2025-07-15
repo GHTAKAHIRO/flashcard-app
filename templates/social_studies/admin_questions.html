@@ -417,6 +417,15 @@ function showCsvUpload() {
         existingModal.dispose();
     }
     
+    // 背景オーバーレイをクリア
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(backdrop => backdrop.remove());
+    
+    // bodyのクラスをクリア
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+    
     // 教材一覧を取得してセレクトボックスに設定
     loadTextbooksForCsv();
     
@@ -430,20 +439,16 @@ function showCsvUpload() {
         modalElement.style.display = 'none';
         modalElement.setAttribute('aria-hidden', 'true');
         
-        // 背景オーバーレイをクリア
-        const backdrop = document.querySelector('.modal-backdrop');
-        if (backdrop) {
-            backdrop.remove();
-        }
-        
-        const modal = new bootstrap.Modal(modalElement, {
-            backdrop: true,
-            keyboard: true,
-            focus: true
-        });
-        console.log('Bootstrapモーダルインスタンス:', modal);
-        modal.show();
-        console.log('モーダルを表示しました');
+        // 少し待ってからモーダルを表示
+        setTimeout(() => {
+            const modal = new bootstrap.Modal(modalElement, {
+                backdrop: true,
+                keyboard: true,
+                focus: true
+            });
+            modal.show();
+            console.log('モーダルを表示しました');
+        }, 100);
     } else {
         console.error('モーダル要素が見つかりません');
     }
@@ -794,6 +799,43 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // 緊急用：モーダルを強制的に閉じる機能
+    window.forceCloseModal = function() {
+        // すべてのモーダルを閉じる
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            const modalInstance = bootstrap.Modal.getInstance(modal);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        });
+        
+        // 背景オーバーレイを削除
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(backdrop => backdrop.remove());
+        
+        // bodyのクラスをクリア
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+        
+        console.log('モーダルを強制的に閉じました');
+    };
+    
+    // ESCキーでモーダルを閉じる
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            window.forceCloseModal();
+        }
+    });
 });
 </script>
+
+<!-- 緊急用：モーダル閉じるボタン（デバッグ用） -->
+<div style="position: fixed; bottom: 10px; right: 10px; z-index: 9999;">
+    <button onclick="forceCloseModal()" class="btn btn-danger btn-sm">
+        <i class="fas fa-times"></i> モーダル閉じる
+    </button>
+</div>
 {% endblock %} 
