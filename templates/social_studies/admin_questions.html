@@ -161,9 +161,9 @@
 </div>
 
 <!-- CSV一括登録モーダル -->
-<div class="modal fade" id="csvUploadModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+<div class="modal fade" id="csvUploadModal" tabindex="-1" style="z-index: 1050;">
+    <div class="modal-dialog modal-lg" style="z-index: 1055;">
+        <div class="modal-content" style="z-index: 1060;">
             <div class="modal-header">
                 <h5 class="modal-title">CSV一括登録</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -227,7 +227,7 @@
             </div>
             <div class="modal-footer" style="background-color: #f8f9fa; border-top: 1px solid #dee2e6; padding: 1rem;">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-primary" onclick="alert('ボタンがクリックされました'); uploadCsv();" id="csv-upload-btn">
+                <button type="button" class="btn btn-primary" onclick="alert('ボタンがクリックされました'); uploadCsv();" id="csv-upload-btn" style="cursor: pointer; position: relative; z-index: 1000;">
                     <i class="fas fa-upload me-1"></i>アップロード
                 </button>
             </div>
@@ -712,6 +712,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (uploadBtn) {
         console.log('アップロードボタンにイベントリスナーを追加します');
+        
+        // ボタンの状態を確認して修正
+        console.log('ボタンのdisabled状態:', uploadBtn.disabled);
+        console.log('ボタンのinnerHTML:', uploadBtn.innerHTML);
+        console.log('ボタンのstyle:', uploadBtn.style);
+        
+        // ボタンを確実に有効化
+        uploadBtn.disabled = false;
+        uploadBtn.style.pointerEvents = 'auto';
+        uploadBtn.style.cursor = 'pointer';
+        uploadBtn.style.position = 'relative';
+        uploadBtn.style.zIndex = '1000';
+        
         uploadBtn.addEventListener('click', function(e) {
             console.log('アップロードボタンがクリックされました');
             e.preventDefault();
@@ -719,9 +732,13 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadCsv();
         });
         
-        // 追加のデバッグ: ボタンの状態を確認
-        console.log('ボタンのdisabled状態:', uploadBtn.disabled);
-        console.log('ボタンのinnerHTML:', uploadBtn.innerHTML);
+        // ボタンがクリック可能かテスト
+        console.log('ボタンの最終状態:');
+        console.log('- disabled:', uploadBtn.disabled);
+        console.log('- pointerEvents:', uploadBtn.style.pointerEvents);
+        console.log('- cursor:', uploadBtn.style.cursor);
+        console.log('- zIndex:', uploadBtn.style.zIndex);
+        
     } else {
         console.error('アップロードボタンが見つかりません');
     }
@@ -729,6 +746,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // モーダル内のボタンも確認
     const modalUploadBtn = document.querySelector('#csvUploadModal .btn-primary');
     console.log('モーダル内のアップロードボタン:', modalUploadBtn);
+    
+    // モーダルが表示された時の処理を追加
+    const csvModal = document.getElementById('csvUploadModal');
+    if (csvModal) {
+        csvModal.addEventListener('shown.bs.modal', function() {
+            console.log('CSVモーダルが表示されました');
+            const uploadBtnInModal = document.getElementById('csv-upload-btn');
+            if (uploadBtnInModal) {
+                console.log('モーダル内のアップロードボタンを確認:');
+                console.log('- disabled:', uploadBtnInModal.disabled);
+                console.log('- style:', uploadBtnInModal.style);
+                
+                // モーダル表示時にボタンを確実に有効化
+                uploadBtnInModal.disabled = false;
+                uploadBtnInModal.style.pointerEvents = 'auto';
+                uploadBtnInModal.style.cursor = 'pointer';
+            }
+        });
+    }
 });
 </script>
 {% endblock %} 
