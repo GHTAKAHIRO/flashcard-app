@@ -285,8 +285,6 @@
 
 {% block extra_js %}
 <script>
-// CSRFトークンを設定
-window.csrfToken = '{{ csrf_token() }}';
 let currentEditId = null;
 
 function editQuestion(questionId) {
@@ -487,9 +485,6 @@ function uploadCsv() {
     console.log('APIリクエストを送信中...');
     fetch('/social_studies/admin/upload_questions_csv', {
         method: 'POST',
-        headers: {
-            'X-CSRFToken': window.csrfToken || ''
-        },
         body: formData
     })
     .then(response => {
