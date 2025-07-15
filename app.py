@@ -3363,7 +3363,7 @@ def social_studies_edit_question(question_id):
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute('''
-                        SELECT id, subject, question, correct_answer, acceptable_answers, explanation
+                        SELECT id, subject, question, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation
                         FROM social_studies_questions 
                         WHERE id = %s
                     ''', (question_id,))
@@ -3385,6 +3385,8 @@ def social_studies_edit_question(question_id):
             question_text = data.get('question', '').strip()
             correct_answer = data.get('correct_answer', '').strip()
             acceptable_answers = data.get('acceptable_answers', '').strip()
+            answer_prefix = data.get('answer_prefix', '').strip()
+            answer_suffix = data.get('answer_suffix', '').strip()
             explanation = data.get('explanation', '').strip()
             
             # バリデーション
@@ -3402,9 +3404,10 @@ def social_studies_edit_question(question_id):
                     cur.execute('''
                         UPDATE social_studies_questions 
                         SET subject = %s, question = %s, correct_answer = %s, 
-                            acceptable_answers = %s, explanation = %s, updated_at = CURRENT_TIMESTAMP
+                            acceptable_answers = %s, answer_prefix = %s, answer_suffix = %s, 
+                            explanation = %s, updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
-                    ''', (subject, question_text, correct_answer, acceptable_answers, explanation, question_id))
+                    ''', (subject, question_text, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation, question_id))
                     conn.commit()
                     
                     return jsonify({'success': True, 'message': '問題が更新されました'})

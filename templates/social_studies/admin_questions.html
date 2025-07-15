@@ -263,6 +263,16 @@
                         <input type="text" class="form-control" id="edit-acceptable-answers" name="acceptable_answers" placeholder="例: 東京都, Tokyo">
                     </div>
                     <div class="mb-3">
+                        <label for="edit-answer-prefix" class="form-label">解答欄の前補足</label>
+                        <input type="text" class="form-control" id="edit-answer-prefix" name="answer_prefix" placeholder="例: 大陸（「オーストラリア大陸」の場合）">
+                        <div class="form-text">解答欄に予め表示したい補足情報があれば入力してください</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-answer-suffix" class="form-label">解答欄の後補足</label>
+                        <input type="text" class="form-control" id="edit-answer-suffix" name="answer_suffix" placeholder="例: 年（「1868年」の場合）">
+                        <div class="form-text">解答欄に予め表示したい補足情報があれば入力してください</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="edit-explanation" class="form-label">解説</label>
                         <textarea class="form-control" id="edit-explanation" name="explanation" rows="2"></textarea>
                     </div>
@@ -418,6 +428,8 @@ function editQuestion(questionId) {
             document.getElementById('edit-question').value = data.question || '';
             document.getElementById('edit-correct-answer').value = data.correct_answer || '';
             document.getElementById('edit-acceptable-answers').value = data.acceptable_answers || '';
+            document.getElementById('edit-answer-prefix').value = data.answer_prefix || '';
+            document.getElementById('edit-answer-suffix').value = data.answer_suffix || '';
             document.getElementById('edit-explanation').value = data.explanation || '';
             
             // モーダルを表示
@@ -442,6 +454,8 @@ function saveEdit() {
         question: document.getElementById('edit-question').value.trim(),
         correct_answer: document.getElementById('edit-correct-answer').value.trim(),
         acceptable_answers: document.getElementById('edit-acceptable-answers').value.trim(),
+        answer_prefix: document.getElementById('edit-answer-prefix').value.trim(),
+        answer_suffix: document.getElementById('edit-answer-suffix').value.trim(),
         explanation: document.getElementById('edit-explanation').value.trim()
     };
     
