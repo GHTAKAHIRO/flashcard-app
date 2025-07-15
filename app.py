@@ -19,7 +19,7 @@ import queue
 import psycopg2.pool
 from contextlib import contextmanager
 import atexit
-from flask_wtf.csrf import CSRFProtect, exempt
+from flask_wtf.csrf import CSRFProtect
 import io
 import csv
 import re
@@ -2043,7 +2043,7 @@ def study(source):
 
 
 @app.route('/log_result', methods=['POST'])
-@exempt
+@csrf.exempt
 def log_result():
     try:
         import sys
@@ -2435,7 +2435,7 @@ def vocabulary_study(source):
 
 @app.route('/vocabulary/answer', methods=['POST'])
 @login_required
-@exempt
+@csrf.exempt
 def vocabulary_answer():
     """英単語の回答処理"""
     try:
@@ -2529,7 +2529,7 @@ def vocabulary_answer():
 
 @app.route('/vocabulary/complete', methods=['POST'])
 @login_required
-@exempt
+@csrf.exempt
 def vocabulary_complete():
     """英単語学習完了処理"""
     try:
@@ -2733,7 +2733,7 @@ def vocabulary_admin():
 
 @app.route('/vocabulary/upload', methods=['POST'])
 @login_required
-@exempt
+@csrf.exempt
 def vocabulary_upload():
     """英単語データのアップロード（管理者のみ）"""
     if not current_user.is_admin:
@@ -2883,7 +2883,7 @@ def social_studies_quiz(subject):
 
 @app.route('/social_studies/submit_answer', methods=['POST'])
 @login_required
-@exempt
+@csrf.exempt
 def social_studies_submit_answer():
     """社会科問題の回答送信"""
     try:
