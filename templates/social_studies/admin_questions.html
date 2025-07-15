@@ -15,9 +15,10 @@
             <a href="{{ url_for('social_studies_add_question') }}" class="btn btn-success me-2">
                 <i class="fas fa-plus me-2"></i>新規追加
             </a>
-            <button class="btn btn-info me-2" onclick="showCsvUpload()">
+            <!-- CSV一括登録ボタンを無効化 -->
+            <!-- <button class="btn btn-info me-2" onclick="showCsvUpload()">
                 <i class="fas fa-upload me-2"></i>CSV一括登録
-            </button>
+            </button> -->
             <a href="{{ url_for('social_studies_admin') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i>管理画面に戻る
             </a>
@@ -160,8 +161,8 @@
     </div>
 </div>
 
-<!-- CSV一括登録モーダル -->
-<div class="modal fade" id="csvUploadModal" tabindex="-1" style="z-index: 1050;">
+<!-- CSV一括登録モーダル（無効化） -->
+<!-- <div class="modal fade" id="csvUploadModal" tabindex="-1" style="z-index: 1050;">
     <div class="modal-dialog modal-lg" style="z-index: 1055;">
         <div class="modal-content" style="z-index: 1060;">
             <div class="modal-header">
@@ -233,7 +234,7 @@
             </div>
         </div>
     </div>
-</div>
+</div> -->
 
 <!-- 画像アップロードモーダル -->
 <div class="modal fade" id="imageUploadModal" tabindex="-1">
@@ -410,45 +411,9 @@ function deleteQuestion(questionId) {
 
 // CSV一括登録機能
 function showCsvUpload() {
-    console.log('showCsvUpload関数が呼び出されました');
-    
-    // 既存のモーダルインスタンスをクリア
-    const existingModal = bootstrap.Modal.getInstance(document.getElementById('csvUploadModal'));
-    if (existingModal) {
-        console.log('既存のモーダルインスタンスを破棄します');
-        existingModal.dispose();
-    }
-    
-    // 教材一覧を取得してセレクトボックスに設定
-    loadTextbooksForCsv();
-    
-    // モーダルを表示
-    const modalElement = document.getElementById('csvUploadModal');
-    console.log('モーダル要素:', modalElement);
-    
-    if (modalElement) {
-        // モーダルの状態をリセット
-        modalElement.classList.remove('show');
-        modalElement.style.display = 'none';
-        modalElement.setAttribute('aria-hidden', 'true');
-        
-        // 背景オーバーレイをクリア
-        const backdrop = document.querySelector('.modal-backdrop');
-        if (backdrop) {
-            backdrop.remove();
-        }
-        
-        const modal = new bootstrap.Modal(modalElement, {
-            backdrop: true,
-            keyboard: true,
-            focus: true
-        });
-        console.log('Bootstrapモーダルインスタンス:', modal);
-        modal.show();
-        console.log('モーダルを表示しました');
-    } else {
-        console.error('モーダル要素が見つかりません');
-    }
+    // CSVアップロード機能を無効化
+    alert('CSVアップロード機能は現在無効化されています');
+    return;
 }
 
 function loadTextbooksForCsv() {

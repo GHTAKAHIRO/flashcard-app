@@ -177,64 +177,24 @@
                     </div>
                 </div>
 
-                <!-- アップロードセクション -->
+                <!-- CSVアップロード機能無効化セクション -->
                 <div class="upload-section">
                     <h3 class="mb-4">
-                        <i class="fas fa-upload me-2"></i>単語データアップロード
+                        <i class="fas fa-exclamation-triangle me-2"></i>CSVアップロード機能
                     </h3>
                     
                     <!-- アラート表示エリア -->
                     <div id="alert-area"></div>
                     
-                    <!-- アップロードフォーム -->
-                    <form id="upload-form" enctype="multipart/form-data">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label for="source-select" class="form-label">学習セット</label>
-                                <select class="source-select" id="source-select" name="source" required>
-                                    <option value="">セットを選択してください</option>
-                                    <option value="basic">基本英単語</option>
-                                    <option value="toeic">TOEIC単語</option>
-                                    <option value="university">大学受験単語</option>
-                                    <option value="custom">カスタム</option>
-                                </select>
-                                
-                                <div id="custom-source-input" style="display: none;">
-                                    <label for="custom-source" class="form-label">カスタムセット名</label>
-                                    <input type="text" class="form-control" id="custom-source" name="custom_source" placeholder="例: ビジネス英語">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="file-input" class="form-label">CSVファイル</label>
-                                <div class="upload-area" id="upload-area">
-                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                    <p class="mb-2">ファイルをドラッグ&ドロップまたはクリックして選択</p>
-                                    <input type="file" id="file-input" name="file" accept=".csv" style="display: none;" required>
-                                    <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('file-input').click()">
-                                        ファイルを選択
-                                    </button>
-                                </div>
-                                <div class="form-text mt-2">UTF-8、Shift_JIS、CP932、EUC-JP、ISO-2022-JPエンコーディングのCSVファイルを選択してください</div>
-                            </div>
-                        </div>
-                        
-                        <div class="text-center mt-4">
-                            <button type="submit" class="btn-upload" id="upload-btn">
-                                <i class="fas fa-upload me-2"></i>アップロード
-                            </button>
-                        </div>
-                    </form>
-                    
-                    <!-- テンプレートダウンロード -->
-                    <div class="text-center">
-                        <a href="#" class="template-download" onclick="downloadTemplate()">
-                            <i class="fas fa-download me-2"></i>CSVテンプレートをダウンロード
-                        </a>
-                    </div>
-                    
-                    <!-- 進捗バー -->
-                    <div class="progress mt-3" id="progress-bar" style="display: none;">
-                        <div class="progress-bar" id="progress-fill" style="width: 0%"></div>
+                    <!-- 無効化メッセージ -->
+                    <div class="alert alert-warning" role="alert">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-exclamation-triangle me-2"></i>CSVアップロード機能は無効化されています
+                        </h5>
+                        <p class="mb-0">
+                            現在、CSVファイルからの一括登録機能は利用できません。
+                            個別に単語を登録するか、管理者にお問い合わせください。
+                        </p>
                     </div>
                 </div>
             </div>
