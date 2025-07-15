@@ -410,21 +410,8 @@ function deleteQuestion(questionId) {
 function showCsvUpload() {
     console.log('showCsvUpload関数が呼び出されました');
     
-    // 既存のモーダルインスタンスをクリア
-    const existingModal = bootstrap.Modal.getInstance(document.getElementById('csvUploadModal'));
-    if (existingModal) {
-        console.log('既存のモーダルインスタンスを破棄します');
-        existingModal.dispose();
-    }
-    
-    // 背景オーバーレイをクリア
-    const backdrops = document.querySelectorAll('.modal-backdrop');
-    backdrops.forEach(backdrop => backdrop.remove());
-    
-    // bodyのクラスをクリア
-    document.body.classList.remove('modal-open');
-    document.body.style.overflow = '';
-    document.body.style.paddingRight = '';
+    // まず完全にクリーンアップ
+    cleanupAllModals();
     
     // 教材一覧を取得してセレクトボックスに設定
     loadTextbooksForCsv();
@@ -434,24 +421,96 @@ function showCsvUpload() {
     console.log('モーダル要素:', modalElement);
     
     if (modalElement) {
-        // モーダルの状態をリセット
+        // モーダルの状態を完全にリセット
         modalElement.classList.remove('show');
         modalElement.style.display = 'none';
         modalElement.setAttribute('aria-hidden', 'true');
+        modalElement.setAttribute('aria-modal', 'false');
         
-        // 少し待ってからモーダルを表示
+        // 確実にモーダルを表示
         setTimeout(() => {
-            const modal = new bootstrap.Modal(modalElement, {
-                backdrop: true,
-                keyboard: true,
-                focus: true
-            });
-            modal.show();
-            console.log('モーダルを表示しました');
-        }, 100);
+            try {
+                const modal = new bootstrap.Modal(modalElement, {
+                    backdrop: 'static', // 背景クリックで閉じない
+                    keyboard: true,
+                    focus: true
+                });
+                
+                // モーダル表示前の最終チェック
+                cleanupAllModals();
+                
+                modal.show();
+                console.log('モーダルを表示しました');
+                
+                // モーダル表示後の確認
+                setTimeout(() => {
+                    if (!modalElement.classList.contains('show')) {
+                        console.log('モーダルが正しく表示されていません、再試行します');
+                        modal.show();
+                    }
+                }, 50);
+                
+            } catch (error) {
+                console.error('モーダル表示エラー:', error);
+                // エラーが発生した場合は手動でモーダルを表示
+                modalElement.style.display = 'block';
+                modalElement.classList.add('show');
+                document.body.classList.add('modal-open');
+                const backdrop = document.createElement('div');
+                backdrop.className = 'modal-backdrop fade show';
+                document.body.appendChild(backdrop);
+            }
+        }, 200);
     } else {
         console.error('モーダル要素が見つかりません');
     }
+}
+
+// すべてのモーダルとオーバーレイをクリーンアップする関数
+function cleanupAllModals() {
+    console.log('cleanupAllModals関数が呼び出されました');
+    
+    // すべてのモーダルインスタンスを破棄
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach((modal, index) => {
+        console.log(`モーダル${index + 1}をクリーンアップ:`, modal.id);
+        const modalInstance = bootstrap.Modal.getInstance(modal);
+        if (modalInstance) {
+            try {
+                modalInstance.dispose();
+            } catch (error) {
+                console.error(`モーダル${index + 1}の破棄エラー:`, error);
+            }
+        }
+        
+        // モーダル要素の状態をリセット
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        modal.setAttribute('aria-modal', 'false');
+    });
+    
+    // すべてのオーバーレイを削除
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    console.log(`${backdrops.length}個のオーバーレイを削除`);
+    backdrops.forEach((backdrop, index) => {
+        console.log(`オーバーレイ${index + 1}を削除`);
+        backdrop.remove();
+    });
+    
+    // bodyの状態を完全にリセット
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+    document.body.style.removeProperty('position');
+    
+    // 追加のクリーンアップ
+    const modalOpenElements = document.querySelectorAll('.modal-open');
+    modalOpenElements.forEach(element => {
+        element.classList.remove('modal-open');
+    });
+    
+    console.log('クリーンアップ完了');
 }
 
 function loadTextbooksForCsv() {
@@ -803,54 +862,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 緊急用：モーダルを強制的に閉じる機能
     window.forceCloseModal = function() {
         console.log('forceCloseModal関数が呼び出されました');
-        
-        // すべてのモーダルを閉じる
-        const modals = document.querySelectorAll('.modal');
-        console.log('見つかったモーダル数:', modals.length);
-        modals.forEach((modal, index) => {
-            console.log(`モーダル${index + 1}:`, modal.id);
-            const modalInstance = bootstrap.Modal.getInstance(modal);
-            if (modalInstance) {
-                console.log(`モーダル${index + 1}のインスタンスを破棄`);
-                modalInstance.dispose();
-            }
-            // モーダル要素自体も非表示にする
-            modal.classList.remove('show');
-            modal.style.display = 'none';
-            modal.setAttribute('aria-hidden', 'true');
-        });
-        
-        // 背景オーバーレイを削除（複数回実行）
-        for (let i = 0; i < 5; i++) {
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            console.log(`オーバーレイ削除試行${i + 1}: ${backdrops.length}個見つかりました`);
-            backdrops.forEach((backdrop, index) => {
-                console.log(`オーバーレイ${index + 1}を削除`);
-                backdrop.remove();
-            });
-        }
-        
-        // bodyのクラスとスタイルを完全にクリア
-        document.body.classList.remove('modal-open');
-        document.body.style.overflow = '';
-        document.body.style.paddingRight = '';
-        document.body.style.position = '';
-        
-        // 追加のクリーンアップ
-        const body = document.body;
-        body.style.removeProperty('overflow');
-        body.style.removeProperty('padding-right');
-        body.style.removeProperty('position');
-        
-        // すべてのmodal-openクラスを持つ要素をクリア
-        const modalOpenElements = document.querySelectorAll('.modal-open');
-        modalOpenElements.forEach(element => {
-            element.classList.remove('modal-open');
-        });
-        
+        cleanupAllModals();
         console.log('モーダルを強制的に閉じました');
-        console.log('bodyのクラス:', document.body.className);
-        console.log('bodyのスタイル:', document.body.style.cssText);
     };
     
     // ESCキーでモーダルを閉じる
@@ -881,12 +894,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const modals = document.querySelectorAll('.modal.show');
         if (backdrops.length > 0 && modals.length === 0) {
             console.log('孤立したオーバーレイを検出、クリアします');
-            backdrops.forEach(backdrop => backdrop.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
+            cleanupAllModals();
         }
-    }, 2000);
+    }, 1000); // 1秒ごとにチェック
 });
 </script>
 
