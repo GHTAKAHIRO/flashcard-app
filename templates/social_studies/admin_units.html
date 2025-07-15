@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}単元管理 - 社会科管理{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-list me-2"></i>単元管理
+            </h2>
+            <p class="text-muted">{{ textbook.name }}の単元を管理できます</p>
+        </div>
+        <div>
+            <a href="{{ url_for('social_studies_add_unit', textbook_id=textbook.id) }}" class="btn btn-success me-2">
+                <i class="fas fa-plus me-2"></i>新規追加
+            </a>
+            <a href="{{ url_for('social_studies_admin_textbooks') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>教材一覧に戻る
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 教材情報 -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">
+            <i class="fas fa-book me-2"></i>{{ textbook.name }}
+        </h5>
+        <div class="row">
+            <div class="col-md-3">
+                <small class="text-muted">科目</small>
+                <div><span class="badge bg-primary">{{ textbook.subject }}</span></div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">学年</small>
+                <div>{{ textbook.grade or '未設定' }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">出版社</small>
+                <div>{{ textbook.publisher or '未設定' }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">問題数</small>
+                <div><span class="badge bg-success">{{ textbook.question_count or 0 }}</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>章番号</th>
+                        <th>単元名</th>
+                        <th>説明</th>
+                        <th>問題数</th>
+                        <th>登録日</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for unit in units %}
+                    <tr>
+                        <td>
+                            {% if unit.chapter_number %}
+                                <span class="badge bg-secondary">{{ unit.chapter_number }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-bold">{{ unit.name }}</div>
+                        </td>
+                        <td>
+                            {% if unit.description %}
+                                <div class="text-truncate" style="max-width: 300px;" title="{{ unit.description }}">
+                                    {{ unit.description }}
+                                </div>
+                            {% else %}
+                                <span class="text-muted">説明なし</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ unit.question_count or 0 }}</span>
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                {{ unit.created_at.strftime('%Y/%m/%d') if unit.created_at else '不明' }}
+                            </small>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-primary" onclick="editUnit({{ unit.id }})" title="編集">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="deleteUnit({{ unit.id }})" title="削除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not units %}
+        <div class="text-center py-5">
+            <i class="fas fa-list fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">まだ単元が登録されていません</h4>
+            <p class="text-muted">新しい単元を追加してください</p>
+            <a href="{{ url_for('social_studies_add_unit', textbook_id=textbook.id) }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>単元を追加
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">単元編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <div class="mb-3">
+                        <label for="edit-name" class="form-label">単元名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-chapter-number" class="form-label">章番号</label>
+                        <input type="number" class="form-control" id="edit-chapter-number" name="chapter_number" min="1" placeholder="例: 1">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-description" class="form-label">説明</label>
+                        <textarea class="form-control" id="edit-description" name="description" rows="3" placeholder="単元の説明を入力してください"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentEditId = null;
+
+function editUnit(unitId) {
+    // 単元データを取得してモーダルに設定
+    // 実際の実装ではAPIからデータを取得
+    currentEditId = unitId;
+    
+    // モーダルを表示
+    const modal = new bootstrap.Modal(document.getElementById('editModal'));
+    modal.show();
+}
+
+function saveEdit() {
+    // 編集内容を保存
+    // 実際の実装ではAPIに送信
+    alert('編集機能は開発中です');
+}
+
+function deleteUnit(unitId) {
+    if (confirm('この単元を削除しますか？\n関連する問題も削除されます。\nこの操作は取り消せません。')) {
+        // 削除APIを呼び出し
+        fetch(`/social_studies/admin/delete_unit/${unitId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 成功時はページを再読み込み
+                location.reload();
+            } else {
+                // エラーメッセージを表示
+                alert(data.error || '削除に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('削除エラー:', error);
+            alert('削除に失敗しました');
+        });
+    }
+}
+</script>
+{% endblock %} 
