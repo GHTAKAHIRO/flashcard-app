@@ -3047,7 +3047,7 @@ def social_studies_quiz(subject):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 指定された科目の問題を取得
                 cur.execute('''
-                    SELECT id, question, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation
+                    SELECT id, question, correct_answer, acceptable_answers, answer_suffix, explanation
                     FROM social_studies_questions 
                     WHERE subject = %s 
                     ORDER BY RANDOM() 
@@ -3109,8 +3109,6 @@ def social_studies_submit_answer():
                 # 補足情報を考慮した回答をチェック
                 # ユーザーの回答に補足情報を追加して比較
                 full_user_answer = user_answer
-                if question_data['answer_prefix']:
-                    full_user_answer = question_data['answer_prefix'] + full_user_answer
                 if question_data['answer_suffix']:
                     full_user_answer = full_user_answer + question_data['answer_suffix']
                 
@@ -3252,7 +3250,6 @@ def social_studies_add_question():
         question = request.form['question']
         correct_answer = request.form['correct_answer']
         acceptable_answers = request.form.get('acceptable_answers', '')
-        answer_prefix = request.form.get('answer_prefix', '')
         answer_suffix = request.form.get('answer_suffix', '')
         explanation = request.form.get('explanation', '')
         difficulty_level = request.form.get('difficulty_level', 'basic')
@@ -3262,9 +3259,9 @@ def social_studies_add_question():
                 with conn.cursor() as cur:
                     cur.execute('''
                         INSERT INTO social_studies_questions 
-                        (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation, difficulty_level)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation, difficulty_level))
+                        (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, answer_suffix, explanation, difficulty_level)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, answer_suffix, explanation, difficulty_level))
                     conn.commit()
                     flash('問題が追加されました', 'success')
                     return redirect(url_for('social_studies_admin_questions'))
@@ -3363,7 +3360,7 @@ def social_studies_edit_question(question_id):
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute('''
-                        SELECT id, subject, question, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation
+                        SELECT id, subject, question, correct_answer, acceptable_answers, answer_suffix, explanation
                         FROM social_studies_questions 
                         WHERE id = %s
                     ''', (question_id,))
@@ -3385,7 +3382,6 @@ def social_studies_edit_question(question_id):
             question_text = data.get('question', '').strip()
             correct_answer = data.get('correct_answer', '').strip()
             acceptable_answers = data.get('acceptable_answers', '').strip()
-            answer_prefix = data.get('answer_prefix', '').strip()
             answer_suffix = data.get('answer_suffix', '').strip()
             explanation = data.get('explanation', '').strip()
             
@@ -3404,10 +3400,10 @@ def social_studies_edit_question(question_id):
                     cur.execute('''
                         UPDATE social_studies_questions 
                         SET subject = %s, question = %s, correct_answer = %s, 
-                            acceptable_answers = %s, answer_prefix = %s, answer_suffix = %s, 
+                            acceptable_answers = %s, answer_suffix = %s, 
                             explanation = %s, updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
-                    ''', (subject, question_text, correct_answer, acceptable_answers, answer_prefix, answer_suffix, explanation, question_id))
+                    ''', (subject, question_text, correct_answer, acceptable_answers, answer_suffix, explanation, question_id))
                     conn.commit()
                     
                     return jsonify({'success': True, 'message': '問題が更新されました'})
