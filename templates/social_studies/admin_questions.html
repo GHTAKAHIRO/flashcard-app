@@ -412,6 +412,13 @@ function deleteQuestion(questionId) {
 function showCsvUpload() {
     console.log('showCsvUpload関数が呼び出されました');
     
+    // 既存のモーダルインスタンスをクリア
+    const existingModal = bootstrap.Modal.getInstance(document.getElementById('csvUploadModal'));
+    if (existingModal) {
+        console.log('既存のモーダルインスタンスを破棄します');
+        existingModal.dispose();
+    }
+    
     // 教材一覧を取得してセレクトボックスに設定
     loadTextbooksForCsv();
     
@@ -420,7 +427,22 @@ function showCsvUpload() {
     console.log('モーダル要素:', modalElement);
     
     if (modalElement) {
-        const modal = new bootstrap.Modal(modalElement);
+        // モーダルの状態をリセット
+        modalElement.classList.remove('show');
+        modalElement.style.display = 'none';
+        modalElement.setAttribute('aria-hidden', 'true');
+        
+        // 背景オーバーレイをクリア
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.remove();
+        }
+        
+        const modal = new bootstrap.Modal(modalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
         console.log('Bootstrapモーダルインスタンス:', modal);
         modal.show();
         console.log('モーダルを表示しました');
@@ -507,10 +529,19 @@ function uploadCsv() {
         console.log('レスポンスデータ:', data);
         if (data.success) {
             // 成功時はモーダルを閉じてページを再読み込み
+            console.log('アップロード成功、モーダルを閉じます');
             const modal = bootstrap.Modal.getInstance(document.getElementById('csvUploadModal'));
-            modal.hide();
-            alert(`✅ ${data.message}\n登録件数: ${data.registered_count}件\nスキップ件数: ${data.skipped_count}件`);
-            location.reload();
+            if (modal) {
+                modal.hide();
+                // モーダルが完全に閉じられるまで待つ
+                setTimeout(() => {
+                    alert(`✅ ${data.message}\n登録件数: ${data.registered_count}件\nスキップ件数: ${data.skipped_count}件`);
+                    location.reload();
+                }, 300);
+            } else {
+                alert(`✅ ${data.message}\n登録件数: ${data.registered_count}件\nスキップ件数: ${data.skipped_count}件`);
+                location.reload();
+            }
         } else {
             // エラーメッセージを表示
             alert(data.error || 'アップロードに失敗しました');
