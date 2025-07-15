@@ -23,6 +23,10 @@ from flask_wtf.csrf import CSRFProtect
 import io
 import csv
 import re
+import boto3
+from botocore.exceptions import ClientError
+from PIL import Image
+import uuid
 
 # ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
@@ -34,6 +38,10 @@ print(f"DB_PORT: {os.getenv('DB_PORT', 'Not set')}")
 print(f"DB_NAME: {os.getenv('DB_NAME', 'Not set')}")
 print(f"DB_USER: {os.getenv('DB_USER', 'Not set')}")
 print(f"DB_PASSWORD: {'Set' if os.getenv('DB_PASSWORD') else 'Not set'}")
+print(f"WASABI_ACCESS_KEY: {'Set' if os.getenv('WASABI_ACCESS_KEY') else 'Not set'}")
+print(f"WASABI_SECRET_KEY: {'Set' if os.getenv('WASABI_SECRET_KEY') else 'Not set'}")
+print(f"WASABI_BUCKET: {os.getenv('WASABI_BUCKET', 'Not set')}")
+print(f"WASABI_ENDPOINT: {os.getenv('WASABI_ENDPOINT', 'Not set')}")
 
 app = Flask(__name__)
 CORS(app)
@@ -110,6 +118,91 @@ def log_worker():
 # ワーカースレッド開始
 log_thread = threading.Thread(target=log_worker, daemon=True)
 log_thread.start()
+
+# Wasabi S3クライアント初期化
+def init_wasabi_client():
+    """Wasabi S3クライアントを初期化"""
+    try:
+        access_key = os.getenv('WASABI_ACCESS_KEY')
+        secret_key = os.getenv('WASABI_SECRET_KEY')
+        endpoint = os.getenv('WASABI_ENDPOINT')
+        
+        if not all([access_key, secret_key, endpoint]):
+            print("⚠️ Wasabi設定が不完全です。画像アップロード機能は無効になります。")
+            return None
+        
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            endpoint_url=endpoint,
+            region_name='us-east-1'  # Wasabiのデフォルトリージョン
+        )
+        
+        # 接続テスト
+        s3_client.head_bucket(Bucket=os.getenv('WASABI_BUCKET'))
+        print("✅ Wasabi S3クライアント初期化完了")
+        return s3_client
+        
+    except Exception as e:
+        print(f"❌ Wasabi S3クライアント初期化エラー: {e}")
+        return None
+
+# 画像アップロード関数
+def upload_image_to_wasabi(image_file, question_id):
+    """画像をWasabiにアップロード"""
+    try:
+        s3_client = init_wasabi_client()
+        if not s3_client:
+            return None, "Wasabi設定が不完全です"
+        
+        # 画像をPILで開いて検証
+        image = Image.open(image_file)
+        
+        # 画像形式を確認
+        if image.format not in ['JPEG', 'PNG', 'GIF']:
+            return None, "サポートされていない画像形式です。JPEG、PNG、GIFのみ対応しています。"
+        
+        # ファイルサイズチェック（5MB以下）
+        image_file.seek(0, 2)  # ファイルの末尾に移動
+        file_size = image_file.tell()
+        image_file.seek(0)  # ファイルの先頭に戻る
+        
+        if file_size > 5 * 1024 * 1024:  # 5MB
+            return None, "ファイルサイズが大きすぎます。5MB以下にしてください。"
+        
+        # ユニークなファイル名を生成
+        file_extension = image.format.lower()
+        if file_extension == 'jpeg':
+            file_extension = 'jpg'
+        
+        filename = f"question_images/{question_id}/{uuid.uuid4()}.{file_extension}"
+        
+        # Wasabiにアップロード
+        bucket_name = os.getenv('WASABI_BUCKET')
+        s3_client.upload_fileobj(
+            image_file,
+            bucket_name,
+            filename,
+            ExtraArgs={
+                'ContentType': f'image/{file_extension}',
+                'ACL': 'public-read'
+            }
+        )
+        
+        # 公開URLを生成
+        endpoint = os.getenv('WASABI_ENDPOINT')
+        if endpoint.endswith('/'):
+            endpoint = endpoint[:-1]
+        
+        image_url = f"{endpoint}/{bucket_name}/{filename}"
+        
+        return image_url, None
+        
+    except ClientError as e:
+        return None, f"Wasabiアップロードエラー: {str(e)}"
+    except Exception as e:
+        return None, f"画像アップロードエラー: {str(e)}"
 
 # DB接続情報
 DB_HOST = os.getenv('DB_HOST')
@@ -3778,6 +3871,140 @@ def social_studies_upload_questions_csv():
     except Exception as e:
         app.logger.error(f"CSVアップロードエラー: {e}")
         return jsonify({'error': f'CSVアップロードに失敗しました: {str(e)}'}), 500
+
+@app.route('/social_studies/admin/upload_image/<int:question_id>', methods=['POST'])
+@login_required
+def social_studies_upload_image(question_id):
+    """問題に関連する画像をアップロード（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': '画像ファイルが選択されていません'}), 400
+        
+        image_file = request.files['image']
+        
+        if image_file.filename == '':
+            return jsonify({'error': '画像ファイルが選択されていません'}), 400
+        
+        # 問題が存在するかチェック
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT id FROM social_studies_questions WHERE id = %s', (question_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '指定された問題が見つかりません'}), 404
+        
+        # 画像をWasabiにアップロード
+        image_url, error = upload_image_to_wasabi(image_file, question_id)
+        
+        if error:
+            return jsonify({'error': error}), 500
+        
+        # データベースに画像URLを保存
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    UPDATE social_studies_questions 
+                    SET image_url = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (image_url, question_id))
+                conn.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': '画像をアップロードしました',
+            'image_url': image_url
+        })
+        
+    except Exception as e:
+        app.logger.error(f"画像アップロードエラー: {e}")
+        return jsonify({'error': f'画像アップロードに失敗しました: {str(e)}'}), 500
+
+@app.route('/social_studies/admin/delete_image/<int:question_id>', methods=['POST'])
+@login_required
+def social_studies_delete_image(question_id):
+    """問題に関連する画像を削除（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        # 現在の画像URLを取得
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT image_url FROM social_studies_questions WHERE id = %s', (question_id,))
+                result = cur.fetchone()
+                if not result:
+                    return jsonify({'error': '指定された問題が見つかりません'}), 404
+                
+                current_image_url = result[0]
+                if not current_image_url:
+                    return jsonify({'error': 'この問題には画像が設定されていません'}), 400
+        
+        # Wasabiから画像を削除
+        if current_image_url:
+            try:
+                s3_client = init_wasabi_client()
+                if s3_client:
+                    # URLからファイルパスを抽出
+                    bucket_name = os.getenv('WASABI_BUCKET')
+                    endpoint = os.getenv('WASABI_ENDPOINT')
+                    if endpoint.endswith('/'):
+                        endpoint = endpoint[:-1]
+                    
+                    file_path = current_image_url.replace(f"{endpoint}/{bucket_name}/", "")
+                    s3_client.delete_object(Bucket=bucket_name, Key=file_path)
+            except Exception as e:
+                app.logger.warning(f"Wasabiからの画像削除に失敗: {e}")
+        
+        # データベースから画像URLを削除
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    UPDATE social_studies_questions 
+                    SET image_url = NULL, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (question_id,))
+                conn.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': '画像を削除しました'
+        })
+        
+    except Exception as e:
+        app.logger.error(f"画像削除エラー: {e}")
+        return jsonify({'error': f'画像削除に失敗しました: {str(e)}'}), 500
+
+@app.route('/social_studies/admin/question/<int:question_id>')
+@login_required
+def social_studies_get_question(question_id):
+    """問題詳細を取得（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT id, subject, question, correct_answer, acceptable_answers, 
+                           explanation, image_url, difficulty_level, textbook_id, unit_id
+                    FROM social_studies_questions 
+                    WHERE id = %s
+                ''', (question_id,))
+                
+                question = cur.fetchone()
+                if not question:
+                    return jsonify({'error': '問題が見つかりません'}), 404
+                
+                return jsonify({
+                    'success': True,
+                    'question': dict(question)
+                })
+                
+    except Exception as e:
+        app.logger.error(f"問題取得エラー: {e}")
+        return jsonify({'error': f'問題の取得に失敗しました: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # データベース接続プールを初期化

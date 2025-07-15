@@ -64,6 +64,7 @@ def create_social_studies_tables():
         correct_answer TEXT NOT NULL,
         acceptable_answers TEXT,  -- JSON形式で許容回答を保存
         explanation TEXT,
+        image_url TEXT,  -- 問題に関連する画像のURL
         difficulty_level VARCHAR(20) DEFAULT 'basic', -- basic, intermediate, advanced
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

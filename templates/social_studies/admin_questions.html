@@ -90,6 +90,9 @@
                             <button class="btn btn-sm btn-outline-primary" onclick="editQuestion({{ question.id }})">
                                 <i class="fas fa-edit"></i>
                             </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="showImageUpload({{ question.id }})">
+                                <i class="fas fa-image"></i>
+                            </button>
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteQuestion({{ question.id }})">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -183,13 +186,14 @@
                 <div class="mb-3">
                     <label for="csv-file" class="form-label">CSVファイル <span class="text-danger">*</span></label>
                     <input type="file" class="form-control" id="csv-file" accept=".csv" required>
-                    <div class="form-text">UTF-8、Shift_JIS、CP932、EUC-JP、ISO-2022-JPエンコーディングのCSVファイルを選択してください</div>
-                    <div class="mt-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downloadSampleCsv()">
-                            <i class="fas fa-download me-1"></i>サンプルCSVをダウンロード
-                        </button>
+                                            <div class="mt-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downloadSampleCsv()">
+                                <i class="fas fa-download me-1"></i>サンプルCSVをダウンロード
+                            </button>
+                        </div>
                     </div>
-                </div>
+                    
+                    </div>
                 
                 <div class="mb-3">
                     <label for="csv-subject" class="form-label">デフォルト科目</label>
@@ -219,10 +223,58 @@
                         <li>最大1000件まで一括登録できます</li>
                     </ul>
                 </div>
+                <div class="form-text mt-2">CSVファイル <strong>social_studies_questions_sample.csv</strong>、UTF-8、Shift_JIS、CP932、EUC-JP、ISO-2022-JPエンコーディングのCSVファイルを選択してください</div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
                 <button type="button" class="btn btn-primary" onclick="uploadCsv()">
+                    <i class="fas fa-upload me-1"></i>アップロード
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 画像アップロードモーダル -->
+<div class="modal fade" id="imageUploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">問題画像アップロード</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle me-2"></i>画像アップロードについて</h6>
+                    <p class="mb-2">問題に関連する画像をアップロードできます。画像はWasabiクラウドストレージに保存されます。</p>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="image-file" class="form-label">画像ファイル</label>
+                    <div class="upload-area" id="image-upload-area">
+                        <i class="fas fa-image fa-3x text-muted mb-3"></i>
+                        <p class="mb-2">画像をドラッグ&ドロップまたはクリックして選択</p>
+                        <input type="file" id="image-file" name="image" accept="image/*" style="display: none;">
+                        <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('image-file').click()">
+                            画像を選択
+                        </button>
+                    </div>
+                    <div class="form-text">JPEG、PNG、GIF形式、5MB以下の画像ファイルを選択してください</div>
+                </div>
+                
+                <div id="current-image-section" style="display: none;">
+                    <h6>現在の画像</h6>
+                    <div class="text-center mb-3">
+                        <img id="current-image" src="" alt="現在の画像" class="img-fluid" style="max-height: 200px;">
+                    </div>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteCurrentImage()">
+                        <i class="fas fa-trash me-1"></i>現在の画像を削除
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="uploadImage()">
                     <i class="fas fa-upload me-1"></i>アップロード
                 </button>
             </div>
@@ -499,5 +551,121 @@ function downloadSampleCsv() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+
+// 画像アップロード機能
+let currentQuestionId = null;
+
+function showImageUpload(questionId) {
+    currentQuestionId = questionId;
+    
+    // 現在の画像を取得
+    fetch(`/social_studies/admin/question/${questionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.question.image_url) {
+                document.getElementById('current-image').src = data.question.image_url;
+                document.getElementById('current-image-section').style.display = 'block';
+            } else {
+                document.getElementById('current-image-section').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('画像取得エラー:', error);
+            document.getElementById('current-image-section').style.display = 'none';
+        });
+    
+    // モーダルを表示
+    const modal = new bootstrap.Modal(document.getElementById('imageUploadModal'));
+    modal.show();
+}
+
+function uploadImage() {
+    const fileInput = document.getElementById('image-file');
+    
+    if (!fileInput.files[0]) {
+        alert('画像ファイルを選択してください');
+        return;
+    }
+    
+    if (!currentQuestionId) {
+        alert('問題IDが設定されていません');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('image', fileInput.files[0]);
+    
+    // アップロードボタンを無効化
+    const uploadButton = document.querySelector('#imageUploadModal .btn-primary');
+    const originalText = uploadButton.textContent;
+    uploadButton.disabled = true;
+    uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>アップロード中...';
+    
+    fetch(`/social_studies/admin/upload_image/${currentQuestionId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('画像をアップロードしました');
+            // 現在の画像を更新
+            document.getElementById('current-image').src = data.image_url;
+            document.getElementById('current-image-section').style.display = 'block';
+            // ファイル入力をリセット
+            fileInput.value = '';
+        } else {
+            alert(data.error || 'アップロードに失敗しました');
+        }
+    })
+    .catch(error => {
+        console.error('アップロードエラー:', error);
+        alert('アップロードに失敗しました');
+    })
+    .finally(() => {
+        // ボタンを元に戻す
+        uploadButton.disabled = false;
+        uploadButton.innerHTML = originalText;
+    });
+}
+
+function deleteCurrentImage() {
+    if (!currentQuestionId) {
+        alert('問題IDが設定されていません');
+        return;
+    }
+    
+    if (confirm('現在の画像を削除しますか？')) {
+        fetch(`/social_studies/admin/delete_image/${currentQuestionId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('画像を削除しました');
+                document.getElementById('current-image-section').style.display = 'none';
+            } else {
+                alert(data.error || '削除に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('削除エラー:', error);
+            alert('削除に失敗しました');
+        });
+    }
+}
+
+// 画像ファイル選択時の処理
+document.getElementById('image-file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const uploadArea = document.getElementById('image-upload-area');
+        uploadArea.innerHTML = `
+            <i class="fas fa-image fa-3x text-success mb-3"></i>
+            <p class="mb-2"><strong>${file.name}</strong></p>
+            <p class="text-muted">画像が選択されました</p>
+        `;
+    }
+});
 </script>
 {% endblock %} 
