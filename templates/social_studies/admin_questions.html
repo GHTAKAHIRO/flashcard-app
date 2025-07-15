@@ -264,8 +264,17 @@
                     </div>
                     <div class="mb-3">
                         <label for="edit-answer-suffix" class="form-label">解答欄の後補足</label>
-                        <input type="text" class="form-control" id="edit-answer-suffix" name="answer_suffix" placeholder="例: 大陸（「オーストラリア大陸」の場合）、年（「1868年」の場合）">
+                        <input type="text" class="form-control" id="edit-answer-suffix" name="answer_suffix" 
+                               placeholder="例: 大陸（「オーストラリア大陸」の場合）、年（「1868年」の場合）"
+                               oninput="updateEditPreview()">
                         <div class="form-text">解答欄に予め表示したい補足情報があれば入力してください</div>
+                        <div id="edit-preview-section" class="mt-2" style="display: none;">
+                            <div class="alert alert-info">
+                                <small>
+                                    <strong>プレビュー:</strong> 問題文の下に「答えの後に「<span id="edit-preview-suffix"></span>」が付きます」と表示されます
+                                </small>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="edit-explanation" class="form-label">解説</label>
@@ -406,6 +415,20 @@
 <script>
 let currentEditId = null;
 
+// 編集画面のプレビュー更新機能
+function updateEditPreview() {
+    const suffixInput = document.getElementById('edit-answer-suffix');
+    const previewSection = document.getElementById('edit-preview-section');
+    const previewSuffix = document.getElementById('edit-preview-suffix');
+    
+    if (suffixInput.value.trim()) {
+        previewSuffix.textContent = suffixInput.value.trim();
+        previewSection.style.display = 'block';
+    } else {
+        previewSection.style.display = 'none';
+    }
+}
+
 function editQuestion(questionId) {
     currentEditId = questionId;
     
@@ -425,6 +448,9 @@ function editQuestion(questionId) {
             document.getElementById('edit-acceptable-answers').value = data.acceptable_answers || '';
             document.getElementById('edit-answer-suffix').value = data.answer_suffix || '';
             document.getElementById('edit-explanation').value = data.explanation || '';
+            
+            // プレビューを更新
+            updateEditPreview();
             
             // モーダルを表示
             const modal = new bootstrap.Modal(document.getElementById('editModal'));

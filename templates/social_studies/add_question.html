@@ -89,8 +89,16 @@
                     <div class="mb-3">
                         <label for="answer_suffix" class="form-label">解答欄の後補足</label>
                         <input type="text" class="form-control" id="answer_suffix" name="answer_suffix" 
-                               placeholder="例: 大陸（「オーストラリア大陸」の場合）、年（「1868年」の場合）">
+                               placeholder="例: 大陸（「オーストラリア大陸」の場合）、年（「1868年」の場合）"
+                               oninput="updatePreview()">
                         <div class="form-text">解答欄に予め表示したい補足情報があれば入力してください</div>
+                        <div id="preview-section" class="mt-2" style="display: none;">
+                            <div class="alert alert-info">
+                                <small>
+                                    <strong>プレビュー:</strong> 問題文の下に「答えの後に「<span id="preview-suffix"></span>」が付きます」と表示されます
+                                </small>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -215,6 +223,20 @@ function loadUnits() {
             console.error('単元取得エラー:', error);
             statusText.textContent = '単元・章の取得に失敗しました';
         });
+}
+
+// プレビュー更新機能
+function updatePreview() {
+    const suffixInput = document.getElementById('answer_suffix');
+    const previewSection = document.getElementById('preview-section');
+    const previewSuffix = document.getElementById('preview-suffix');
+    
+    if (suffixInput.value.trim()) {
+        previewSuffix.textContent = suffixInput.value.trim();
+        previewSection.style.display = 'block';
+    } else {
+        previewSection.style.display = 'none';
+    }
 }
 
 // 全角文字を半角に自動変換する機能

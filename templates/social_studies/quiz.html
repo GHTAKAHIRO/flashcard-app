@@ -36,6 +36,14 @@
             <div class="card-body">
                 <div class="text-center mb-4">
                     <h4 class="fw-bold">{{ loop.index }}. {{ question.question }}</h4>
+                    {% if question.answer_suffix %}
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            答えの後に「{{ question.answer_suffix }}」が付きます
+                        </small>
+                    </div>
+                    {% endif %}
                 </div>
                 
                 <div class="answer-section">
