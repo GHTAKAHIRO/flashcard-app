@@ -802,25 +802,55 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 緊急用：モーダルを強制的に閉じる機能
     window.forceCloseModal = function() {
+        console.log('forceCloseModal関数が呼び出されました');
+        
         // すべてのモーダルを閉じる
         const modals = document.querySelectorAll('.modal');
-        modals.forEach(modal => {
+        console.log('見つかったモーダル数:', modals.length);
+        modals.forEach((modal, index) => {
+            console.log(`モーダル${index + 1}:`, modal.id);
             const modalInstance = bootstrap.Modal.getInstance(modal);
             if (modalInstance) {
-                modalInstance.hide();
+                console.log(`モーダル${index + 1}のインスタンスを破棄`);
+                modalInstance.dispose();
             }
+            // モーダル要素自体も非表示にする
+            modal.classList.remove('show');
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
         });
         
-        // 背景オーバーレイを削除
-        const backdrops = document.querySelectorAll('.modal-backdrop');
-        backdrops.forEach(backdrop => backdrop.remove());
+        // 背景オーバーレイを削除（複数回実行）
+        for (let i = 0; i < 5; i++) {
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            console.log(`オーバーレイ削除試行${i + 1}: ${backdrops.length}個見つかりました`);
+            backdrops.forEach((backdrop, index) => {
+                console.log(`オーバーレイ${index + 1}を削除`);
+                backdrop.remove();
+            });
+        }
         
-        // bodyのクラスをクリア
+        // bodyのクラスとスタイルを完全にクリア
         document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
         document.body.style.paddingRight = '';
+        document.body.style.position = '';
+        
+        // 追加のクリーンアップ
+        const body = document.body;
+        body.style.removeProperty('overflow');
+        body.style.removeProperty('padding-right');
+        body.style.removeProperty('position');
+        
+        // すべてのmodal-openクラスを持つ要素をクリア
+        const modalOpenElements = document.querySelectorAll('.modal-open');
+        modalOpenElements.forEach(element => {
+            element.classList.remove('modal-open');
+        });
         
         console.log('モーダルを強制的に閉じました');
+        console.log('bodyのクラス:', document.body.className);
+        console.log('bodyのスタイル:', document.body.style.cssText);
     };
     
     // ESCキーでモーダルを閉じる
@@ -829,6 +859,34 @@ document.addEventListener('DOMContentLoaded', function() {
             window.forceCloseModal();
         }
     });
+    
+    // ページ読み込み時にオーバーレイをクリア
+    window.addEventListener('load', function() {
+        console.log('ページ読み込み完了、オーバーレイをクリアします');
+        setTimeout(() => {
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            if (backdrops.length > 0) {
+                console.log(`${backdrops.length}個のオーバーレイをクリアします`);
+                backdrops.forEach(backdrop => backdrop.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            }
+        }, 100);
+    });
+    
+    // 定期的にオーバーレイをチェックしてクリア
+    setInterval(() => {
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        const modals = document.querySelectorAll('.modal.show');
+        if (backdrops.length > 0 && modals.length === 0) {
+            console.log('孤立したオーバーレイを検出、クリアします');
+            backdrops.forEach(backdrop => backdrop.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }
+    }, 2000);
 });
 </script>
 
@@ -836,6 +894,9 @@ document.addEventListener('DOMContentLoaded', function() {
 <div style="position: fixed; bottom: 10px; right: 10px; z-index: 9999;">
     <button onclick="forceCloseModal()" class="btn btn-danger btn-sm">
         <i class="fas fa-times"></i> モーダル閉じる
+    </button>
+    <button onclick="location.reload()" class="btn btn-warning btn-sm ms-1">
+        <i class="fas fa-redo"></i> ページ再読み込み
     </button>
 </div>
 {% endblock %} 
