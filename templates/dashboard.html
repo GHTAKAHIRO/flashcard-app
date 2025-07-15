@@ -72,6 +72,7 @@
                 
                 <!-- 設定フォーム -->
                 <form method="POST" action="{{ url_for('set_page_range_and_prepare', source=source.source) }}" class="mb-3">
+                    {{ csrf_token() }}
                     <div class="mb-2">
                         <label for="page_range_{{ source.source }}" class="form-label small">ページ範囲</label>
                         <input type="text" class="form-control form-control-sm" 

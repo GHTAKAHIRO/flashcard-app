@@ -330,6 +330,9 @@
             
             fetch('/vocabulary/upload', {
                 method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
                 body: formData
             })
             .then(response => response.json())
