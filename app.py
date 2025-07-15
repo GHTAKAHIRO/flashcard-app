@@ -47,6 +47,11 @@ app = Flask(__name__)
 CORS(app)
 app.secret_key = 'your_secret_key'
 # csrf = CSRFProtect(app)  # 本番環境ではCSRF保護を無効化
+
+# CSRFトークンを空文字列として提供（テンプレート互換性のため）
+@app.context_processor
+def inject_csrf_token():
+    return dict(csrf_token=lambda: '')
 logging.basicConfig(level=logging.DEBUG)
 
 app.config.update(
