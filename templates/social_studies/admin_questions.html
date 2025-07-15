@@ -2,6 +2,51 @@
 
 {% block title %}問題一覧 - 社会科管理{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* 問題一覧ページ専用のスタイル */
+    .main-container {
+        max-width: 1400px !important;
+        width: 95% !important;
+    }
+    
+    /* テーブルの横幅を最適化 */
+    .table-responsive {
+        overflow-x: auto;
+        border-radius: 10px;
+    }
+    
+    /* テーブルセルの余白を調整 */
+    .table th, .table td {
+        padding: 12px 8px;
+        vertical-align: middle;
+    }
+    
+    /* 問題文の表示を改善 */
+    .question-text {
+        max-width: 380px;
+        word-wrap: break-word;
+        line-height: 1.4;
+    }
+    
+    /* 正解の表示を改善 */
+    .answer-text {
+        max-width: 130px;
+        word-wrap: break-word;
+        line-height: 1.3;
+    }
+    
+    /* 操作ボタンの配置を改善 */
+    .action-buttons {
+        white-space: nowrap;
+    }
+    
+    .action-buttons .btn {
+        margin: 0 2px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="mb-4">
     <div class="d-flex justify-content-between align-items-center">
@@ -12,6 +57,9 @@
             <p class="text-muted">登録されている問題を管理できます</p>
         </div>
         <div>
+            <button class="btn btn-danger me-2" id="bulk-delete-btn" style="display: none;" onclick="bulkDeleteQuestions()">
+                <i class="fas fa-trash me-2"></i>選択削除
+            </button>
             <a href="{{ url_for('social_studies_add_question') }}" class="btn btn-success me-2">
                 <i class="fas fa-plus me-2"></i>新規追加
             </a>
@@ -25,25 +73,93 @@
     </div>
 </div>
 
+<!-- フィルターセクション -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h6 class="mb-0">
+            <i class="fas fa-filter me-2"></i>フィルター
+        </h6>
+    </div>
+    <div class="card-body">
+        <form id="filter-form" method="GET">
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="filter-subject" class="form-label">科目</label>
+                    <select class="form-select" id="filter-subject" name="subject" onchange="loadFilterTextbooks()">
+                        <option value="">全ての科目</option>
+                        <option value="地理">地理</option>
+                        <option value="歴史">歴史</option>
+                        <option value="公民">公民</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filter-textbook" class="form-label">教材</label>
+                    <select class="form-select" id="filter-textbook" name="textbook_id" onchange="loadFilterUnits()">
+                        <option value="">全ての教材</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filter-unit" class="form-label">単元・章</label>
+                    <select class="form-select" id="filter-unit" name="unit_id">
+                        <option value="">全ての単元・章</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filter-difficulty" class="form-label">難易度</label>
+                    <select class="form-select" id="filter-difficulty" name="difficulty">
+                        <option value="">全ての難易度</option>
+                        <option value="basic">基本</option>
+                        <option value="intermediate">中級</option>
+                        <option value="advanced">上級</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label for="filter-search" class="form-label">キーワード検索</label>
+                    <input type="text" class="form-control" id="filter-search" name="search" 
+                           placeholder="問題文や正解で検索..." value="{{ request.args.get('search', '') }}">
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i>検索
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times me-1"></i>クリア
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table class="table table-hover" style="min-width: 1200px;">
                 <thead class="table-light">
                     <tr>
-                        <th>ID</th>
-                        <th>科目</th>
-                        <th>教材・単元</th>
-                        <th>問題文</th>
-                        <th>正解</th>
-                        <th>難易度</th>
-                        <th>登録日</th>
-                        <th>操作</th>
+                        <th style="width: 50px;">
+                            <input type="checkbox" id="select-all" class="form-check-input" onchange="toggleSelectAll()">
+                        </th>
+                        <th style="width: 60px;">ID</th>
+                        <th style="width: 80px;">科目</th>
+                        <th style="width: 150px;">教材・単元</th>
+                        <th style="width: 400px;">問題文</th>
+                        <th style="width: 150px;">正解</th>
+                        <th style="width: 80px;">難易度</th>
+                        <th style="width: 100px;">登録日</th>
+                        <th style="width: 120px;">操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for question in questions %}
                     <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input question-checkbox" value="{{ question.id }}" onchange="updateBulkDeleteButton()">
+                        </td>
                         <td>{{ question.id }}</td>
                         <td>
                             <span class="badge bg-primary">{{ question.subject }}</span>
@@ -61,12 +177,12 @@
                             {% endif %}
                         </td>
                         <td>
-                            <div class="text-truncate" style="max-width: 250px;" title="{{ question.question }}">
+                            <div class="question-text" title="{{ question.question }}">
                                 {{ question.question }}
                             </div>
                         </td>
                         <td>
-                            <div class="text-truncate" style="max-width: 120px;" title="{{ question.correct_answer }}">
+                            <div class="answer-text" title="{{ question.correct_answer }}">
                                 {{ question.correct_answer }}
                             </div>
                         </td>
@@ -86,7 +202,7 @@
                                 {{ question.created_at.strftime('%Y/%m/%d') if question.created_at else '不明' }}
                             </small>
                         </td>
-                        <td>
+                        <td class="action-buttons">
                             <button class="btn btn-sm btn-outline-primary" onclick="editQuestion({{ question.id }})">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -734,7 +850,103 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('緊急用ボタン有効化完了');
         }
     };
+    
+    // フィルター機能の初期化
+    initializeFilters();
 });
+
+// フィルター機能
+function initializeFilters() {
+    // URLパラメータから現在のフィルター値を設定
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    if (urlParams.get('subject')) {
+        document.getElementById('filter-subject').value = urlParams.get('subject');
+        loadFilterTextbooks();
+    }
+    
+    if (urlParams.get('textbook_id')) {
+        document.getElementById('filter-textbook').value = urlParams.get('textbook_id');
+        loadFilterUnits();
+    }
+    
+    if (urlParams.get('unit_id')) {
+        document.getElementById('filter-unit').value = urlParams.get('unit_id');
+    }
+    
+    if (urlParams.get('difficulty')) {
+        document.getElementById('filter-difficulty').value = urlParams.get('difficulty');
+    }
+}
+
+function loadFilterTextbooks() {
+    const subject = document.getElementById('filter-subject').value;
+    const textbookSelect = document.getElementById('filter-textbook');
+    const unitSelect = document.getElementById('filter-unit');
+    
+    // 単元セレクトをリセット
+    unitSelect.innerHTML = '<option value="">全ての単元・章</option>';
+    
+    if (!subject) {
+        textbookSelect.innerHTML = '<option value="">全ての教材</option>';
+        return;
+    }
+    
+    // 教材を取得
+    fetch(`/social_studies/api/textbooks?subject=${subject}`)
+        .then(response => response.json())
+        .then(data => {
+            textbookSelect.innerHTML = '<option value="">全ての教材</option>';
+            data.forEach(textbook => {
+                const option = document.createElement('option');
+                option.value = textbook.id;
+                option.textContent = `${textbook.name} (${textbook.subject})`;
+                textbookSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('教材取得エラー:', error);
+        });
+}
+
+function loadFilterUnits() {
+    const textbookId = document.getElementById('filter-textbook').value;
+    const unitSelect = document.getElementById('filter-unit');
+    
+    if (!textbookId) {
+        unitSelect.innerHTML = '<option value="">全ての単元・章</option>';
+        return;
+    }
+    
+    // 単元を取得
+    fetch(`/social_studies/api/units?textbook_id=${textbookId}`)
+        .then(response => response.json())
+        .then(data => {
+            unitSelect.innerHTML = '<option value="">全ての単元・章</option>';
+            data.forEach(unit => {
+                const option = document.createElement('option');
+                option.value = unit.id;
+                const chapterText = unit.chapter_number ? `第${unit.chapter_number}章` : '';
+                option.textContent = `${chapterText} ${unit.name}`;
+                unitSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('単元取得エラー:', error);
+        });
+}
+
+function clearFilters() {
+    // フィルターフォームをリセット
+    document.getElementById('filter-form').reset();
+    
+    // 教材と単元のセレクトをリセット
+    document.getElementById('filter-textbook').innerHTML = '<option value="">全ての教材</option>';
+    document.getElementById('filter-unit').innerHTML = '<option value="">全ての単元・章</option>';
+    
+    // 現在のページにリダイレクト（フィルターなし）
+    window.location.href = window.location.pathname;
+}
 </script>
 
 

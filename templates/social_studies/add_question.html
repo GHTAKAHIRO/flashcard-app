@@ -33,17 +33,29 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="textbook_id" class="form-label">教材</label>
+                        <label for="textbook_id" class="form-label">
+                            <i class="fas fa-book me-1"></i>教材
+                        </label>
                         <select class="form-select" id="textbook_id" name="textbook_id" onchange="loadUnits()">
                             <option value="">教材を選択してください（オプション）</option>
                         </select>
+                        <div class="form-text">問題に関連する教材があれば選択してください</div>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="unit_id" class="form-label">単元</label>
+                        <label for="unit_id" class="form-label">
+                            <i class="fas fa-list-ol me-1"></i>単元・章
+                        </label>
                         <select class="form-select" id="unit_id" name="unit_id">
-                            <option value="">単元を選択してください（オプション）</option>
+                            <option value="">単元・章を選択してください（オプション）</option>
                         </select>
+                        <div class="form-text">教材を選択すると、関連する単元・章が表示されます</div>
+                        <div id="selection-status" class="mt-2" style="display: none;">
+                            <small class="text-info">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <span id="status-text"></span>
+                            </small>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -130,7 +142,7 @@ function loadTextbooks() {
     const unitSelect = document.getElementById('unit_id');
     
     // 単元セレクトをリセット
-    unitSelect.innerHTML = '<option value="">単元を選択してください（オプション）</option>';
+    unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
     
     if (!subject) {
         textbookSelect.innerHTML = '<option value="">教材を選択してください（オプション）</option>';
@@ -145,7 +157,7 @@ function loadTextbooks() {
             data.forEach(textbook => {
                 const option = document.createElement('option');
                 option.value = textbook.id;
-                option.textContent = textbook.name;
+                option.textContent = `${textbook.name} (${textbook.subject})`;
                 textbookSelect.appendChild(option);
             });
         })
@@ -157,26 +169,44 @@ function loadTextbooks() {
 function loadUnits() {
     const textbookId = document.getElementById('textbook_id').value;
     const unitSelect = document.getElementById('unit_id');
+    const statusDiv = document.getElementById('selection-status');
+    const statusText = document.getElementById('status-text');
     
     if (!textbookId) {
-        unitSelect.innerHTML = '<option value="">単元を選択してください（オプション）</option>';
+        unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
+        statusDiv.style.display = 'none';
         return;
     }
+    
+    // 選択された教材名を取得
+    const selectedTextbook = document.getElementById('textbook_id').options[document.getElementById('textbook_id').selectedIndex].text;
+    statusText.textContent = `教材「${selectedTextbook}」の単元・章を読み込み中...`;
+    statusDiv.style.display = 'block';
     
     // 単元を取得
     fetch(`/social_studies/api/units?textbook_id=${textbookId}`)
         .then(response => response.json())
         .then(data => {
-            unitSelect.innerHTML = '<option value="">単元を選択してください（オプション）</option>';
+            unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
             data.forEach(unit => {
                 const option = document.createElement('option');
                 option.value = unit.id;
-                option.textContent = `${unit.chapter_number}. ${unit.name}`;
+                // 章番号と単元名を明確に表示
+                const chapterText = unit.chapter_number ? `第${unit.chapter_number}章` : '';
+                option.textContent = `${chapterText} ${unit.name}`;
                 unitSelect.appendChild(option);
             });
+            
+            // 選択状況を更新
+            if (data.length > 0) {
+                statusText.textContent = `教材「${selectedTextbook}」から ${data.length}個の単元・章が見つかりました`;
+            } else {
+                statusText.textContent = `教材「${selectedTextbook}」には単元・章が登録されていません`;
+            }
         })
         .catch(error => {
             console.error('単元取得エラー:', error);
+            statusText.textContent = '単元・章の取得に失敗しました';
         });
 }
 
@@ -221,6 +251,21 @@ document.addEventListener('DOMContentLoaded', function() {
         input.addEventListener('focus', function() {
             normalizeInput(this);
         });
+    });
+    
+    // 単元選択時の状況表示
+    document.getElementById('unit_id').addEventListener('change', function() {
+        const unitId = this.value;
+        const statusDiv = document.getElementById('selection-status');
+        const statusText = document.getElementById('status-text');
+        
+        if (unitId) {
+            const selectedUnit = this.options[this.selectedIndex].text;
+            statusText.textContent = `選択中: ${selectedUnit}`;
+            statusDiv.style.display = 'block';
+        } else {
+            statusDiv.style.display = 'none';
+        }
     });
 });
 </script>
