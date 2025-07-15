@@ -44,7 +44,11 @@
                         <input type="text" class="form-control form-control-lg" 
                                id="answer-{{ question.id }}" 
                                placeholder="答えを入力してください"
-                               data-question-id="{{ question.id }}">
+                               data-question-id="{{ question.id }}"
+                               autocomplete="off"
+                               autocorrect="off"
+                               autocapitalize="off"
+                               spellcheck="false">
                     </div>
                     
                     <div class="text-center mt-3">
@@ -124,8 +128,16 @@ function updateProgress() {
 
 // 回答送信
 function submitAnswer(questionId) {
+    console.log('submitAnswer関数が呼び出されました。問題ID:', questionId);
+    
     const answerInput = document.getElementById('answer-' + questionId);
+    if (!answerInput) {
+        console.error('入力フィールドが見つかりません:', 'answer-' + questionId);
+        return;
+    }
+    
     const userAnswer = answerInput.value.trim();
+    console.log('ユーザーの回答:', userAnswer);
     
     if (!userAnswer) {
         alert('答えを入力してください。');
@@ -133,6 +145,7 @@ function submitAnswer(questionId) {
     }
     
     if (answeredQuestions.has(questionId)) {
+        console.log('既に回答済みの問題です:', questionId);
         return; // 既に回答済み
     }
     
@@ -236,12 +249,16 @@ function showCompletion() {
     document.getElementById('final-accuracy').textContent = accuracy + '%';
 }
 
-// Enterキーで回答
+// Enterキーで回答（改善版）
 document.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         const activeElement = document.activeElement;
+        console.log('Enterキーが押されました。アクティブ要素:', activeElement);
+        
         if (activeElement && activeElement.id && activeElement.id.startsWith('answer-')) {
             const questionId = activeElement.id.replace('answer-', '');
+            console.log('問題ID:', questionId);
+            e.preventDefault(); // フォームのデフォルト動作を防ぐ
             submitAnswer(questionId);
         }
     }
@@ -250,46 +267,21 @@ document.addEventListener('keypress', function(e) {
 // 初期化
 updateProgress();
 
-// 全角文字を半角に自動変換する機能
-function normalizeInput(input) {
-    let value = input.value;
-    
-    // 全角数字を半角に変換
-    value = value.replace(/[０-９]/g, function(s) {
-        return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
-    
-    // 全角英字を半角に変換
-    value = value.replace(/[Ａ-Ｚａ-ｚ]/g, function(s) {
-        return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
-    
-    // 全角記号を半角に変換
-    const fullwidthSymbols = {
-        '！': '!', '＠': '@', '＃': '#', '＄': '$', '％': '%', '＾': '^', '＆': '&', '＊': '*',
-        '（': '(', '）': ')', '＿': '_', '＋': '+', '－': '-', '＝': '=', '｛': '{', '｝': '}',
-        '｜': '|', '：': ':', '；': ';', '＂': '"', '＇': "'", '＜': '<', '＞': '>', '？': '?',
-        '、': ',', '。': '.', '・': '·', '～': '~', '　': ' '
-    };
-    
-    for (let full in fullwidthSymbols) {
-        value = value.replace(new RegExp(full, 'g'), fullwidthSymbols[full]);
-    }
-    
-    input.value = value;
-}
+// 文字変換機能は削除（文字重複問題の解決のため）
 
-// すべての入力フィールドに変換機能を追加
+// 入力フィールドの初期化（最小限の設定）
 document.addEventListener('DOMContentLoaded', function() {
     const inputs = document.querySelectorAll('input[type="text"]');
     inputs.forEach(input => {
-        input.addEventListener('input', function() {
-            normalizeInput(this);
+        // すべてのイベントリスナーを削除して、文字重複を防ぐ
+        input.addEventListener('input', function(e) {
+            // 入力値をログ出力（デバッグ用）
+            console.log('入力値:', this.value, 'イベント:', e.type);
         });
         
-        // フォーカス時にも変換
+        // フォーカス時の処理も最小限に
         input.addEventListener('focus', function() {
-            normalizeInput(this);
+            console.log('フォーカス:', this.id);
         });
     });
 });
