@@ -7,8 +7,7 @@ if (window.location.pathname.startsWith('/admin')) {
 console.log("🔧 アニメーション対応版 main.js が読み込まれました");
 
 // ========== CSRFトークン取得 ==========
-const csrfTokenElement = document.querySelector('meta[name="csrf-token"]');
-const csrfToken = csrfTokenElement ? csrfTokenElement.getAttribute('content') : '';
+const csrfToken = window.csrfToken || '';
 
 // ========== 瞬間応答用変数 ==========
 let cards = [];
