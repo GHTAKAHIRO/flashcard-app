@@ -3080,7 +3080,7 @@ def social_studies_submit_answer():
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 問題の正解を取得
                 cur.execute('''
-                    SELECT correct_answer, acceptable_answers, subject 
+                    SELECT correct_answer, acceptable_answers, subject, answer_suffix
                     FROM social_studies_questions 
                     WHERE id = %s
                 ''', (question_id,))
