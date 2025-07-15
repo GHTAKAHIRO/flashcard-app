@@ -2928,14 +2928,21 @@ def check_answer(user_answer, correct_answer, acceptable_answers=None):
     user_norm = normalize_answer(user_answer)
     correct_norm = normalize_answer(correct_answer)
     
+    app.logger.info(f"採点: ユーザー回答='{user_answer}' -> 正規化='{user_norm}', 正解='{correct_answer}' -> 正規化='{correct_norm}'")
+    
     # 完全一致
     if user_norm == correct_norm:
+        app.logger.info("完全一致で正解")
         return True, "完全一致"
     
     # 許容回答のチェック
     if acceptable_answers:
+        app.logger.info(f"許容回答チェック: {acceptable_answers}")
         for acceptable in acceptable_answers:
-            if user_norm == normalize_answer(acceptable):
+            acceptable_norm = normalize_answer(acceptable)
+            app.logger.info(f"許容回答比較: '{acceptable}' -> '{acceptable_norm}' vs '{user_norm}'")
+            if user_norm == acceptable_norm:
+                app.logger.info("許容回答で正解")
                 return True, "許容回答"
     
     # 数字のみの場合は数値として比較
@@ -3086,9 +3093,18 @@ def social_studies_submit_answer():
                 acceptable_answers = []
                 if question_data['acceptable_answers']:
                     try:
-                        acceptable_answers = json.loads(question_data['acceptable_answers'])
-                    except:
-                        pass
+                        # JSON形式の場合
+                        if question_data['acceptable_answers'].startswith('['):
+                            acceptable_answers = json.loads(question_data['acceptable_answers'])
+                        else:
+                            # 文字列形式の場合（カンマ区切り）
+                            acceptable_answers = [ans.strip() for ans in question_data['acceptable_answers'].split(',') if ans.strip()]
+                    except Exception as e:
+                        app.logger.error(f"許容回答パースエラー: {e}, データ: {question_data['acceptable_answers']}")
+                        # パースに失敗した場合は単一の文字列として扱う
+                        acceptable_answers = [question_data['acceptable_answers'].strip()]
+                
+                app.logger.info(f"問題ID: {question_id}, 正解: {question_data['correct_answer']}, 許容回答: {acceptable_answers}")
                 
                 # 回答をチェック
                 is_correct, result_message = check_answer(
