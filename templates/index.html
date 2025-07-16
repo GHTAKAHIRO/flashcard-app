@@ -45,8 +45,8 @@
 
     {% if current_user.is_authenticated %}
         <div class="d-grid gap-3 d-md-block">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">
-                <i class="fas fa-play me-2"></i>学習を始める
+            <a href="{{ url_for('admin') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-cog me-2"></i>管理画面へ
             </a>
         </div>
     {% else %}

@@ -1727,11 +1727,11 @@ def home():
                     # 管理者の場合は管理者画面にリダイレクト
                     if user[4]:  # is_adminがTrueの場合
                         return redirect(url_for('admin'))
-                    # 通常ユーザーの場合はnextパラメータまたはダッシュボードにリダイレクト
+                    # 通常ユーザーの場合はnextパラメータまたは管理画面にリダイレクト
                     next_page = request.args.get('next')
                     if next_page:
                         return redirect(next_page)
-                    return redirect(url_for('dashboard'))
+                    return redirect(url_for('admin'))
                 else:
                     flash("ログインに失敗しました。")
             except Exception as e:
@@ -1742,7 +1742,7 @@ def home():
         # 管理者の場合は管理者画面にリダイレクト
         if current_user.is_admin:
             return redirect(url_for('admin'))
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin'))
     return render_template('login.html')
 
 # favicon.icoのルートを追加
@@ -1754,63 +1754,8 @@ def favicon():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    try:
-        # データベース接続テスト
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # まず基本的な接続テスト
-                cur.execute('SELECT 1')
-                test_result = cur.fetchone()
-                app.logger.info(f"データベース接続テスト成功: {test_result}")
-                
-                # imageテーブルの存在確認
-                cur.execute("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'image'
-                    )
-                """)
-                table_exists = cur.fetchone()[0]
-                app.logger.info(f"imageテーブル存在確認: {table_exists}")
-                
-                if not table_exists:
-                    app.logger.warning("imageテーブルが存在しません")
-                    return render_template('dashboard.html', 
-                                         sources=[], 
-                                         saved_ranges={}, 
-                                         saved_difficulties={},
-                                         settings_locked={})
-                
-                cur.execute('SELECT DISTINCT source, subject, grade FROM image ORDER BY source')
-                rows = cur.fetchall()
-                sources = [{"source": r[0], "subject": r[1], "grade": r[2]} for r in rows]
-                
-                user_id = str(current_user.id)
-                cur.execute('SELECT source, page_range, difficulty FROM user_settings WHERE user_id = %s', (user_id,))
-                settings = cur.fetchall()
-                saved_ranges = {}
-                saved_difficulties = {}
-                # 学習履歴チェックを追加
-                settings_locked = {}
-                
-                for setting in settings:
-                    source_name = setting[0]
-                    saved_ranges[source_name] = setting[1] or ''
-                    saved_difficulties[source_name] = setting[2] or ''
-                    # 各教材の設定変更可否をチェック
-                    settings_locked[source_name] = has_study_history(user_id, source_name)
-        
-        return render_template('dashboard.html', 
-                             sources=sources, 
-                             saved_ranges=saved_ranges, 
-                             saved_difficulties=saved_difficulties,
-                             settings_locked=settings_locked)  # ロック状態を渡す
-    except Exception as e:
-        app.logger.error(f"ダッシュボードエラー: {e}")
-        import traceback
-        app.logger.error(f"詳細エラー: {traceback.format_exc()}")
-        flash("教材一覧の取得に失敗しました")
-        return redirect(url_for('login'))
+    """ダッシュボード画面 - 管理画面にリダイレクト"""
+    return redirect(url_for('admin'))
 
 @app.route('/set_page_range_and_prepare/<source>', methods=['POST'])
 @login_required
@@ -1931,7 +1876,7 @@ def reset_history(source):
         import traceback
         app.logger.error(f"詳細エラー: {traceback.format_exc()}")
     
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('admin'))
 
 @app.route('/prepare/<source>')
 @login_required
@@ -2006,7 +1951,7 @@ def prepare(source):
     except Exception as e:
         app.logger.error(f"準備画面エラー: {e}")
         flash("準備画面でエラーが発生しました")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin'))
 
 def is_all_stages_perfect(user_id, source, page_range, difficulty):
     return (
@@ -2309,7 +2254,7 @@ def vocabulary_home():
     except Exception as e:
         app.logger.error(f"英単語ホーム画面エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin'))
 
 @app.route('/vocabulary/chapters/<source>')
 @login_required
@@ -4220,7 +4165,7 @@ def admin():
     """メイン管理画面（管理者のみ）"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin'))
     
     try:
         with get_db_connection() as conn:
@@ -4242,7 +4187,7 @@ def admin():
     except Exception as e:
         app.logger.error(f"管理画面エラー: {e}")
         flash('管理画面の読み込みに失敗しました', 'error')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin'))
 
 @app.route('/social_studies/admin/upload_csv', methods=['POST'])
 @login_required
