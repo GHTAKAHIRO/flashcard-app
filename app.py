@@ -143,6 +143,7 @@ def init_wasabi_client():
             print("⚠️ Wasabi設定が不完全です。画像アップロード機能は無効になります。")
             return None
         
+        print(f"🔍 Wasabi S3クライアント作成中...")
         s3_client = boto3.client(
             's3',
             aws_access_key_id=access_key,
@@ -153,9 +154,21 @@ def init_wasabi_client():
         
         # 接続テスト
         print(f"🔍 Wasabiバケット接続テスト: {bucket_name}")
-        s3_client.head_bucket(Bucket=bucket_name)
-        print("✅ Wasabi S3クライアント初期化完了")
-        return s3_client
+        try:
+            s3_client.head_bucket(Bucket=bucket_name)
+            print("✅ Wasabi S3クライアント初期化完了")
+            return s3_client
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            error_message = e.response['Error']['Message']
+            print(f"❌ Wasabiバケット接続テスト失敗:")
+            print(f"  エラーコード: {error_code}")
+            print(f"  エラーメッセージ: {error_message}")
+            if error_code == '403':
+                print("  認証エラーまたは権限不足の可能性があります")
+            elif error_code == '404':
+                print("  バケットが存在しない可能性があります")
+            return None
         
     except Exception as e:
         print(f"❌ Wasabi S3クライアント初期化エラー: {e}")
@@ -166,8 +179,10 @@ def init_wasabi_client():
 def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
     """画像をWasabiにアップロード"""
     try:
+        print(f"🔍 画像アップロード開始: question_id={question_id}, textbook_id={textbook_id}")
         s3_client = init_wasabi_client()
         if not s3_client:
+            print("❌ Wasabiクライアント初期化失敗")
             return None, "Wasabi設定が不完全です"
         
         # 画像をPILで開いて検証
@@ -4043,10 +4058,14 @@ def social_studies_upload_image(question_id):
         return jsonify({'error': '管理者権限が必要です'}), 403
     
     try:
+        print(f"🔍 画像アップロードリクエスト受信: question_id={question_id}")
+        print(f"🔍 リクエストファイル: {list(request.files.keys())}")
+        
         if 'image' not in request.files:
             return jsonify({'error': '画像ファイルが選択されていません'}), 400
         
         image_file = request.files['image']
+        print(f"🔍 画像ファイル: {image_file.filename}, サイズ: {image_file.content_length if hasattr(image_file, 'content_length') else 'Unknown'}")
         
         if image_file.filename == '':
             return jsonify({'error': '画像ファイルが選択されていません'}), 400
@@ -4062,9 +4081,11 @@ def social_studies_upload_image(question_id):
                 textbook_id = result[1]
         
         # 画像をWasabiにアップロード
+        print(f"🔍 Wasabiアップロード開始: question_id={question_id}, textbook_id={textbook_id}")
         image_url, error = upload_image_to_wasabi(image_file, question_id, textbook_id)
         
         if error:
+            print(f"❌ Wasabiアップロードエラー: {error}")
             return jsonify({'error': error}), 500
         
         # データベースに画像URLを保存
