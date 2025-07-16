@@ -4562,11 +4562,13 @@ def social_studies_upload_questions_csv():
                                 except ValueError:
                                     unit_id = None
                         
-                        # 画像名の処理
-                        image_name = row.get('image_name', '').strip()
-                        image_url = None
+                        # 画像URLと画像タイトルの処理
+                        image_url = row.get('image_url', '').strip()
+                        image_title = row.get('image_title', '').strip()
                         
-                        if image_name and textbook_id:
+                        # 従来のimage_name項目も対応（後方互換性）
+                        image_name = row.get('image_name', '').strip()
+                        if not image_url and image_name and textbook_id:
                             # 画像存在確認とURL取得
                             try:
                                 # 教材のフォルダパスを取得
@@ -4608,9 +4610,9 @@ def social_studies_upload_questions_csv():
                         # 問題を登録
                         cur.execute('''
                             INSERT INTO social_studies_questions 
-                            (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url))
+                            (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url, image_title)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url, image_title))
                         
                         app.logger.info(f"行{row_num}: 問題を登録しました - subject: '{subject}', question: '{question}'")
                         registered_count += 1
@@ -4729,12 +4731,12 @@ def social_studies_delete_image(question_id):
             except Exception as e:
                 app.logger.warning(f"Wasabiからの画像削除に失敗: {e}")
         
-        # データベースから画像URLを削除
+        # データベースから画像URLと画像タイトルを削除
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute('''
                     UPDATE social_studies_questions 
-                    SET image_url = NULL, updated_at = CURRENT_TIMESTAMP
+                    SET image_url = NULL, image_title = NULL, updated_at = CURRENT_TIMESTAMP
                     WHERE id = %s
                 ''', (question_id,))
                 conn.commit()
@@ -4760,7 +4762,7 @@ def social_studies_get_question(question_id):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute('''
                     SELECT id, subject, question, correct_answer, acceptable_answers, 
-                           explanation, image_url, difficulty_level, textbook_id, unit_id
+                           explanation, image_url, image_title, difficulty_level, textbook_id, unit_id
                     FROM social_studies_questions 
                     WHERE id = %s
                 ''', (question_id,))
@@ -4788,26 +4790,6 @@ def social_studies_download_csv_template():
         return jsonify({'error': '管理者権限が必要です'}), 403
     
     try:
-        # 現在の教材と単元の情報を取得
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 教材一覧を取得
-                cur.execute('''
-                    SELECT id, name, subject, grade, publisher, wasabi_folder_path
-                    FROM social_studies_textbooks 
-                    ORDER BY subject, name
-                ''')
-                textbooks = cur.fetchall()
-                
-                # 単元一覧を取得
-                cur.execute('''
-                    SELECT u.id, u.name, u.chapter_number, t.name as textbook_name, t.subject
-                    FROM social_studies_units u
-                    JOIN social_studies_textbooks t ON u.textbook_id = t.id
-                    ORDER BY t.subject, t.name, u.chapter_number
-                ''')
-                units = cur.fetchall()
-        
         # CSVデータを作成
         csv_data = []
         
@@ -4815,55 +4797,13 @@ def social_studies_download_csv_template():
         csv_data.append([
             'subject', 'textbook_id', 'textbook_name', 'textbook_grade', 'textbook_publisher', 
             'textbook_wasabi_folder', 'unit_id', 'unit_name', 'unit_chapter', 
-            'question', 'correct_answer', 'acceptable_answers', 'answer_suffix', 'explanation', 'image_name'
+            'question', 'correct_answer', 'acceptable_answers', 'answer_suffix', 'explanation', 'image_url', 'image_title'
         ])
         
-        # サンプルデータ行（教材と単元の情報を含む）
-        for textbook in textbooks:
-            # その教材の単元を取得
-            textbook_units = [u for u in units if u['textbook_name'] == textbook['name']]
-            
-            if textbook_units:
-                # 単元がある場合は、各単元でサンプル問題を作成
-                for unit in textbook_units:
-                    csv_data.append([
-                        textbook['subject'],  # 科目
-                        textbook['id'],  # 教材ID
-                        textbook['name'],  # 教材名
-                        textbook['grade'] or '',  # 学年
-                        textbook['publisher'] or '',  # 出版社
-                        textbook['wasabi_folder_path'] or 'question_images',  # Wasabiフォルダパス
-                        unit['id'],  # 単元ID
-                        unit['name'],  # 単元名
-                        unit['chapter_number'] or '',  # 章番号
-                        f"{unit['name']}に関する問題例",  # 問題文
-                        '正解例',  # 正解
-                        '許容回答例1,許容回答例2',  # 許容回答
-                        '解答欄の補足',  # 解答欄の補足
-                        '解説例',  # 解説
-                        f"{unit['chapter_number'] or '1'}-1"  # 画像名
-                    ])
-            else:
-                # 単元がない場合は、教材レベルでサンプル問題を作成
-                csv_data.append([
-                    textbook['subject'],  # 科目
-                    textbook['id'],  # 教材ID
-                    textbook['name'],  # 教材名
-                    textbook['grade'] or '',  # 学年
-                    textbook['publisher'] or '',  # 出版社
-                    textbook['wasabi_folder_path'] or 'question_images',  # Wasabiフォルダパス
-                    '',  # 単元ID（空）
-                    '',  # 単元名（空）
-                    '',  # 章番号（空）
-                    f"{textbook['name']}に関する問題例",  # 問題文
-                    '正解例',  # 正解
-                    '許容回答例1,許容回答例2',  # 許容回答
-                    '解答欄の補足',  # 解答欄の補足
-                    '解説例',  # 解説
-                    '1-1'  # 画像名
-                ])
+        # 基本画像URL
+        base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/question_images"
         
-        # 空のテンプレート行も追加
+        # テンプレート行を追加
         csv_data.append([
             '地理',  # 科目
             '',  # 教材ID
@@ -4879,7 +4819,28 @@ def social_studies_download_csv_template():
             '新しい許容回答1,新しい許容回答2',  # 許容回答
             '新しい解答欄の補足',  # 解答欄の補足
             '新しい解説',  # 解説
-            '1-1'  # 画像名
+            f"{base_image_url}/1-1.jpg",  # 画像URL
+            '画像タイトル'  # 画像タイトル
+        ])
+        
+        # 追加のテンプレート行
+        csv_data.append([
+            '歴史',  # 科目
+            '',  # 教材ID
+            '',  # 教材名
+            '',  # 学年
+            '',  # 出版社
+            '',  # Wasabiフォルダパス
+            '',  # 単元ID
+            '',  # 単元名
+            '2',  # 章番号
+            '',  # 問題文
+            '',  # 正解
+            '',  # 許容回答
+            '',  # 解答欄の補足
+            '',  # 解説
+            f"{base_image_url}/2-1.jpg",  # 画像URL
+            ''  # 画像タイトル
         ])
         
         # CSVファイルを生成（BOM付きUTF-8）
@@ -4915,43 +4876,13 @@ def download_units_csv(textbook_id):
         return jsonify({'error': '管理者権限が必要です'}), 403
     
     try:
-        # 教材情報を取得
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute('''
-                    SELECT name, subject, grade, publisher
-                    FROM social_studies_textbooks 
-                    WHERE id = %s
-                ''', (textbook_id,))
-                textbook = cur.fetchone()
-                
-                if not textbook:
-                    return jsonify({'error': '教材が見つかりません'}), 404
-                
-                # 単元一覧を取得
-                cur.execute('''
-                    SELECT name, chapter_number, description
-                    FROM social_studies_units 
-                    WHERE textbook_id = %s
-                    ORDER BY chapter_number, name
-                ''', (textbook_id,))
-                units = cur.fetchall()
-        
         # CSVデータを作成
         csv_data = []
         
         # ヘッダー行
         csv_data.append(['単元名', '小番号', '説明'])
         
-        # 既存の単元データ
-        for unit in units:
-            csv_data.append([
-                unit['name'] or '',
-                unit['chapter_number'] or '',
-                unit['description'] or ''
-            ])
-        
-        # 空のテンプレート行を追加（新しい単元追加用）
+        # テンプレート行を追加（新しい単元追加用）
         csv_data.append(['新しい単元名', '1', '新しい単元の説明'])
         csv_data.append(['', '2', ''])
         csv_data.append(['', '3', ''])
@@ -4992,74 +4923,33 @@ def download_questions_csv(textbook_id):
         return jsonify({'error': '管理者権限が必要です'}), 403
     
     try:
-        # 教材情報を取得
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute('''
-                    SELECT name, subject, grade, publisher
-                    FROM social_studies_textbooks 
-                    WHERE id = %s
-                ''', (textbook_id,))
-                textbook = cur.fetchone()
-                
-                if not textbook:
-                    return jsonify({'error': '教材が見つかりません'}), 404
-                
-                # 問題一覧を取得（単元情報も含む）
-                cur.execute('''
-                    SELECT q.id, q.question, q.correct_answer, q.acceptable_answers, 
-                           q.answer_suffix, q.explanation, q.difficulty_level, q.image_url,
-                           u.name as unit_name, u.chapter_number,
-                           q.created_at
-                    FROM social_studies_questions q
-                    LEFT JOIN social_studies_units u ON q.unit_id = u.id
-                    WHERE q.textbook_id = %s
-                    ORDER BY u.chapter_number, u.name, q.id
-                ''', (textbook_id,))
-                questions = cur.fetchall()
-        
         # CSVデータを作成
         csv_data = []
         
         # ヘッダー行
         csv_data.append([
             '単元名', '章番号', '問題文', '正解', '許容回答', '解答欄の補足', 
-            '解説', '難易度', '画像URL', '登録日'
+            '解説', '難易度', '画像URL', '画像タイトル', '登録日'
         ])
         
-        # 既存の問題データ
-        for question in questions:
-            # 難易度を日本語に変換
-            difficulty_map = {
-                'basic': '基本',
-                'intermediate': '中級', 
-                'advanced': '上級'
-            }
-            difficulty = difficulty_map.get(question['difficulty_level'], '未設定')
-            
-            # 登録日をフォーマット
-            created_date = question['created_at'].strftime('%Y/%m/%d') if question['created_at'] else ''
-            
-            csv_data.append([
-                question['unit_name'] or '',
-                question['chapter_number'] or '',
-                question['question'] or '',
-                question['correct_answer'] or '',
-                question['acceptable_answers'] or '',
-                question['answer_suffix'] or '',
-                question['explanation'] or '',
-                difficulty,
-                question['image_url'] or '',
-                created_date
-            ])
+        # 教材の画像URLを取得
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT wasabi_folder_path
+                    FROM social_studies_textbooks 
+                    WHERE id = %s
+                ''', (textbook_id,))
+                textbook = cur.fetchone()
+                base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{textbook['wasabi_folder_path'] or 'question_images'}" if textbook else "https://s3.ap-northeast-1.wasabisys.com/bucket/question_images"
         
-        # 空のテンプレート行を追加（新しい問題追加用）
+        # テンプレート行を追加（新しい問題追加用）
         csv_data.append([
             '単元名', '1', '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
-            '解答欄の補足', '解説', '基本', '', ''
+            '解答欄の補足', '解説', '基本', f"{base_image_url}/1-1.jpg", '画像タイトル', ''
         ])
-        csv_data.append(['', '2', '', '', '', '', '', '基本', '', ''])
-        csv_data.append(['', '3', '', '', '', '', '', '基本', '', ''])
+        csv_data.append(['', '2', '', '', '', '', '', '基本', f"{base_image_url}/2-1.jpg", '', ''])
+        csv_data.append(['', '3', '', '', '', '', '', '基本', f"{base_image_url}/3-1.jpg", '', ''])
         
         # CSVファイルを生成（BOM付きUTF-8）
         output = io.StringIO()
