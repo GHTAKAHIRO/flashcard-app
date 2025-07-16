@@ -4897,7 +4897,7 @@ def social_studies_download_csv_template():
             status=200,
             mimetype='text/csv; charset=utf-8',
             headers={
-                'Content-Disposition': 'attachment; filename*=UTF-8\'\'social_studies_template_with_structure.csv'
+                'Content-Disposition': 'attachment; filename="social_studies_template_with_structure.csv"'
             }
         )
         
@@ -4965,9 +4965,11 @@ def download_units_csv(textbook_id):
         csv_content = output.getvalue()
         csv_bytes = csv_content.encode('utf-8-sig')  # BOM付きUTF-8
         
-        # ファイル名に教材名を含める
+        # ファイル名を英数字のみに制限
         safe_textbook_name = re.sub(r'[^\w\s-]', '', textbook['name']).strip()
         safe_textbook_name = re.sub(r'[-\s]+', '-', safe_textbook_name)
+        if not safe_textbook_name or safe_textbook_name == '-':
+            safe_textbook_name = f"textbook_{textbook_id}"
         filename = f"{safe_textbook_name}_units_template.csv"
         
         # レスポンスを作成
@@ -4976,7 +4978,7 @@ def download_units_csv(textbook_id):
             status=200,
             mimetype='text/csv; charset=utf-8',
             headers={
-                'Content-Disposition': f'attachment; filename*=UTF-8\'\'{filename}'
+                'Content-Disposition': f'attachment; filename="{filename}"'
             }
         )
         
@@ -5072,9 +5074,11 @@ def download_questions_csv(textbook_id):
         csv_content = output.getvalue()
         csv_bytes = csv_content.encode('utf-8-sig')  # BOM付きUTF-8
         
-        # ファイル名に教材名を含める
+        # ファイル名を英数字のみに制限
         safe_textbook_name = re.sub(r'[^\w\s-]', '', textbook['name']).strip()
         safe_textbook_name = re.sub(r'[-\s]+', '-', safe_textbook_name)
+        if not safe_textbook_name or safe_textbook_name == '-':
+            safe_textbook_name = f"textbook_{textbook_id}"
         filename = f"{safe_textbook_name}_questions_template.csv"
         
         # レスポンスを作成
@@ -5083,7 +5087,7 @@ def download_questions_csv(textbook_id):
             status=200,
             mimetype='text/csv; charset=utf-8',
             headers={
-                'Content-Disposition': f'attachment; filename*=UTF-8\'\'{filename}'
+                'Content-Disposition': f'attachment; filename="{filename}"'
             }
         )
         
