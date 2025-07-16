@@ -185,6 +185,9 @@ function loadTextbooks() {
     // 単元セレクトをリセット
     unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
     
+    // 科目が変更された場合は画像名欄もクリア
+    clearImagePathInfo();
+    
     if (!subject) {
         textbookSelect.innerHTML = '<option value="">教材を選択してください（オプション）</option>';
         return;
@@ -216,6 +219,8 @@ function loadUnits() {
     if (!textbookId) {
         unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
         statusDiv.style.display = 'none';
+        // 教材が選択されていない場合は画像名欄をクリア
+        clearImagePathInfo();
         return;
     }
     
@@ -223,6 +228,22 @@ function loadUnits() {
     const selectedTextbook = document.getElementById('textbook_id').options[document.getElementById('textbook_id').selectedIndex].text;
     statusText.textContent = `教材「${selectedTextbook}」の単元・章を読み込み中...`;
     statusDiv.style.display = 'block';
+    
+    // 教材の詳細情報を取得（wasabi_folder_pathを含む）
+    fetch(`/social_studies/api/textbook/${textbookId}`)
+        .then(response => response.json())
+        .then(textbookData => {
+            if (textbookData.error) {
+                console.error('教材詳細取得エラー:', textbookData.error);
+                return;
+            }
+            
+            // 画像名欄にパス情報を表示
+            updateImagePathInfo(textbookData.wasabi_folder_path);
+        })
+        .catch(error => {
+            console.error('教材詳細取得エラー:', error);
+        });
     
     // 単元を取得
     fetch(`/social_studies/api/units?textbook_id=${textbookId}`)
@@ -249,6 +270,74 @@ function loadUnits() {
             console.error('単元取得エラー:', error);
             statusText.textContent = '単元・章の取得に失敗しました';
         });
+}
+
+// 画像名欄にパス情報を表示する関数
+function updateImagePathInfo(folderPath) {
+    const imageNameInput = document.getElementById('image_name');
+    const imagePreviewDiv = document.getElementById('image-preview');
+    const statusSpan = document.getElementById('image-status');
+    
+    if (folderPath) {
+        // プレースホルダーを更新
+        imageNameInput.placeholder = `例: 1-2 (保存先: ${folderPath})`;
+        
+        // パス情報を表示
+        statusSpan.innerHTML = `<i class="fas fa-info-circle text-info"></i> 画像保存先: <code>${folderPath}</code>`;
+        imagePreviewDiv.style.display = 'block';
+        
+        // 画像名欄の下にパス情報を表示
+        const pathInfoDiv = document.getElementById('path-info');
+        if (!pathInfoDiv) {
+            const newPathInfoDiv = document.createElement('div');
+            newPathInfoDiv.id = 'path-info';
+            newPathInfoDiv.className = 'mt-2';
+            newPathInfoDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <small>
+                        <i class="fas fa-folder-open me-1"></i>
+                        <strong>画像保存先:</strong> <code>${folderPath}</code><br>
+                        <i class="fas fa-info-circle me-1"></i>
+                        画像名を入力すると、このフォルダ内の画像が自動的に検索されます
+                    </small>
+                </div>
+            `;
+            imageNameInput.parentNode.insertBefore(newPathInfoDiv, imageNameInput.nextSibling);
+        } else {
+            pathInfoDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <small>
+                        <i class="fas fa-folder-open me-1"></i>
+                        <strong>画像保存先:</strong> <code>${folderPath}</code><br>
+                        <i class="fas fa-info-circle me-1"></i>
+                        画像名を入力すると、このフォルダ内の画像が自動的に検索されます
+                    </small>
+                </div>
+            `;
+        }
+    } else {
+        clearImagePathInfo();
+    }
+}
+
+// 画像名欄のパス情報をクリアする関数
+function clearImagePathInfo() {
+    const imageNameInput = document.getElementById('image_name');
+    const imagePreviewDiv = document.getElementById('image-preview');
+    const statusSpan = document.getElementById('image-status');
+    
+    // プレースホルダーを元に戻す
+    imageNameInput.placeholder = '例: 1-2';
+    
+    // パス情報をクリア
+    statusSpan.innerHTML = '';
+    imagePreviewDiv.style.display = 'none';
+    
+    // パス情報表示を削除
+    const pathInfoDiv = document.getElementById('path-info');
+    if (pathInfoDiv) {
+        pathInfoDiv.remove();
+    }
 }
 
 // プレビュー更新機能
@@ -349,7 +438,7 @@ function checkImageExists() {
         });
 }
 
-// 全角文字を半角に自動変換する機能
+// 全角文字を半角に自動変換する機能（IME重複入力を防ぐため、blur時のみ実行）
 function normalizeInput(input) {
     let value = input.value;
     
@@ -378,16 +467,12 @@ function normalizeInput(input) {
     input.value = value;
 }
 
-// すべての入力フィールドに変換機能を追加
+// すべての入力フィールドに変換機能を追加（IME重複入力を防ぐため、blur時のみ実行）
 document.addEventListener('DOMContentLoaded', function() {
     const inputs = document.querySelectorAll('input[type="text"], textarea');
     inputs.forEach(input => {
-        input.addEventListener('input', function() {
-            normalizeInput(this);
-        });
-        
-        // フォーカス時にも変換
-        input.addEventListener('focus', function() {
+        // IME重複入力を防ぐため、blur時（フォーカスが外れた時）のみ変換を実行
+        input.addEventListener('blur', function() {
             normalizeInput(this);
         });
     });

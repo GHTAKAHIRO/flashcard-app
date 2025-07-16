@@ -3897,6 +3897,28 @@ def social_studies_api_textbooks():
         app.logger.error(f"教材APIエラー: {e}")
         return jsonify({'error': '教材の取得に失敗しました'}), 500
 
+@app.route('/social_studies/api/textbook/<int:textbook_id>')
+@login_required
+def social_studies_api_textbook_detail(textbook_id):
+    """教材詳細API（wasabi_folder_pathを含む）"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT id, name, subject, grade, publisher, wasabi_folder_path
+                    FROM social_studies_textbooks 
+                    WHERE id = %s
+                ''', (textbook_id,))
+                textbook = cur.fetchone()
+                
+                if not textbook:
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                return jsonify(dict(textbook))
+    except Exception as e:
+        app.logger.error(f"教材詳細APIエラー: {e}")
+        return jsonify({'error': '教材の取得に失敗しました'}), 500
+
 @app.route('/social_studies/api/units')
 @login_required
 def social_studies_api_units():
