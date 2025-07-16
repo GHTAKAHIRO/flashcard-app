@@ -3204,6 +3204,110 @@ def social_studies_admin():
         flash('管理者画面の読み込みに失敗しました', 'error')
         return redirect(url_for('social_studies_home'))
 
+@app.route('/social_studies/admin/unified')
+@login_required
+def social_studies_admin_unified():
+    """社会科統合管理画面（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('social_studies_home'))
+    
+    try:
+        # フィルターパラメータを取得
+        subject = request.args.get('subject', '').strip()
+        textbook_id = request.args.get('textbook_id', '').strip()
+        unit_id = request.args.get('unit_id', '').strip()
+        difficulty = request.args.get('difficulty', '').strip()
+        search = request.args.get('search', '').strip()
+        
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 統計情報を取得
+                cur.execute('SELECT COUNT(*) as total_textbooks FROM social_studies_textbooks')
+                total_textbooks = cur.fetchone()['total_textbooks']
+                
+                cur.execute('SELECT COUNT(*) as total_units FROM social_studies_units')
+                total_units = cur.fetchone()['total_units']
+                
+                cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions')
+                total_questions = cur.fetchone()['total_questions']
+                
+                cur.execute('SELECT COUNT(*) as total_study_logs FROM social_studies_study_log')
+                total_study_logs = cur.fetchone()['total_study_logs']
+                
+                # 教材一覧を取得
+                cur.execute('''
+                    SELECT 
+                        t.id, t.name, t.subject, t.grade, t.publisher, t.description, t.wasabi_folder_path,
+                        COUNT(DISTINCT u.id) as unit_count,
+                        COUNT(DISTINCT q.id) as question_count
+                    FROM social_studies_textbooks t
+                    LEFT JOIN social_studies_units u ON t.id = u.textbook_id
+                    LEFT JOIN social_studies_questions q ON t.id = q.textbook_id
+                    GROUP BY t.id, t.name, t.subject, t.grade, t.publisher, t.description, t.wasabi_folder_path
+                    ORDER BY t.created_at DESC
+                ''')
+                textbooks = cur.fetchall()
+                
+                # 問題一覧を取得（フィルター適用）
+                query = '''
+                    SELECT 
+                        q.id, q.subject, q.question, q.correct_answer, q.acceptable_answers, 
+                        q.difficulty_level, q.created_at,
+                        t.name as textbook_name, u.name as unit_name
+                    FROM social_studies_questions q
+                    LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
+                    LEFT JOIN social_studies_units u ON q.unit_id = u.id
+                '''
+                
+                # WHERE句の条件を構築
+                conditions = []
+                params = []
+                
+                if subject:
+                    conditions.append('q.subject = %s')
+                    params.append(subject)
+                
+                if textbook_id:
+                    conditions.append('q.textbook_id = %s')
+                    params.append(int(textbook_id))
+                
+                if unit_id:
+                    conditions.append('q.unit_id = %s')
+                    params.append(int(unit_id))
+                
+                if difficulty:
+                    conditions.append('q.difficulty_level = %s')
+                    params.append(difficulty)
+                
+                if search:
+                    conditions.append('(q.question ILIKE %s OR q.correct_answer ILIKE %s)')
+                    search_param = f'%{search}%'
+                    params.extend([search_param, search_param])
+                
+                # WHERE句を追加
+                if conditions:
+                    query += ' WHERE ' + ' AND '.join(conditions)
+                
+                # ORDER BY句を追加
+                query += ' ORDER BY q.created_at DESC'
+                
+                # クエリを実行
+                cur.execute(query, params)
+                questions = cur.fetchall()
+                
+                return render_template('social_studies/admin_unified.html',
+                                     total_textbooks=total_textbooks,
+                                     total_units=total_units,
+                                     total_questions=total_questions,
+                                     total_study_logs=total_study_logs,
+                                     textbooks=textbooks,
+                                     questions=questions)
+    except Exception as e:
+        app.logger.error(f"社会科統合管理画面エラー: {e}")
+        flash('統合管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('social_studies_home'))
+
 @app.route('/social_studies/admin/questions')
 @login_required
 def social_studies_admin_questions():
@@ -4051,6 +4155,132 @@ def admin():
         app.logger.error(f"管理画面エラー: {e}")
         flash('管理画面の読み込みに失敗しました', 'error')
         return redirect(url_for('dashboard'))
+
+@app.route('/social_studies/admin/upload_csv', methods=['POST'])
+@login_required
+def social_studies_upload_csv():
+    """社会科問題CSV一括登録（統合管理画面用）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    if 'csv_file' not in request.files:
+        return jsonify({'error': 'CSVファイルが選択されていません'}), 400
+    
+    file = request.files['csv_file']
+    if file.filename == '':
+        return jsonify({'error': 'CSVファイルが選択されていません'}), 400
+    
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'CSVファイルを選択してください'}), 400
+    
+    try:
+        # CSVファイルを読み込み
+        content = file.read().decode('utf-8')
+        lines = content.strip().split('\n')
+        
+        if len(lines) < 2:
+            return jsonify({'error': 'CSVファイルが空です'}), 400
+        
+        # ヘッダー行をスキップ
+        data_lines = lines[1:]
+        
+        imported_count = 0
+        error_count = 0
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for i, line in enumerate(data_lines, 2):
+                    try:
+                        # カンマで分割（ただし、ダブルクォート内のカンマは無視）
+                        import csv
+                        from io import StringIO
+                        
+                        csv_reader = csv.reader(StringIO(line))
+                        row = next(csv_reader)
+                        
+                        if len(row) < 7:
+                            app.logger.warning(f"行 {i}: 列数が不足しています")
+                            error_count += 1
+                            continue
+                        
+                        subject = row[0].strip()
+                        textbook_id = row[1].strip() if row[1].strip() else None
+                        unit_id = row[2].strip() if row[2].strip() else None
+                        question = row[3].strip()
+                        correct_answer = row[4].strip()
+                        explanation = row[5].strip() if len(row) > 5 else ''
+                        difficulty_level = row[6].strip() if len(row) > 6 else 'basic'
+                        
+                        # 必須項目のチェック
+                        if not subject or not question or not correct_answer:
+                            app.logger.warning(f"行 {i}: 必須項目が不足しています")
+                            error_count += 1
+                            continue
+                        
+                        # 科目の妥当性チェック
+                        if subject not in ['地理', '歴史', '公民']:
+                            app.logger.warning(f"行 {i}: 無効な科目です: {subject}")
+                            error_count += 1
+                            continue
+                        
+                        # 難易度の妥当性チェック
+                        if difficulty_level not in ['basic', 'intermediate', 'advanced']:
+                            difficulty_level = 'basic'
+                        
+                        # 教材IDと単元IDの妥当性チェック
+                        if textbook_id:
+                            try:
+                                textbook_id = int(textbook_id)
+                                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                                if not cur.fetchone():
+                                    app.logger.warning(f"行 {i}: 無効な教材IDです: {textbook_id}")
+                                    textbook_id = None
+                            except ValueError:
+                                app.logger.warning(f"行 {i}: 無効な教材IDです: {textbook_id}")
+                                textbook_id = None
+                        
+                        if unit_id and textbook_id:
+                            try:
+                                unit_id = int(unit_id)
+                                cur.execute('SELECT id FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                                if not cur.fetchone():
+                                    app.logger.warning(f"行 {i}: 無効な単元IDです: {unit_id}")
+                                    unit_id = None
+                            except ValueError:
+                                app.logger.warning(f"行 {i}: 無効な単元IDです: {unit_id}")
+                                unit_id = None
+                        
+                        # 問題を挿入
+                        cur.execute('''
+                            INSERT INTO social_studies_questions 
+                            (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ''', (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level))
+                        
+                        imported_count += 1
+                        
+                    except Exception as e:
+                        app.logger.error(f"行 {i} の処理エラー: {e}")
+                        error_count += 1
+                        continue
+                
+                conn.commit()
+        
+        if error_count > 0:
+            return jsonify({
+                'imported_count': imported_count,
+                'error_count': error_count,
+                'message': f'{imported_count}件の問題をインポートしました（{error_count}件エラー）'
+            })
+        else:
+            return jsonify({
+                'imported_count': imported_count,
+                'message': f'{imported_count}件の問題をインポートしました'
+            })
+            
+    except Exception as e:
+        app.logger.error(f"CSVアップロードエラー: {e}")
+        return jsonify({'error': 'CSVファイルの処理に失敗しました'}), 500
 
 @app.route('/social_studies/admin/upload_questions_csv', methods=['POST'])
 @login_required

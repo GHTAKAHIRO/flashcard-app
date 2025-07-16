@@ -1,0 +1,1011 @@
+{% extends "base.html" %}
+
+{% block title %}統合管理 - 社会科管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 統合管理画面専用のスタイル */
+    .main-container {
+        max-width: 1400px !important;
+        width: 95% !important;
+    }
+    
+    /* タブのスタイル */
+    .nav-tabs .nav-link {
+        font-weight: 500;
+        border: none;
+        border-bottom: 3px solid transparent;
+        color: #6c757d;
+    }
+    
+    .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom-color: #0d6efd;
+        background-color: transparent;
+    }
+    
+    /* テーブルの横幅を最適化 */
+    .table-responsive {
+        overflow-x: auto;
+        border-radius: 10px;
+    }
+    
+    /* テーブルセルの余白を調整 */
+    .table th, .table td {
+        padding: 12px 8px;
+        vertical-align: middle;
+    }
+    
+    /* 問題文の表示を改善 */
+    .question-text {
+        max-width: 380px;
+        word-wrap: break-word;
+        line-height: 1.4;
+    }
+    
+    /* 正解の表示を改善 */
+    .answer-text {
+        max-width: 130px;
+        word-wrap: break-word;
+        line-height: 1.3;
+    }
+    
+    /* 操作ボタンの配置を改善 */
+    .action-buttons {
+        white-space: nowrap;
+    }
+    
+    .action-buttons .btn {
+        margin: 0 2px;
+    }
+    
+    /* 統計カードのスタイル */
+    .stats-card {
+        transition: transform 0.2s;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-cog me-2"></i>社会科統合管理画面
+            </h2>
+            <p class="text-muted">教材と問題を一つの画面で管理できます</p>
+        </div>
+        <a href="{{ url_for('social_studies_home') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>ホームに戻る
+        </a>
+    </div>
+</div>
+
+<!-- 統計カード -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card stats-card text-center">
+            <div class="card-body">
+                <i class="fas fa-book fa-2x text-primary mb-2"></i>
+                <h6 class="card-title">登録教材数</h6>
+                <p class="card-text h4">{{ total_textbooks }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center">
+            <div class="card-body">
+                <i class="fas fa-list fa-2x text-info mb-2"></i>
+                <h6 class="card-title">登録単元数</h6>
+                <p class="card-text h4">{{ total_units }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center">
+            <div class="card-body">
+                <i class="fas fa-question-circle fa-2x text-success mb-2"></i>
+                <h6 class="card-title">登録問題数</h6>
+                <p class="card-text h4">{{ total_questions }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card text-center">
+            <div class="card-body">
+                <i class="fas fa-chart-line fa-2x text-warning mb-2"></i>
+                <h6 class="card-title">学習ログ数</h6>
+                <p class="card-text h4">{{ total_study_logs }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- タブナビゲーション -->
+<ul class="nav nav-tabs mb-4" id="managementTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="textbooks-tab" data-bs-toggle="tab" data-bs-target="#textbooks" type="button" role="tab">
+            <i class="fas fa-book me-2"></i>教材管理
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="questions-tab" data-bs-toggle="tab" data-bs-target="#questions" type="button" role="tab">
+            <i class="fas fa-question-circle me-2"></i>問題管理
+        </button>
+    </li>
+</ul>
+
+<!-- タブコンテンツ -->
+<div class="tab-content" id="managementTabsContent">
+    <!-- 教材管理タブ -->
+    <div class="tab-pane fade show active" id="textbooks" role="tabpanel">
+        <div class="mb-3">
+            <a href="{{ url_for('social_studies_add_textbook') }}" class="btn btn-success">
+                <i class="fas fa-plus me-2"></i>新規教材追加
+            </a>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>教材名</th>
+                                <th>科目</th>
+                                <th>学年</th>
+                                <th>出版社</th>
+                                <th>Wasabiフォルダ</th>
+                                <th>単元数</th>
+                                <th>問題数</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for textbook in textbooks %}
+                            <tr>
+                                <td>{{ textbook.id }}</td>
+                                <td>
+                                    <div class="fw-bold">{{ textbook.name }}</div>
+                                    {% if textbook.description %}
+                                    <small class="text-muted">{{ textbook.description[:50] }}{% if textbook.description|length > 50 %}...{% endif %}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ textbook.subject }}</span>
+                                </td>
+                                <td>{{ textbook.grade or '未設定' }}</td>
+                                <td>{{ textbook.publisher or '未設定' }}</td>
+                                <td>
+                                    <small class="text-muted">{{ textbook.wasabi_folder_path or 'question_images' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ textbook.unit_count or 0 }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">{{ textbook.question_count or 0 }}</span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('social_studies_admin_units', textbook_id=textbook.id) }}" 
+                                           class="btn btn-outline-info" title="単元管理">
+                                            <i class="fas fa-list"></i>
+                                        </a>
+                                        <button class="btn btn-outline-primary" onclick="editTextbook({{ textbook.id }})" title="編集">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" onclick="deleteTextbook({{ textbook.id }})" title="削除">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if not textbooks %}
+                <div class="text-center py-5">
+                    <i class="fas fa-book fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">まだ教材が登録されていません</h4>
+                    <p class="text-muted">新しい教材を追加してください</p>
+                    <a href="{{ url_for('social_studies_add_textbook') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>教材を追加
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 問題管理タブ -->
+    <div class="tab-pane fade" id="questions" role="tabpanel">
+        <div class="mb-3">
+            <button class="btn btn-danger me-2" id="bulk-delete-btn" style="display: none;" onclick="bulkDeleteQuestions()">
+                <i class="fas fa-trash me-2"></i>選択削除
+            </button>
+            <a href="{{ url_for('social_studies_add_question') }}" class="btn btn-success me-2">
+                <i class="fas fa-plus me-2"></i>新規問題追加
+            </a>
+            <button class="btn btn-info me-2" onclick="showCsvUpload()">
+                <i class="fas fa-upload me-2"></i>CSV一括登録
+            </button>
+        </div>
+
+        <!-- フィルターセクション -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-filter me-2"></i>フィルター
+                </h6>
+            </div>
+            <div class="card-body">
+                <form id="filter-form" method="GET">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="filter-subject" class="form-label">科目</label>
+                            <select class="form-select" id="filter-subject" name="subject" onchange="loadFilterTextbooks()">
+                                <option value="">全ての科目</option>
+                                <option value="地理">地理</option>
+                                <option value="歴史">歴史</option>
+                                <option value="公民">公民</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filter-textbook" class="form-label">教材</label>
+                            <select class="form-select" id="filter-textbook" name="textbook_id" onchange="loadFilterUnits()">
+                                <option value="">全ての教材</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filter-unit" class="form-label">単元・章</label>
+                            <select class="form-select" id="filter-unit" name="unit_id">
+                                <option value="">全ての単元・章</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filter-difficulty" class="form-label">難易度</label>
+                            <select class="form-select" id="filter-difficulty" name="difficulty">
+                                <option value="">全ての難易度</option>
+                                <option value="basic">基本</option>
+                                <option value="intermediate">中級</option>
+                                <option value="advanced">上級</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="filter-search" class="form-label">キーワード検索</label>
+                            <input type="text" class="form-control" id="filter-search" name="search" 
+                                   placeholder="問題文や正解で検索..." value="{{ request.args.get('search', '') }}">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search me-1"></i>検索
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+                                    <i class="fas fa-times me-1"></i>クリア
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" style="min-width: 1200px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 50px;">
+                                    <input type="checkbox" id="select-all" class="form-check-input" onchange="toggleSelectAll()">
+                                </th>
+                                <th style="width: 60px;">ID</th>
+                                <th style="width: 80px;">科目</th>
+                                <th style="width: 150px;">教材・単元</th>
+                                <th style="width: 400px;">問題文</th>
+                                <th style="width: 150px;">正解</th>
+                                <th style="width: 80px;">難易度</th>
+                                <th style="width: 100px;">登録日</th>
+                                <th style="width: 120px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for question in questions %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input question-checkbox" value="{{ question.id }}" onchange="updateBulkDeleteButton()">
+                                </td>
+                                <td>{{ question.id }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ question.subject }}</span>
+                                </td>
+                                <td>
+                                    {% if question.textbook_name %}
+                                        <div class="small">
+                                            <strong>{{ question.textbook_name }}</strong>
+                                            {% if question.unit_name %}
+                                                <br><span class="text-muted">{{ question.unit_name }}</span>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="question-text" title="{{ question.question }}">
+                                        {{ question.question }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="answer-text" title="{{ question.correct_answer }}">
+                                        {{ question.correct_answer }}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if question.difficulty_level == 'basic' %}
+                                        <span class="badge bg-success">基本</span>
+                                    {% elif question.difficulty_level == 'intermediate' %}
+                                        <span class="badge bg-warning">中級</span>
+                                    {% elif question.difficulty_level == 'advanced' %}
+                                        <span class="badge bg-danger">上級</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">未設定</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ question.created_at.strftime('%Y/%m/%d') if question.created_at else '未設定' }}</small>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editQuestion({{ question.id }})" title="編集">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteQuestion({{ question.id }})" title="削除">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if not questions %}
+                <div class="text-center py-5">
+                    <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">まだ問題が登録されていません</h4>
+                    <p class="text-muted">新しい問題を追加してください</p>
+                    <a href="{{ url_for('social_studies_add_question') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>問題を追加
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 教材編集モーダル -->
+<div class="modal fade" id="editTextbookModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">教材編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTextbookForm">
+                    <div class="mb-3">
+                        <label for="edit-textbook-name" class="form-label">教材名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-textbook-name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-textbook-subject" class="form-label">科目 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="edit-textbook-subject" name="subject" required>
+                            <option value="地理">地理</option>
+                            <option value="歴史">歴史</option>
+                            <option value="公民">公民</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit-textbook-grade" class="form-label">学年</label>
+                                <input type="text" class="form-control" id="edit-textbook-grade" name="grade" placeholder="例: 中学1年">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit-textbook-publisher" class="form-label">出版社</label>
+                                <input type="text" class="form-control" id="edit-textbook-publisher" name="publisher" placeholder="例: 東京書籍">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-textbook-description" class="form-label">説明</label>
+                        <textarea class="form-control" id="edit-textbook-description" name="description" rows="3" placeholder="教材の説明を入力してください"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-textbook-wasabi-folder-path" class="form-label">Wasabi保存フォルダ</label>
+                        <input type="text" class="form-control" id="edit-textbook-wasabi-folder-path" name="wasabi_folder_path" 
+                               placeholder="例: question_images/geography">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            この教材の問題画像を保存するWasabiのフォルダパスを指定します。
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveTextbookEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 問題編集モーダル -->
+<div class="modal fade" id="editQuestionModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">問題編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editQuestionForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit-question-subject" class="form-label">科目 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="edit-question-subject" name="subject" required onchange="loadEditTextbooks()">
+                                    <option value="地理">地理</option>
+                                    <option value="歴史">歴史</option>
+                                    <option value="公民">公民</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit-question-difficulty" class="form-label">難易度</label>
+                                <select class="form-select" id="edit-question-difficulty" name="difficulty_level">
+                                    <option value="basic">基本</option>
+                                    <option value="intermediate">中級</option>
+                                    <option value="advanced">上級</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit-question-textbook" class="form-label">教材</label>
+                                <select class="form-select" id="edit-question-textbook" name="textbook_id" onchange="loadEditUnits()">
+                                    <option value="">教材を選択</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit-question-unit" class="form-label">単元・章</label>
+                                <select class="form-select" id="edit-question-unit" name="unit_id">
+                                    <option value="">単元・章を選択</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-question-text" class="form-label">問題文 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="edit-question-text" name="question" rows="3" required placeholder="問題文を入力してください"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-question-answer" class="form-label">正解 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-question-answer" name="correct_answer" required placeholder="正解を入力してください">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-question-explanation" class="form-label">解説</label>
+                        <textarea class="form-control" id="edit-question-explanation" name="explanation" rows="3" placeholder="解説を入力してください"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuestionEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CSVアップロードモーダル -->
+<div class="modal fade" id="csvUploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">CSV一括登録</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="csvUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csv-file" class="form-label">CSVファイル</label>
+                        <input type="file" class="form-control" id="csv-file" name="csv_file" accept=".csv" required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            CSVファイルの形式: 科目,教材ID,単元ID,問題文,正解,解説,難易度
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="uploadCsv()">アップロード</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 教材管理関連の変数と関数
+let currentEditTextbookId = null;
+
+function editTextbook(textbookId) {
+    currentEditTextbookId = textbookId;
+    
+    // 教材データを取得
+    fetch(`/social_studies/admin/edit_textbook/${textbookId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            
+            // モーダルのフォームにデータを設定
+            document.getElementById('edit-textbook-name').value = data.name || '';
+            document.getElementById('edit-textbook-subject').value = data.subject || '';
+            document.getElementById('edit-textbook-grade').value = data.grade || '';
+            document.getElementById('edit-textbook-publisher').value = data.publisher || '';
+            document.getElementById('edit-textbook-description').value = data.description || '';
+            document.getElementById('edit-textbook-wasabi-folder-path').value = data.wasabi_folder_path || 'question_images';
+            
+            // モーダルを表示
+            const modal = new bootstrap.Modal(document.getElementById('editTextbookModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('教材データ取得エラー:', error);
+            alert('教材データの取得に失敗しました');
+        });
+}
+
+function saveTextbookEdit() {
+    if (!currentEditTextbookId) {
+        alert('編集する教材が選択されていません');
+        return;
+    }
+    
+    // フォームデータを取得
+    const formData = {
+        name: document.getElementById('edit-textbook-name').value,
+        subject: document.getElementById('edit-textbook-subject').value,
+        grade: document.getElementById('edit-textbook-grade').value,
+        publisher: document.getElementById('edit-textbook-publisher').value,
+        description: document.getElementById('edit-textbook-description').value,
+        wasabi_folder_path: document.getElementById('edit-textbook-wasabi-folder-path').value
+    };
+    
+    // 必須項目のチェック
+    if (!formData.name || !formData.subject) {
+        alert('教材名と科目は必須です');
+        return;
+    }
+    
+    // データを送信
+    fetch(`/social_studies/admin/edit_textbook/${currentEditTextbookId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert('教材を更新しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('教材更新エラー:', error);
+        alert('教材の更新に失敗しました');
+    });
+}
+
+function deleteTextbook(textbookId) {
+    if (!confirm('この教材を削除しますか？関連する単元と問題も削除されます。')) {
+        return;
+    }
+    
+    fetch(`/social_studies/admin/delete_textbook/${textbookId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert('教材を削除しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('教材削除エラー:', error);
+        alert('教材の削除に失敗しました');
+    });
+}
+
+// 問題管理関連の変数と関数
+let currentEditQuestionId = null;
+
+function editQuestion(questionId) {
+    currentEditQuestionId = questionId;
+    
+    // 問題データを取得
+    fetch(`/social_studies/admin/edit_question/${questionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            
+            // モーダルのフォームにデータを設定
+            document.getElementById('edit-question-subject').value = data.subject || '';
+            document.getElementById('edit-question-difficulty').value = data.difficulty_level || 'basic';
+            document.getElementById('edit-question-text').value = data.question || '';
+            document.getElementById('edit-question-answer').value = data.correct_answer || '';
+            document.getElementById('edit-question-explanation').value = data.explanation || '';
+            
+            // 教材と単元の選択肢を読み込み
+            loadEditTextbooks();
+            if (data.textbook_id) {
+                document.getElementById('edit-question-textbook').value = data.textbook_id;
+                loadEditUnits();
+                setTimeout(() => {
+                    document.getElementById('edit-question-unit').value = data.unit_id || '';
+                }, 500);
+            }
+            
+            // モーダルを表示
+            const modal = new bootstrap.Modal(document.getElementById('editQuestionModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('問題データ取得エラー:', error);
+            alert('問題データの取得に失敗しました');
+        });
+}
+
+function saveQuestionEdit() {
+    if (!currentEditQuestionId) {
+        alert('編集する問題が選択されていません');
+        return;
+    }
+    
+    // フォームデータを取得
+    const formData = {
+        subject: document.getElementById('edit-question-subject').value,
+        textbook_id: document.getElementById('edit-question-textbook').value || null,
+        unit_id: document.getElementById('edit-question-unit').value || null,
+        question: document.getElementById('edit-question-text').value,
+        correct_answer: document.getElementById('edit-question-answer').value,
+        explanation: document.getElementById('edit-question-explanation').value,
+        difficulty_level: document.getElementById('edit-question-difficulty').value
+    };
+    
+    // 必須項目のチェック
+    if (!formData.question || !formData.correct_answer) {
+        alert('問題文と正解は必須です');
+        return;
+    }
+    
+    // データを送信
+    fetch(`/social_studies/admin/edit_question/${currentEditQuestionId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert('問題を更新しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('問題更新エラー:', error);
+        alert('問題の更新に失敗しました');
+    });
+}
+
+function deleteQuestion(questionId) {
+    if (!confirm('この問題を削除しますか？')) {
+        return;
+    }
+    
+    fetch(`/social_studies/admin/delete_question/${questionId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert('問題を削除しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('問題削除エラー:', error);
+        alert('問題の削除に失敗しました');
+    });
+}
+
+// フィルター関連の関数
+function loadFilterTextbooks() {
+    const subject = document.getElementById('filter-subject').value;
+    const textbookSelect = document.getElementById('filter-textbook');
+    const unitSelect = document.getElementById('filter-unit');
+    
+    // 単元選択をリセット
+    unitSelect.innerHTML = '<option value="">全ての単元・章</option>';
+    
+    if (!subject) {
+        textbookSelect.innerHTML = '<option value="">全ての教材</option>';
+        return;
+    }
+    
+    fetch(`/social_studies/api/textbooks?subject=${subject}`)
+        .then(response => response.json())
+        .then(data => {
+            textbookSelect.innerHTML = '<option value="">全ての教材</option>';
+            data.forEach(textbook => {
+                const option = document.createElement('option');
+                option.value = textbook.id;
+                option.textContent = textbook.name;
+                textbookSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('教材データ取得エラー:', error);
+        });
+}
+
+function loadFilterUnits() {
+    const textbookId = document.getElementById('filter-textbook').value;
+    const unitSelect = document.getElementById('filter-unit');
+    
+    if (!textbookId) {
+        unitSelect.innerHTML = '<option value="">全ての単元・章</option>';
+        return;
+    }
+    
+    fetch(`/social_studies/api/units?textbook_id=${textbookId}`)
+        .then(response => response.json())
+        .then(data => {
+            unitSelect.innerHTML = '<option value="">全ての単元・章</option>';
+            data.forEach(unit => {
+                const option = document.createElement('option');
+                option.value = unit.id;
+                option.textContent = unit.name;
+                unitSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('単元データ取得エラー:', error);
+        });
+}
+
+function clearFilters() {
+    document.getElementById('filter-subject').value = '';
+    document.getElementById('filter-textbook').value = '';
+    document.getElementById('filter-unit').value = '';
+    document.getElementById('filter-difficulty').value = '';
+    document.getElementById('filter-search').value = '';
+    document.getElementById('filter-form').submit();
+}
+
+// 編集用の教材・単元読み込み関数
+function loadEditTextbooks() {
+    const subject = document.getElementById('edit-question-subject').value;
+    const textbookSelect = document.getElementById('edit-question-textbook');
+    
+    if (!subject) {
+        textbookSelect.innerHTML = '<option value="">教材を選択</option>';
+        return;
+    }
+    
+    fetch(`/social_studies/api/textbooks?subject=${subject}`)
+        .then(response => response.json())
+        .then(data => {
+            textbookSelect.innerHTML = '<option value="">教材を選択</option>';
+            data.forEach(textbook => {
+                const option = document.createElement('option');
+                option.value = textbook.id;
+                option.textContent = textbook.name;
+                textbookSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('教材データ取得エラー:', error);
+        });
+}
+
+function loadEditUnits() {
+    const textbookId = document.getElementById('edit-question-textbook').value;
+    const unitSelect = document.getElementById('edit-question-unit');
+    
+    if (!textbookId) {
+        unitSelect.innerHTML = '<option value="">単元・章を選択</option>';
+        return;
+    }
+    
+    fetch(`/social_studies/api/units?textbook_id=${textbookId}`)
+        .then(response => response.json())
+        .then(data => {
+            unitSelect.innerHTML = '<option value="">単元・章を選択</option>';
+            data.forEach(unit => {
+                const option = document.createElement('option');
+                option.value = unit.id;
+                option.textContent = unit.name;
+                unitSelect.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('単元データ取得エラー:', error);
+        });
+}
+
+// 一括削除関連の関数
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const questionCheckboxes = document.querySelectorAll('.question-checkbox');
+    
+    questionCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateBulkDeleteButton();
+}
+
+function updateBulkDeleteButton() {
+    const selectedCheckboxes = document.querySelectorAll('.question-checkbox:checked');
+    const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+    
+    if (selectedCheckboxes.length > 0) {
+        bulkDeleteBtn.style.display = 'inline-block';
+        bulkDeleteBtn.textContent = `選択削除 (${selectedCheckboxes.length}件)`;
+    } else {
+        bulkDeleteBtn.style.display = 'none';
+    }
+}
+
+function bulkDeleteQuestions() {
+    const selectedCheckboxes = document.querySelectorAll('.question-checkbox:checked');
+    const questionIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+    
+    if (questionIds.length === 0) {
+        alert('削除する問題を選択してください');
+        return;
+    }
+    
+    if (!confirm(`${questionIds.length}件の問題を削除しますか？`)) {
+        return;
+    }
+    
+    fetch('/social_studies/admin/bulk_delete_questions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question_ids: questionIds })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert(`${data.deleted_count}件の問題を削除しました`);
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('一括削除エラー:', error);
+        alert('一括削除に失敗しました');
+    });
+}
+
+// CSVアップロード関連の関数
+function showCsvUpload() {
+    const modal = new bootstrap.Modal(document.getElementById('csvUploadModal'));
+    modal.show();
+}
+
+function uploadCsv() {
+    const formData = new FormData();
+    const fileInput = document.getElementById('csv-file');
+    
+    if (!fileInput.files[0]) {
+        alert('CSVファイルを選択してください');
+        return;
+    }
+    
+    formData.append('csv_file', fileInput.files[0]);
+    
+    fetch('/social_studies/admin/upload_csv', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert(`${data.imported_count}件の問題をインポートしました`);
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('CSVアップロードエラー:', error);
+        alert('CSVアップロードに失敗しました');
+    });
+}
+
+// ページ読み込み時の初期化
+document.addEventListener('DOMContentLoaded', function() {
+    // 現在のURLパラメータをフィルターに反映
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    if (urlParams.get('subject')) {
+        document.getElementById('filter-subject').value = urlParams.get('subject');
+        loadFilterTextbooks();
+    }
+    
+    if (urlParams.get('textbook_id')) {
+        setTimeout(() => {
+            document.getElementById('filter-textbook').value = urlParams.get('textbook_id');
+            loadFilterUnits();
+        }, 500);
+    }
+    
+    if (urlParams.get('unit_id')) {
+        setTimeout(() => {
+            document.getElementById('filter-unit').value = urlParams.get('unit_id');
+        }, 1000);
+    }
+    
+    if (urlParams.get('difficulty')) {
+        document.getElementById('filter-difficulty').value = urlParams.get('difficulty');
+    }
+});
+</script>
+{% endblock %} 
