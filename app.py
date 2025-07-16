@@ -131,8 +131,15 @@ def init_wasabi_client():
         access_key = os.getenv('WASABI_ACCESS_KEY')
         secret_key = os.getenv('WASABI_SECRET_KEY')
         endpoint = os.getenv('WASABI_ENDPOINT')
+        bucket_name = os.getenv('WASABI_BUCKET')
         
-        if not all([access_key, secret_key, endpoint]):
+        print(f"🔍 Wasabi設定確認:")
+        print(f"  ACCESS_KEY: {'Set' if access_key else 'Not Set'}")
+        print(f"  SECRET_KEY: {'Set' if secret_key else 'Not Set'}")
+        print(f"  ENDPOINT: {endpoint}")
+        print(f"  BUCKET: {bucket_name}")
+        
+        if not all([access_key, secret_key, endpoint, bucket_name]):
             print("⚠️ Wasabi設定が不完全です。画像アップロード機能は無効になります。")
             return None
         
@@ -145,12 +152,14 @@ def init_wasabi_client():
         )
         
         # 接続テスト
-        s3_client.head_bucket(Bucket=os.getenv('WASABI_BUCKET'))
+        print(f"🔍 Wasabiバケット接続テスト: {bucket_name}")
+        s3_client.head_bucket(Bucket=bucket_name)
         print("✅ Wasabi S3クライアント初期化完了")
         return s3_client
         
     except Exception as e:
         print(f"❌ Wasabi S3クライアント初期化エラー: {e}")
+        print(f"❌ エラータイプ: {type(e).__name__}")
         return None
 
 # 画像アップロード関数
@@ -220,8 +229,11 @@ def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
         return image_url, None
         
     except ClientError as e:
+        print(f"❌ Wasabi ClientError: {e}")
         return None, f"Wasabiアップロードエラー: {str(e)}"
     except Exception as e:
+        print(f"❌ 画像アップロード例外: {e}")
+        print(f"❌ 例外タイプ: {type(e).__name__}")
         return None, f"画像アップロードエラー: {str(e)}"
 
 # DB接続情報
