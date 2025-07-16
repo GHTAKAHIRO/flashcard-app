@@ -3932,7 +3932,10 @@ def social_studies_api_check_image():
         image_name = request.args.get('image_name', '').strip()
         textbook_id = request.args.get('textbook_id')
         
+        app.logger.info(f"🔍 画像確認API呼び出し: image_name='{image_name}', textbook_id='{textbook_id}'")
+        
         if not image_name or not textbook_id:
+            app.logger.warning("❌ パラメータ不足")
             return jsonify({'exists': False, 'error': '画像名と教材IDが必要です'})
         
         # 教材のフォルダパスを取得
@@ -3941,46 +3944,59 @@ def social_studies_api_check_image():
                 cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
                 result = cur.fetchone()
                 if not result or not result[0]:
+                    app.logger.warning(f"❌ 教材ID {textbook_id} のフォルダパスが設定されていません")
                     return jsonify({'exists': False, 'error': '教材のフォルダパスが設定されていません'})
                 
                 folder_path = result[0]
+                app.logger.info(f"📁 教材フォルダパス: {folder_path}")
         
         # Wasabiで画像を検索
         s3_client = init_wasabi_client()
         if not s3_client:
+            app.logger.error("❌ Wasabiクライアント初期化失敗")
             return jsonify({'exists': False, 'error': 'Wasabi接続エラー'})
         
         bucket_name = os.getenv('WASABI_BUCKET')
         endpoint = os.getenv('WASABI_ENDPOINT')
         
+        app.logger.info(f"🔍 Wasabi検索: bucket={bucket_name}, endpoint={endpoint}")
+        
         # 複数の拡張子で試行
         extensions = ['jpg', 'jpeg', 'png', 'gif']
         found_image = None
+        found_extension = None
         
         for ext in extensions:
             try:
                 image_key = f"{folder_path}/{image_name}.{ext}"
+                app.logger.info(f"🔍 試行中: {image_key}")
                 s3_client.head_object(Bucket=bucket_name, Key=image_key)
                 found_image = f"{endpoint}/{bucket_name}/{image_key}"
+                found_extension = ext
+                app.logger.info(f"✅ 画像発見: {found_image}")
                 break
-            except Exception:
+            except Exception as e:
+                app.logger.debug(f"❌ 拡張子 {ext} で失敗: {str(e)}")
                 continue
         
         if found_image:
+            app.logger.info(f"✅ 画像確認成功: {found_image}")
             return jsonify({
                 'exists': True,
                 'image_url': found_image,
-                'folder_path': folder_path
+                'folder_path': folder_path,
+                'extension': found_extension
             })
         else:
+            app.logger.warning(f"❌ 画像未発見: フォルダ「{folder_path}」に「{image_name}」の画像が見つかりません")
             return jsonify({
                 'exists': False,
                 'message': f'フォルダ「{folder_path}」に「{image_name}」の画像が見つかりません'
             })
                 
     except Exception as e:
-        app.logger.error(f"画像確認エラー: {e}")
-        return jsonify({'exists': False, 'error': '画像確認に失敗しました'}), 500
+        app.logger.error(f"❌ 画像確認エラー: {e}")
+        return jsonify({'exists': False, 'error': f'画像確認に失敗しました: {str(e)}'}), 500
 
 # ========== メイン管理画面 ==========
 

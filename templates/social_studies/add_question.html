@@ -127,7 +127,7 @@
                                 <small>
                                     <strong>画像プレビュー:</strong> 
                                     <span id="image-status"></span>
-                                    <div id="image-preview-container" class="mt-2"></div>
+                                    <div id="image-preview-container" class="mt-2 text-center"></div>
                                 </small>
                             </div>
                         </div>
@@ -272,6 +272,8 @@ function checkImageExists() {
     const statusSpan = document.getElementById('image-status');
     const containerDiv = document.getElementById('image-preview-container');
     
+    console.log('🔍 画像確認開始:', { imageName, textbookId: document.getElementById('textbook_id').value });
+    
     if (!imageName) {
         previewDiv.style.display = 'none';
         return;
@@ -280,28 +282,69 @@ function checkImageExists() {
     // 選択された教材のフォルダパスを取得
     const textbookId = document.getElementById('textbook_id').value;
     if (!textbookId) {
-        statusSpan.textContent = '教材を選択してください';
+        statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> 教材を選択してください`;
         previewDiv.style.display = 'block';
         return;
     }
     
+    // ローディング表示
+    statusSpan.innerHTML = `<i class="fas fa-spinner fa-spin text-info"></i> 画像を確認中...`;
+    containerDiv.innerHTML = '';
+    previewDiv.style.display = 'block';
+    
     // 画像存在確認APIを呼び出し
     fetch(`/social_studies/api/check_image?image_name=${encodeURIComponent(imageName)}&textbook_id=${textbookId}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('🔍 APIレスポンス:', response.status, response.statusText);
+            return response.json();
+        })
         .then(data => {
+            console.log('🔍 APIデータ:', data);
+            
             if (data.exists) {
                 statusSpan.innerHTML = `<i class="fas fa-check-circle text-success"></i> 画像が見つかりました`;
-                containerDiv.innerHTML = `<img src="${data.image_url}" class="img-fluid" style="max-height: 200px;" alt="画像プレビュー">`;
+                
+                // 画像要素を作成
+                const img = document.createElement('img');
+                img.src = data.image_url;
+                img.className = 'img-fluid';
+                img.style.maxHeight = '200px';
+                img.alt = '画像プレビュー';
+                
+                // 画像読み込みエラーハンドリング
+                img.onerror = function() {
+                    console.error('❌ 画像読み込みエラー:', data.image_url);
+                    containerDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            画像が見つかりましたが、表示できませんでした。<br>
+                            URL: ${data.image_url}
+                        </div>
+                    `;
+                };
+                
+                // 画像読み込み成功
+                img.onload = function() {
+                    console.log('✅ 画像読み込み成功:', data.image_url);
+                };
+                
+                containerDiv.innerHTML = '';
+                containerDiv.appendChild(img);
             } else {
-                statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> 画像が見つかりません`;
+                statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> ${data.message || '画像が見つかりません'}`;
                 containerDiv.innerHTML = '';
             }
             previewDiv.style.display = 'block';
         })
         .catch(error => {
-            console.error('画像確認エラー:', error);
+            console.error('❌ 画像確認エラー:', error);
             statusSpan.innerHTML = `<i class="fas fa-times-circle text-danger"></i> 画像確認に失敗しました`;
-            containerDiv.innerHTML = '';
+            containerDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    エラー詳細: ${error.message}
+                </div>
+            `;
             previewDiv.style.display = 'block';
         });
 }
