@@ -304,13 +304,20 @@
                     <p class="mb-2">以下の列を含むCSVファイルをアップロードしてください：</p>
                     <ul class="mb-0">
                         <li><strong>subject</strong>: 科目（地理、歴史、公民）</li>
+                        <li><strong>textbook_name</strong>: 教材名（新規作成時）</li>
+                        <li><strong>textbook_grade</strong>: 学年（新規作成時）</li>
+                        <li><strong>textbook_publisher</strong>: 出版社（新規作成時）</li>
+                        <li><strong>textbook_wasabi_folder</strong>: Wasabi保存フォルダ（新規作成時）</li>
+                        <li><strong>unit_name</strong>: 単元名（新規作成時）</li>
+                        <li><strong>unit_chapter</strong>: 章番号（新規作成時）</li>
                         <li><strong>question</strong>: 問題文</li>
                         <li><strong>correct_answer</strong>: 正解</li>
                         <li><strong>acceptable_answers</strong>: 許容回答（カンマ区切り、オプション）</li>
                         <li><strong>answer_suffix</strong>: 解答欄の補足（オプション）</li>
                         <li><strong>explanation</strong>: 解説（オプション）</li>
-                        <li><strong>textbook_id</strong>: 教材ID（オプション）</li>
-                        <li><strong>unit_id</strong>: 単元ID（オプション）</li>
+                        <li><strong>image_name</strong>: 画像名（オプション）</li>
+                        <li><strong>textbook_id</strong>: 教材ID（既存教材使用時）</li>
+                        <li><strong>unit_id</strong>: 単元ID（既存単元使用時）</li>
                     </ul>
                 </div>
                 
@@ -348,9 +355,15 @@
                     <label for="csv-file" class="form-label">CSVファイル <span class="text-danger">*</span></label>
                     <input type="file" class="form-control" id="csv-file" accept=".csv" required>
                     <div class="mt-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="downloadSampleCsv()">
+                        <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="downloadSampleCsv()">
                             <i class="fas fa-download me-1"></i>サンプルCSVをダウンロード
                         </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="downloadTemplateCsv()">
+                            <i class="fas fa-download me-1"></i>構造付きテンプレートをダウンロード
+                        </button>
+                    </div>
+                    <div class="form-text mt-1">
+                        <strong>構造付きテンプレート</strong>: 現在の教材・単元情報と保存先フォルダパスが入力されたCSV
                     </div>
                 </div>
             </div>
@@ -649,7 +662,14 @@ function uploadCsv() {
             if (modal) {
                 modal.hide();
             }
-            alert(`✅ ${data.message}\n登録件数: ${data.registered_count}件\nスキップ件数: ${data.skipped_count}件`);
+            let message = `✅ ${data.message}\n登録件数: ${data.registered_count}件\nスキップ件数: ${data.skipped_count}件`;
+            if (data.new_textbooks_created > 0) {
+                message += `\n新規教材作成: ${data.new_textbooks_created}件`;
+            }
+            if (data.new_units_created > 0) {
+                message += `\n新規単元作成: ${data.new_units_created}件`;
+            }
+            alert(message);
             location.reload();
         } else {
             // エラーメッセージを表示
@@ -682,6 +702,12 @@ function downloadSampleCsv() {
     link.href = URL.createObjectURL(blob);
     link.download = 'social_studies_questions_sample.csv';
     link.click();
+}
+
+// 構造付きテンプレートCSVダウンロード
+function downloadTemplateCsv() {
+    // サーバーから構造付きテンプレートをダウンロード
+    window.location.href = '/social_studies/admin/download_csv_template';
 }
 
 // 画像アップロード機能

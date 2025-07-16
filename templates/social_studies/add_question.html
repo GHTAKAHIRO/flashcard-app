@@ -107,6 +107,32 @@
                                   placeholder="問題の解説や補足情報があれば入力してください"></textarea>
                     </div>
                     
+                    <div class="mb-3">
+                        <label for="image_name" class="form-label">
+                            <i class="fas fa-image me-1"></i>画像名
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="image_name" name="image_name" 
+                                   placeholder="例: 1-2" onchange="checkImageExists()">
+                            <button type="button" class="btn btn-outline-secondary" onclick="checkImageExists()">
+                                <i class="fas fa-search"></i>確認
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Wasabiに保存されている画像の名前を入力してください（拡張子不要）
+                        </div>
+                        <div id="image-preview" class="mt-2" style="display: none;">
+                            <div class="alert alert-info">
+                                <small>
+                                    <strong>画像プレビュー:</strong> 
+                                    <span id="image-status"></span>
+                                    <div id="image-preview-container" class="mt-2"></div>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         <a href="{{ url_for('social_studies_admin_questions') }}" class="btn btn-secondary me-md-2">
                             <i class="fas fa-times me-1"></i>キャンセル
@@ -237,6 +263,47 @@ function updatePreview() {
     } else {
         previewSection.style.display = 'none';
     }
+}
+
+// 画像存在確認機能
+function checkImageExists() {
+    const imageName = document.getElementById('image_name').value.trim();
+    const previewDiv = document.getElementById('image-preview');
+    const statusSpan = document.getElementById('image-status');
+    const containerDiv = document.getElementById('image-preview-container');
+    
+    if (!imageName) {
+        previewDiv.style.display = 'none';
+        return;
+    }
+    
+    // 選択された教材のフォルダパスを取得
+    const textbookId = document.getElementById('textbook_id').value;
+    if (!textbookId) {
+        statusSpan.textContent = '教材を選択してください';
+        previewDiv.style.display = 'block';
+        return;
+    }
+    
+    // 画像存在確認APIを呼び出し
+    fetch(`/social_studies/api/check_image?image_name=${encodeURIComponent(imageName)}&textbook_id=${textbookId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.exists) {
+                statusSpan.innerHTML = `<i class="fas fa-check-circle text-success"></i> 画像が見つかりました`;
+                containerDiv.innerHTML = `<img src="${data.image_url}" class="img-fluid" style="max-height: 200px;" alt="画像プレビュー">`;
+            } else {
+                statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> 画像が見つかりません`;
+                containerDiv.innerHTML = '';
+            }
+            previewDiv.style.display = 'block';
+        })
+        .catch(error => {
+            console.error('画像確認エラー:', error);
+            statusSpan.innerHTML = `<i class="fas fa-times-circle text-danger"></i> 画像確認に失敗しました`;
+            containerDiv.innerHTML = '';
+            previewDiv.style.display = 'block';
+        });
 }
 
 // 全角文字を半角に自動変換する機能
