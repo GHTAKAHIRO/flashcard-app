@@ -4042,7 +4042,7 @@ def social_studies_edit_textbook(textbook_id):
             if not subject:
                 return jsonify({'error': '科目は必須です'}), 400
             
-            if subject not in ['地理', '歴史', '公民']:
+            if subject not in ['地理', '歴史', '公民', '理科']:
                 return jsonify({'error': '無効な科目です'}), 400
             
             with get_db_connection() as conn:
@@ -4225,7 +4225,7 @@ def social_studies_upload_csv():
                             subject = result[0]
                         else:
                             # 科目の妥当性チェック
-                            if subject not in ['地理', '歴史', '公民']:
+                            if subject not in ['地理', '歴史', '公民', '理科']:
                                 app.logger.warning(f"行 {i}: 無効な科目です: {subject}")
                                 error_count += 1
                                 continue
