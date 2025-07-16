@@ -380,10 +380,10 @@
                 
                 <div class="mb-3">
                     <label for="image-file" class="form-label">画像ファイル</label>
+                    <input type="file" id="image-file" name="image" accept="image/*" style="display: none;">
                     <div class="upload-area" id="image-upload-area">
                         <i class="fas fa-image fa-3x text-muted mb-3"></i>
                         <p class="mb-2">画像をドラッグ&ドロップまたはクリックして選択</p>
-                        <input type="file" id="image-file" name="image" accept="image/*" style="display: none;">
                         <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('image-file').click()">
                             画像を選択
                         </button>
