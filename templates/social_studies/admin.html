@@ -11,8 +11,8 @@
             </h2>
             <p class="text-muted">社会科一問一答システムの管理を行います</p>
         </div>
-        <a href="{{ url_for('social_studies_home') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i>ホームに戻る
+        <a href="{{ url_for('admin') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>管理画面に戻る
         </a>
     </div>
 </div>
@@ -60,20 +60,7 @@
 
 <!-- 管理メニュー -->
 <div class="row g-4">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="fas fa-book me-2"></i>教材管理
-                </h5>
-                <p class="card-text">教材と単元の管理を行います。</p>
-                <a href="{{ url_for('social_studies_admin_textbooks') }}" class="btn btn-info">
-                    <i class="fas fa-book me-1"></i>教材一覧
-                </a>
-            </div>
-        </div>
-    </div>
-    
+
     <div class="col-md-4">
         <div class="card">
             <div class="card-body">

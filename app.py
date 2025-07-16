@@ -2996,38 +2996,7 @@ def levenshtein_distance(str1, str2):
     
     return previous_row[-1]
 
-@app.route('/social_studies')
-@login_required
-def social_studies_home():
-    """社会科一問一答ホーム画面"""
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 科目一覧の取得
-                cur.execute('SELECT DISTINCT subject FROM social_studies_questions ORDER BY subject')
-                subjects = [row['subject'] for row in cur.fetchall()]
-                
-                # 学習履歴の取得
-                cur.execute('''
-                    SELECT 
-                        subject,
-                        COUNT(*) as total_questions,
-                        COUNT(CASE WHEN is_correct THEN 1 END) as correct_answers,
-                        MAX(created_at) as last_studied
-                    FROM social_studies_study_log 
-                    WHERE user_id = %s 
-                    GROUP BY subject
-                    ORDER BY last_studied DESC
-                ''', (current_user.id,))
-                study_history = cur.fetchall()
-                
-                return render_template('social_studies/home.html', 
-                                     subjects=subjects, 
-                                     study_history=study_history)
-    except Exception as e:
-        app.logger.error(f"社会科ホーム画面エラー: {e}")
-        flash('データの取得に失敗しました', 'error')
-        return render_template('social_studies/home.html', subjects=[], study_history=[])
+
 
 @app.route('/social_studies/quiz/<subject>')
 @login_required
@@ -3048,7 +3017,7 @@ def social_studies_quiz(subject):
                 
                 if not questions:
                     flash('この科目の問題が見つかりません', 'error')
-                    return redirect(url_for('social_studies_home'))
+                    return redirect(url_for('admin'))
                 
                 return render_template('social_studies/quiz.html', 
                                      questions=questions, 
@@ -3056,7 +3025,7 @@ def social_studies_quiz(subject):
     except Exception as e:
         app.logger.error(f"社会科クイズ画面エラー: {e}")
         flash('問題の取得に失敗しました', 'error')
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
 
 @app.route('/social_studies/submit_answer', methods=['POST'])
 @login_required
@@ -3129,7 +3098,7 @@ def social_studies_admin():
     """社会科管理画面（管理者のみ）- 統合管理画面にリダイレクト"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
     
     # 統合管理画面にリダイレクト
     return redirect(url_for('social_studies_admin_unified'))
@@ -3140,7 +3109,7 @@ def social_studies_admin_textbook_unified(textbook_id):
     """教材別統合管理画面（管理者のみ）"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
     
     try:
         # フィルターパラメータを取得
@@ -3156,7 +3125,7 @@ def social_studies_admin_textbook_unified(textbook_id):
                 
                 if not textbook:
                     flash('教材が見つかりません', 'error')
-                    return redirect(url_for('social_studies_admin_textbooks'))
+                    return redirect(url_for('social_studies_admin_unified'))
                 
                 # 統計情報を取得
                 cur.execute('SELECT COUNT(*) as total_units FROM social_studies_units WHERE textbook_id = %s', (textbook_id,))
@@ -3235,7 +3204,7 @@ def social_studies_admin_textbook_unified(textbook_id):
     except Exception as e:
         app.logger.error(f"教材別統合管理画面エラー: {e}")
         flash('教材別統合管理画面の読み込みに失敗しました', 'error')
-        return redirect(url_for('social_studies_admin_textbooks'))
+        return redirect(url_for('social_studies_admin_unified'))
 
 @app.route('/social_studies/admin/unified')
 @login_required
@@ -3243,7 +3212,7 @@ def social_studies_admin_unified():
     """社会科統合管理画面（管理者のみ）"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
     
     try:
         # フィルターパラメータを取得
@@ -3339,7 +3308,7 @@ def social_studies_admin_unified():
     except Exception as e:
         app.logger.error(f"社会科統合管理画面エラー: {e}")
         flash('統合管理画面の読み込みに失敗しました', 'error')
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
 
 @app.route('/social_studies/admin/questions')
 @login_required
@@ -3347,7 +3316,7 @@ def social_studies_admin_questions():
     """社会科問題一覧（管理者のみ）"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
     
     try:
         # フィルターパラメータを取得
@@ -3418,7 +3387,7 @@ def social_studies_add_question():
     """社会科問題追加（管理者のみ）"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
     
     if request.method == 'POST':
         subject = request.form['subject']
@@ -3638,177 +3607,13 @@ def social_studies_edit_question(question_id):
 
 # ========== 教材管理 ==========
 
-@app.route('/social_studies/admin/textbooks')
-@login_required
-def social_studies_admin_textbooks():
-    """教材一覧（管理者のみ）"""
-    if not current_user.is_admin:
-        flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 教材一覧を取得（単元数と問題数も含む）
-                cur.execute('''
-                    SELECT 
-                        t.*,
-                        COUNT(DISTINCT u.id) as unit_count,
-                        COUNT(DISTINCT q.id) as question_count
-                    FROM social_studies_textbooks t
-                    LEFT JOIN social_studies_units u ON t.id = u.textbook_id
-                    LEFT JOIN social_studies_questions q ON t.id = q.textbook_id
-                    GROUP BY t.id
-                    ORDER BY t.subject, t.name
-                ''')
-                textbooks = cur.fetchall()
-                return render_template('social_studies/admin_textbooks.html', textbooks=textbooks)
-    except Exception as e:
-        app.logger.error(f"教材一覧エラー: {e}")
-        flash('教材一覧の取得に失敗しました', 'error')
-        return redirect(url_for('social_studies_admin'))
 
-@app.route('/social_studies/admin/add_textbook', methods=['GET', 'POST'])
-@login_required
-def social_studies_add_textbook():
-    """教材追加（管理者のみ）"""
-    if not current_user.is_admin:
-        flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
-    
-    if request.method == 'POST':
-        name = request.form['name']
-        subject = request.form['subject']
-        grade = request.form.get('grade', '')
-        publisher = request.form.get('publisher', '')
-        description = request.form.get('description', '')
-        wasabi_folder_path = request.form.get('wasabi_folder_path', 'question_images').strip()
-        
-        # フォルダパスが空の場合はデフォルト値を使用
-        if not wasabi_folder_path:
-            wasabi_folder_path = 'question_images'
-        
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute('''
-                        INSERT INTO social_studies_textbooks (name, subject, grade, publisher, description, wasabi_folder_path)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    ''', (name, subject, grade, publisher, description, wasabi_folder_path))
-                    conn.commit()
-                    flash('教材が追加されました', 'success')
-                    return redirect(url_for('social_studies_admin_textbooks'))
-        except Exception as e:
-            app.logger.error(f"教材追加エラー: {e}")
-            flash('教材の追加に失敗しました', 'error')
-    
-    return render_template('social_studies/add_textbook.html')
 
-@app.route('/social_studies/admin/edit_textbook/<int:textbook_id>', methods=['GET', 'POST'])
-@login_required
-def social_studies_edit_textbook(textbook_id):
-    """教材編集（管理者のみ）"""
-    if not current_user.is_admin:
-        return jsonify({'error': '管理者権限が必要です'}), 403
-    
-    if request.method == 'GET':
-        # 教材データを取得
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute('''
-                        SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
-                        FROM social_studies_textbooks 
-                        WHERE id = %s
-                    ''', (textbook_id,))
-                    textbook = cur.fetchone()
-                    
-                    if not textbook:
-                        return jsonify({'error': '教材が見つかりません'}), 404
-                    
-                    return jsonify(dict(textbook))
-        except Exception as e:
-            app.logger.error(f"教材取得エラー: {e}")
-            return jsonify({'error': '教材の取得に失敗しました'}), 500
-    
-    elif request.method == 'POST':
-        # 教材データを更新
-        try:
-            data = request.get_json()
-            name = data.get('name', '').strip()
-            subject = data.get('subject', '').strip()
-            grade = data.get('grade', '').strip()
-            publisher = data.get('publisher', '').strip()
-            description = data.get('description', '').strip()
-            wasabi_folder_path = data.get('wasabi_folder_path', 'question_images').strip()
-            
-            # フォルダパスが空の場合はデフォルト値を使用
-            if not wasabi_folder_path:
-                wasabi_folder_path = 'question_images'
-            
-            # バリデーション
-            if not name or not subject:
-                return jsonify({'error': '教材名と科目は必須です'}), 400
-            
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    # 教材が存在するかチェック
-                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
-                    if not cur.fetchone():
-                        return jsonify({'error': '教材が見つかりません'}), 404
-                    
-                    # 教材を更新
-                    cur.execute('''
-                        UPDATE social_studies_textbooks 
-                        SET name = %s, subject = %s, grade = %s, publisher = %s, description = %s, wasabi_folder_path = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    ''', (name, subject, grade, publisher, description, wasabi_folder_path, textbook_id))
-                    conn.commit()
-                    
-                    return jsonify({'success': True, 'message': '教材が更新されました'})
-                    
-        except Exception as e:
-            app.logger.error(f"教材更新エラー: {e}")
-            return jsonify({'error': '教材の更新に失敗しました'}), 500
 
-@app.route('/social_studies/admin/delete_textbook/<int:textbook_id>', methods=['POST'])
-@login_required
-def social_studies_delete_textbook(textbook_id):
-    """教材削除（管理者のみ）"""
-    if not current_user.is_admin:
-        return jsonify({'error': '管理者権限が必要です'}), 403
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # 教材が存在するかチェック
-                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
-                if not cur.fetchone():
-                    return jsonify({'error': '教材が見つかりません'}), 404
-                
-                # 関連する問題の学習ログを削除
-                cur.execute('''
-                    DELETE FROM social_studies_study_log 
-                    WHERE question_id IN (
-                        SELECT id FROM social_studies_questions WHERE textbook_id = %s
-                    )
-                ''', (textbook_id,))
-                
-                # 関連する問題を削除
-                cur.execute('DELETE FROM social_studies_questions WHERE textbook_id = %s', (textbook_id,))
-                
-                # 関連する単元を削除（CASCADE制約により自動削除される）
-                cur.execute('DELETE FROM social_studies_units WHERE textbook_id = %s', (textbook_id,))
-                
-                # 教材を削除
-                cur.execute('DELETE FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
-                conn.commit()
-                
-                return jsonify({'success': True, 'message': '教材が削除されました'})
-                
-    except Exception as e:
-        app.logger.error(f"教材削除エラー: {e}")
-        return jsonify({'error': '教材の削除に失敗しました'}), 500
+
+
+
+
 
 # ========== 単元管理 ==========
 
@@ -3818,7 +3623,7 @@ def social_studies_admin_units(textbook_id):
     """単元一覧（管理者のみ）"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
     
     try:
         with get_db_connection() as conn:
@@ -3829,7 +3634,7 @@ def social_studies_admin_units(textbook_id):
                 
                 if not textbook:
                     flash('教材が見つかりません', 'error')
-                    return redirect(url_for('social_studies_admin_textbooks'))
+                    return redirect(url_for('social_studies_admin_unified'))
                 
                 # 単元一覧を取得（問題数も含む）
                 cur.execute('''
@@ -3854,7 +3659,7 @@ def social_studies_admin_units(textbook_id):
     except Exception as e:
         app.logger.error(f"単元一覧エラー: {e}")
         flash('単元一覧の取得に失敗しました', 'error')
-        return redirect(url_for('social_studies_admin_textbooks'))
+        return redirect(url_for('social_studies_admin_unified'))
 
 @app.route('/social_studies/admin/add_unit/<int:textbook_id>', methods=['GET', 'POST'])
 @login_required
@@ -3862,7 +3667,7 @@ def social_studies_add_unit(textbook_id):
     """単元追加（管理者のみ）"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('social_studies_home'))
+        return redirect(url_for('admin'))
     
     try:
         with get_db_connection() as conn:
@@ -3873,7 +3678,7 @@ def social_studies_add_unit(textbook_id):
                 
                 if not textbook:
                     flash('教材が見つかりません', 'error')
-                    return redirect(url_for('social_studies_admin_textbooks'))
+                    return redirect(url_for('social_studies_admin_unified'))
                 
                 if request.method == 'POST':
                     name = request.form['name']
