@@ -3962,6 +3962,41 @@ def social_studies_api_check_image():
         app.logger.error(f"❌ 画像確認エラー: {e}")
         return jsonify({'exists': False, 'error': f'画像確認に失敗しました: {str(e)}'}), 500
 
+# ========== 教材管理 ==========
+
+@app.route('/social_studies/admin/add_textbook', methods=['GET', 'POST'])
+@login_required
+def social_studies_add_textbook():
+    """教材追加（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('admin'))
+    
+    if request.method == 'POST':
+        name = request.form['name']
+        subject = request.form['subject']
+        grade = request.form.get('grade', '')
+        publisher = request.form.get('publisher', '')
+        description = request.form.get('description', '')
+        wasabi_folder_path = request.form.get('wasabi_folder_path', '').strip()
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        INSERT INTO social_studies_textbooks 
+                        (name, subject, grade, publisher, description, wasabi_folder_path)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    ''', (name, subject, grade, publisher, description, wasabi_folder_path))
+                    conn.commit()
+                    flash('教材が追加されました', 'success')
+                    return redirect(url_for('social_studies_admin_unified'))
+        except Exception as e:
+            app.logger.error(f"教材追加エラー: {e}")
+            flash('教材の追加に失敗しました', 'error')
+    
+    return render_template('social_studies/add_textbook.html')
+
 # ========== メイン管理画面 ==========
 
 @app.route('/admin')
