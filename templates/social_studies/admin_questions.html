@@ -712,17 +712,24 @@ function showImageUpload(questionId) {
 }
 
 function uploadImage() {
+    console.log('uploadImage関数が呼び出されました');
+    
     const fileInput = document.getElementById('image-file');
+    console.log('ファイル入力要素:', fileInput);
     
     if (!fileInput.files[0]) {
         alert('画像ファイルを選択してください');
         return;
     }
     
+    console.log('選択されたファイル:', fileInput.files[0]);
+    
     if (!currentQuestionId) {
         alert('問題IDが設定されていません');
         return;
     }
+    
+    console.log('問題ID:', currentQuestionId);
     
     const formData = new FormData();
     formData.append('image', fileInput.files[0]);
@@ -733,12 +740,18 @@ function uploadImage() {
     uploadButton.disabled = true;
     uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>アップロード中...';
     
+    console.log('アップロード開始:', `/social_studies/admin/upload_image/${currentQuestionId}`);
+    
     fetch(`/social_studies/admin/upload_image/${currentQuestionId}`, {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('レスポンス:', response);
+        return response.json();
+    })
     .then(data => {
+        console.log('レスポンスデータ:', data);
         if (data.success) {
             alert('画像をアップロードしました');
             // 現在の画像を更新
@@ -786,19 +799,6 @@ function deleteCurrentImage() {
         });
     }
 }
-
-// 画像ファイル選択時の処理
-document.getElementById('image-file').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const uploadArea = document.getElementById('image-upload-area');
-        uploadArea.innerHTML = `
-            <i class="fas fa-image fa-3x text-success mb-3"></i>
-            <p class="mb-2"><strong>${file.name}</strong></p>
-            <p class="text-muted">画像が選択されました</p>
-        `;
-    }
-});
 
 // CSVファイル選択時の処理
 document.getElementById('csv-file').addEventListener('change', function(e) {
@@ -944,6 +944,31 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('緊急用ボタン有効化完了');
         }
     };
+    
+    // 画像ファイル選択時の処理
+    const imageFileInput = document.getElementById('image-file');
+    if (imageFileInput) {
+        imageFileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const uploadArea = document.getElementById('image-upload-area');
+                uploadArea.innerHTML = `
+                    <i class="fas fa-image fa-3x text-success mb-3"></i>
+                    <p class="mb-2"><strong>${file.name}</strong></p>
+                    <p class="text-muted">画像が選択されました</p>
+                `;
+            }
+        });
+    }
+    
+    // 画像アップロードボタンのイベントリスナーを設定
+    const imageUploadBtn = document.querySelector('#imageUploadModal .btn-primary');
+    if (imageUploadBtn) {
+        imageUploadBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            uploadImage();
+        });
+    }
     
     // フィルター機能の初期化
     initializeFilters();
