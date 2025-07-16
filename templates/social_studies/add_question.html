@@ -229,7 +229,7 @@ function loadUnits() {
     statusText.textContent = `教材「${selectedTextbook}」の単元・章を読み込み中...`;
     statusDiv.style.display = 'block';
     
-    // 教材の詳細情報を取得（wasabi_folder_pathを含む）
+                    // 教材の詳細情報を取得（画像フォルダパスを含む）
     fetch(`/social_studies/api/textbook/${textbookId}`)
         .then(response => response.json())
         .then(textbookData => {

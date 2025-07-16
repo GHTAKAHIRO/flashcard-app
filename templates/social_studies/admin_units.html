@@ -12,10 +12,12 @@
             <p class="text-muted">{{ textbook.name }}の単元を管理できます</p>
         </div>
         <div>
+            <button class="btn btn-info me-2" onclick="showCsvUploadModal()">
+                <i class="fas fa-upload me-2"></i>CSV一括登録
+            </button>
             <a href="{{ url_for('social_studies_add_unit', textbook_id=textbook.id) }}" class="btn btn-success me-2">
                 <i class="fas fa-plus me-2"></i>新規追加
             </a>
-
         </div>
     </div>
 </div>
@@ -151,6 +153,43 @@
         </div>
     </div>
 </div>
+
+<!-- CSVアップロードモーダル -->
+<div class="modal fade" id="csvUploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">単元CSV一括登録</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="csvUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csv-file" class="form-label">CSVファイル</label>
+                        <input type="file" class="form-control" id="csv-file" name="csv_file" accept=".csv" required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            CSVファイルの形式: 単元名,章番号,説明<br>
+                            <small class="text-muted">※ 章番号と説明は空でも可</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="csv-template" class="form-label">CSVテンプレート</label>
+                        <div class="d-grid">
+                            <button type="button" class="btn btn-outline-secondary" onclick="downloadCsvTemplate()">
+                                <i class="fas fa-download me-1"></i>テンプレートをダウンロード
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="uploadCsv()">アップロード</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -264,6 +303,76 @@ function deleteUnit(unitId) {
             alert('削除に失敗しました');
         });
     }
+}
+
+// CSVアップロード関連の関数
+function showCsvUploadModal() {
+    const modal = new bootstrap.Modal(document.getElementById('csvUploadModal'));
+    modal.show();
+}
+
+function downloadCsvTemplate() {
+    const csvContent = '単元名,章番号,説明\n地理の基礎,1,地理学習の基礎となる内容\n日本の地形,2,日本の地形と気候について\n世界の国々,3,世界各国の地理的特徴';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'units_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function uploadCsv() {
+    const fileInput = document.getElementById('csv-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('CSVファイルを選択してください');
+        return;
+    }
+    
+    if (!file.name.endsWith('.csv')) {
+        alert('CSVファイルを選択してください');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('csv_file', file);
+    formData.append('textbook_id', '{{ textbook.id }}');
+    
+    // アップロードボタンを無効化
+    const uploadButton = document.querySelector('#csvUploadModal .btn-primary');
+    const originalText = uploadButton.textContent;
+    uploadButton.disabled = true;
+    uploadButton.textContent = 'アップロード中...';
+    
+    fetch('/social_studies/admin/upload_units_csv', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラー: ' + data.error);
+        } else {
+            alert(data.message || 'CSVアップロードが完了しました');
+            // モーダルを閉じてページを再読み込み
+            const modal = bootstrap.Modal.getInstance(document.getElementById('csvUploadModal'));
+            modal.hide();
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('CSVアップロードエラー:', error);
+        alert('CSVアップロードに失敗しました');
+    })
+    .finally(() => {
+        // ボタンを元に戻す
+        uploadButton.disabled = false;
+        uploadButton.textContent = originalText;
+    });
 }
 </script>
 {% endblock %} 

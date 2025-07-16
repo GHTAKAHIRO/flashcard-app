@@ -3997,6 +3997,114 @@ def social_studies_add_textbook():
     
     return render_template('social_studies/add_textbook.html')
 
+@app.route('/social_studies/admin/edit_textbook/<int:textbook_id>', methods=['GET', 'POST'])
+@login_required
+def social_studies_edit_textbook(textbook_id):
+    """教材編集（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    if request.method == 'GET':
+        # 教材データを取得
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('''
+                        SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
+                        FROM social_studies_textbooks 
+                        WHERE id = %s
+                    ''', (textbook_id,))
+                    textbook = cur.fetchone()
+                    
+                    if not textbook:
+                        return jsonify({'error': '教材が見つかりません'}), 404
+                    
+                    return jsonify(dict(textbook))
+        except Exception as e:
+            app.logger.error(f"教材取得エラー: {e}")
+            return jsonify({'error': '教材の取得に失敗しました'}), 500
+    
+    elif request.method == 'POST':
+        # 教材データを更新
+        try:
+            data = request.get_json()
+            name = data.get('name', '').strip()
+            subject = data.get('subject', '').strip()
+            grade = data.get('grade', '').strip()
+            publisher = data.get('publisher', '').strip()
+            description = data.get('description', '').strip()
+            wasabi_folder_path = data.get('wasabi_folder_path', '').strip()
+            
+            # バリデーション
+            if not name:
+                return jsonify({'error': '教材名は必須です'}), 400
+            
+            if not subject:
+                return jsonify({'error': '科目は必須です'}), 400
+            
+            if subject not in ['地理', '歴史', '公民']:
+                return jsonify({'error': '無効な科目です'}), 400
+            
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # 教材が存在するかチェック
+                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                    if not cur.fetchone():
+                        return jsonify({'error': '教材が見つかりません'}), 404
+                    
+                    # 教材を更新
+                    cur.execute('''
+                        UPDATE social_studies_textbooks 
+                        SET name = %s, subject = %s, grade = %s, publisher = %s, description = %s, wasabi_folder_path = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s
+                    ''', (name, subject, grade, publisher, description, wasabi_folder_path, textbook_id))
+                    conn.commit()
+                    
+                    return jsonify({'success': True, 'message': '教材が更新されました'})
+                    
+        except Exception as e:
+            app.logger.error(f"教材更新エラー: {e}")
+            return jsonify({'error': '教材の更新に失敗しました'}), 500
+
+@app.route('/social_studies/admin/delete_textbook/<int:textbook_id>', methods=['POST'])
+@login_required
+def social_studies_delete_textbook(textbook_id):
+    """教材削除（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 教材が存在するかチェック
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                # 関連する問題の学習ログを削除
+                cur.execute('''
+                    DELETE FROM social_studies_study_log 
+                    WHERE question_id IN (
+                        SELECT id FROM social_studies_questions WHERE textbook_id = %s
+                    )
+                ''', (textbook_id,))
+                
+                # 関連する問題を削除
+                cur.execute('DELETE FROM social_studies_questions WHERE textbook_id = %s', (textbook_id,))
+                
+                # 関連する単元を削除
+                cur.execute('DELETE FROM social_studies_units WHERE textbook_id = %s', (textbook_id,))
+                
+                # 教材を削除
+                cur.execute('DELETE FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                conn.commit()
+                
+                return jsonify({'success': True, 'message': '教材が削除されました'})
+                
+    except Exception as e:
+        app.logger.error(f"教材削除エラー: {e}")
+        return jsonify({'error': '教材の削除に失敗しました'}), 500
+
 # ========== メイン管理画面 ==========
 
 @app.route('/admin')
@@ -4172,6 +4280,119 @@ def social_studies_upload_csv():
             
     except Exception as e:
         app.logger.error(f"CSVアップロードエラー: {e}")
+        return jsonify({'error': 'CSVファイルの処理に失敗しました'}), 500
+
+@app.route('/social_studies/admin/upload_units_csv', methods=['POST'])
+@login_required
+def social_studies_upload_units_csv():
+    """単元CSV一括登録（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    if 'csv_file' not in request.files:
+        return jsonify({'error': 'CSVファイルが選択されていません'}), 400
+    
+    file = request.files['csv_file']
+    textbook_id = request.form.get('textbook_id')
+    
+    if file.filename == '':
+        return jsonify({'error': 'CSVファイルが選択されていません'}), 400
+    
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'CSVファイルを選択してください'}), 400
+    
+    if not textbook_id:
+        return jsonify({'error': '教材IDが指定されていません'}), 400
+    
+    try:
+        # CSVファイルを読み込み
+        content = file.read().decode('utf-8')
+        lines = content.strip().split('\n')
+        
+        if len(lines) < 2:
+            return jsonify({'error': 'CSVファイルが空です'}), 400
+        
+        # ヘッダー行をスキップ
+        data_lines = lines[1:]
+        
+        imported_count = 0
+        error_count = 0
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 教材が存在するかチェック
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '指定された教材が見つかりません'}), 400
+                
+                for i, line in enumerate(data_lines, 2):
+                    try:
+                        # カンマで分割
+                        import csv
+                        from io import StringIO
+                        
+                        csv_reader = csv.reader(StringIO(line))
+                        row = next(csv_reader)
+                        
+                        if len(row) < 1:
+                            app.logger.warning(f"行 {i}: 列数が不足しています")
+                            error_count += 1
+                            continue
+                        
+                        name = row[0].strip()
+                        chapter_number = row[1].strip() if len(row) > 1 and row[1].strip() else None
+                        description = row[2].strip() if len(row) > 2 and row[2].strip() else ''
+                        
+                        # 必須項目のチェック
+                        if not name:
+                            app.logger.warning(f"行 {i}: 単元名が空です")
+                            error_count += 1
+                            continue
+                        
+                        # 章番号の妥当性チェック
+                        chapter_number_int = None
+                        if chapter_number:
+                            try:
+                                chapter_number_int = int(chapter_number)
+                                if chapter_number_int < 1:
+                                    app.logger.warning(f"行 {i}: 章番号は1以上の数値で入力してください")
+                                    error_count += 1
+                                    continue
+                            except ValueError:
+                                app.logger.warning(f"行 {i}: 章番号は数値で入力してください")
+                                error_count += 1
+                                continue
+                        
+                        # 単元を挿入
+                        cur.execute('''
+                            INSERT INTO social_studies_units 
+                            (textbook_id, name, chapter_number, description)
+                            VALUES (%s, %s, %s, %s)
+                        ''', (textbook_id, name, chapter_number_int, description))
+                        
+                        imported_count += 1
+                        
+                    except Exception as e:
+                        app.logger.error(f"行 {i} の処理エラー: {e}")
+                        error_count += 1
+                        continue
+                
+                conn.commit()
+        
+        if error_count > 0:
+            return jsonify({
+                'imported_count': imported_count,
+                'error_count': error_count,
+                'message': f'{imported_count}件の単元をインポートしました（{error_count}件エラー）'
+            })
+        else:
+            return jsonify({
+                'imported_count': imported_count,
+                'message': f'{imported_count}件の単元をインポートしました'
+            })
+            
+    except Exception as e:
+        app.logger.error(f"単元CSVアップロードエラー: {e}")
         return jsonify({'error': 'CSVファイルの処理に失敗しました'}), 500
 
 @app.route('/social_studies/admin/upload_questions_csv', methods=['POST'])
