@@ -35,7 +35,7 @@ def test_wasabi_connection():
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
             endpoint_url=endpoint,
-            region_name='us-east-1'
+            region_name='ap-northeast-1'
         )
         
         # 接続テスト

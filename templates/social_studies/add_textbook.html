@@ -2,6 +2,44 @@
 
 {% block title %}教材追加 - 社会科管理{% endblock %}
 
+{% block scripts %}
+<script>
+function updateFolderPath() {
+    const subject = document.getElementById('subject_folder').value;
+    const textbook = document.getElementById('textbook_folder').value;
+    const unit = document.getElementById('unit_folder').value;
+    
+    let path = '';
+    if (subject) {
+        path += subject;
+        if (textbook) {
+            path += '/' + textbook;
+            if (unit) {
+                path += '/' + unit;
+            }
+        }
+    }
+    
+    document.getElementById('wasabi_folder_path').value = path;
+}
+
+// 科目選択時に自動で教科フォルダを設定
+document.getElementById('subject').addEventListener('change', function() {
+    const subject = this.value;
+    const subjectFolder = document.getElementById('subject_folder');
+    
+    // 科目に応じて教科フォルダを自動設定
+    if (subject === '地理' || subject === '歴史' || subject === '公民') {
+        subjectFolder.value = '社会';
+    } else {
+        subjectFolder.value = '';
+    }
+    
+    updateFolderPath();
+});
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="mb-4">
     <div class="d-flex justify-content-between align-items-center">
@@ -63,12 +101,36 @@
                     
                     <div class="mb-3">
                         <label for="wasabi_folder_path" class="form-label">Wasabi保存フォルダ</label>
-                        <input type="text" class="form-control" id="wasabi_folder_path" name="wasabi_folder_path" 
-                               placeholder="例: question_images/geography" value="question_images">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="subject_folder" class="form-label">教科</label>
+                                <select class="form-select" id="subject_folder" onchange="updateFolderPath()">
+                                    <option value="">選択してください</option>
+                                    <option value="社会">社会</option>
+                                    <option value="英語">英語</option>
+                                    <option value="数学">数学</option>
+                                    <option value="理科">理科</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="textbook_folder" class="form-label">教材名</label>
+                                <input type="text" class="form-control" id="textbook_folder" 
+                                       placeholder="例: ファイナルステージ" onchange="updateFolderPath()">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="unit_folder" class="form-label">学年・単元</label>
+                                <input type="text" class="form-control" id="unit_folder" 
+                                       placeholder="例: 地理" onchange="updateFolderPath()">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="wasabi_folder_path" class="form-label">最終パス</label>
+                                <input type="text" class="form-control" id="wasabi_folder_path" name="wasabi_folder_path" 
+                                       placeholder="例: 社会/ファイナルステージ/地理" readonly>
+                            </div>
+                        </div>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            この教材の問題画像を保存するWasabiのフォルダパスを指定します。
-                            空欄の場合は「question_images」が使用されます。
+                            階層的にフォルダを指定できます。例: 社会/ファイナルステージ/地理
                         </div>
                     </div>
                     

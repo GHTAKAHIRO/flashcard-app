@@ -149,7 +149,7 @@ def init_wasabi_client():
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
             endpoint_url=endpoint,
-            region_name='us-east-1'  # Wasabiのデフォルトリージョン
+            region_name='ap-northeast-1'  # 日本リージョン
         )
         
         # 接続テスト
@@ -180,6 +180,7 @@ def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
     """画像をWasabiにアップロード"""
     try:
         print(f"🔍 画像アップロード開始: question_id={question_id}, textbook_id={textbook_id}")
+        
         s3_client = init_wasabi_client()
         if not s3_client:
             print("❌ Wasabiクライアント初期化失敗")
@@ -215,6 +216,9 @@ def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
                         result = cur.fetchone()
                         if result and result[0]:
                             folder_path = result[0]
+                            print(f"🔍 教材フォルダパス: {folder_path}")
+                        else:
+                            print(f"⚠️ 教材ID {textbook_id} のフォルダパスが設定されていません")
             except Exception as e:
                 app.logger.warning(f"教材フォルダパス取得エラー: {e}")
                 # エラーの場合はデフォルト値を使用
