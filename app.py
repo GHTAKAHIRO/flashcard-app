@@ -3204,6 +3204,109 @@ def social_studies_admin():
         flash('管理者画面の読み込みに失敗しました', 'error')
         return redirect(url_for('social_studies_home'))
 
+@app.route('/social_studies/admin/textbook/<int:textbook_id>/unified')
+@login_required
+def social_studies_admin_textbook_unified(textbook_id):
+    """教材別統合管理画面（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('social_studies_home'))
+    
+    try:
+        # フィルターパラメータを取得
+        unit_id = request.args.get('unit_id', '').strip()
+        difficulty = request.args.get('difficulty', '').strip()
+        search = request.args.get('search', '').strip()
+        
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 教材情報を取得
+                cur.execute('SELECT * FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                textbook = cur.fetchone()
+                
+                if not textbook:
+                    flash('教材が見つかりません', 'error')
+                    return redirect(url_for('social_studies_admin_textbooks'))
+                
+                # 統計情報を取得
+                cur.execute('SELECT COUNT(*) as total_units FROM social_studies_units WHERE textbook_id = %s', (textbook_id,))
+                total_units = cur.fetchone()['total_units']
+                
+                cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions WHERE textbook_id = %s', (textbook_id,))
+                total_questions = cur.fetchone()['total_questions']
+                
+                cur.execute('''
+                    SELECT COUNT(*) as total_study_logs 
+                    FROM social_studies_study_log sl
+                    JOIN social_studies_questions q ON sl.question_id = q.id
+                    WHERE q.textbook_id = %s
+                ''', (textbook_id,))
+                total_study_logs = cur.fetchone()['total_study_logs']
+                
+                # 単元一覧を取得
+                cur.execute('''
+                    SELECT 
+                        u.id, u.name, u.chapter_number, u.description,
+                        COUNT(q.id) as question_count
+                    FROM social_studies_units u
+                    LEFT JOIN social_studies_questions q ON u.id = q.unit_id
+                    WHERE u.textbook_id = %s
+                    GROUP BY u.id, u.name, u.chapter_number, u.description
+                    ORDER BY u.chapter_number, u.name
+                ''', (textbook_id,))
+                units = cur.fetchall()
+                
+                # 問題一覧を取得（フィルター適用）
+                query = '''
+                    SELECT 
+                        q.id, q.subject, q.question, q.correct_answer, q.acceptable_answers, 
+                        q.difficulty_level, q.created_at,
+                        u.name as unit_name
+                    FROM social_studies_questions q
+                    LEFT JOIN social_studies_units u ON q.unit_id = u.id
+                    WHERE q.textbook_id = %s
+                '''
+                
+                # WHERE句の条件を構築
+                conditions = []
+                params = [textbook_id]
+                
+                if unit_id:
+                    conditions.append('q.unit_id = %s')
+                    params.append(int(unit_id))
+                
+                if difficulty:
+                    conditions.append('q.difficulty_level = %s')
+                    params.append(difficulty)
+                
+                if search:
+                    conditions.append('(q.question ILIKE %s OR q.correct_answer ILIKE %s)')
+                    search_param = f'%{search}%'
+                    params.extend([search_param, search_param])
+                
+                # WHERE句を追加
+                if conditions:
+                    query += ' AND ' + ' AND '.join(conditions)
+                
+                # ORDER BY句を追加
+                query += ' ORDER BY q.created_at DESC'
+                
+                # クエリを実行
+                cur.execute(query, params)
+                questions = cur.fetchall()
+                
+                return render_template('social_studies/admin_textbook_unified.html',
+                                     textbook=textbook,
+                                     total_units=total_units,
+                                     total_questions=total_questions,
+                                     total_study_logs=total_study_logs,
+                                     units=units,
+                                     questions=questions)
+    except Exception as e:
+        app.logger.error(f"教材別統合管理画面エラー: {e}")
+        flash('教材別統合管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('social_studies_admin_textbooks'))
+
 @app.route('/social_studies/admin/unified')
 @login_required
 def social_studies_admin_unified():
@@ -4173,6 +4276,9 @@ def social_studies_upload_csv():
     if not file.filename.endswith('.csv'):
         return jsonify({'error': 'CSVファイルを選択してください'}), 400
     
+    # 教材IDを取得（教材別アップロードの場合）
+    textbook_id = request.form.get('textbook_id')
+    
     try:
         # CSVファイルを読み込み
         content = file.read().decode('utf-8')
@@ -4198,51 +4304,67 @@ def social_studies_upload_csv():
                         csv_reader = csv.reader(StringIO(line))
                         row = next(csv_reader)
                         
-                        if len(row) < 7:
-                            app.logger.warning(f"行 {i}: 列数が不足しています")
-                            error_count += 1
-                            continue
-                        
-                        subject = row[0].strip()
-                        textbook_id = row[1].strip() if row[1].strip() else None
-                        unit_id = row[2].strip() if row[2].strip() else None
-                        question = row[3].strip()
-                        correct_answer = row[4].strip()
-                        explanation = row[5].strip() if len(row) > 5 else ''
-                        difficulty_level = row[6].strip() if len(row) > 6 else 'basic'
+                        # 教材別アップロードの場合は列数が少ない
+                        if textbook_id:
+                            if len(row) < 5:
+                                app.logger.warning(f"行 {i}: 列数が不足しています")
+                                error_count += 1
+                                continue
+                            
+                            unit_id = row[0].strip() if row[0].strip() else None
+                            question = row[1].strip()
+                            correct_answer = row[2].strip()
+                            explanation = row[3].strip() if len(row) > 3 else ''
+                            difficulty_level = row[4].strip() if len(row) > 4 else 'basic'
+                            subject = None  # 教材から取得
+                        else:
+                            if len(row) < 7:
+                                app.logger.warning(f"行 {i}: 列数が不足しています")
+                                error_count += 1
+                                continue
+                            
+                            subject = row[0].strip()
+                            unit_id = row[2].strip() if row[2].strip() else None
+                            question = row[3].strip()
+                            correct_answer = row[4].strip()
+                            explanation = row[5].strip() if len(row) > 5 else ''
+                            difficulty_level = row[6].strip() if len(row) > 6 else 'basic'
                         
                         # 必須項目のチェック
-                        if not subject or not question or not correct_answer:
+                        if not question or not correct_answer:
                             app.logger.warning(f"行 {i}: 必須項目が不足しています")
                             error_count += 1
                             continue
                         
-                        # 科目の妥当性チェック
-                        if subject not in ['地理', '歴史', '公民']:
-                            app.logger.warning(f"行 {i}: 無効な科目です: {subject}")
-                            error_count += 1
-                            continue
+                        # 教材別アップロードの場合は教材の科目を取得
+                        if textbook_id:
+                            cur.execute('SELECT subject FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                            result = cur.fetchone()
+                            if not result:
+                                app.logger.warning(f"行 {i}: 無効な教材IDです: {textbook_id}")
+                                error_count += 1
+                                continue
+                            subject = result[0]
+                        else:
+                            # 科目の妥当性チェック
+                            if subject not in ['地理', '歴史', '公民']:
+                                app.logger.warning(f"行 {i}: 無効な科目です: {subject}")
+                                error_count += 1
+                                continue
                         
                         # 難易度の妥当性チェック
                         if difficulty_level not in ['basic', 'intermediate', 'advanced']:
                             difficulty_level = 'basic'
                         
-                        # 教材IDと単元IDの妥当性チェック
-                        if textbook_id:
-                            try:
-                                textbook_id = int(textbook_id)
-                                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
-                                if not cur.fetchone():
-                                    app.logger.warning(f"行 {i}: 無効な教材IDです: {textbook_id}")
-                                    textbook_id = None
-                            except ValueError:
-                                app.logger.warning(f"行 {i}: 無効な教材IDです: {textbook_id}")
-                                textbook_id = None
-                        
-                        if unit_id and textbook_id:
+                        # 単元IDの妥当性チェック
+                        if unit_id:
                             try:
                                 unit_id = int(unit_id)
-                                cur.execute('SELECT id FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                                if textbook_id:
+                                    # 教材別アップロードの場合は教材に属する単元かチェック
+                                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                                else:
+                                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
                                 if not cur.fetchone():
                                     app.logger.warning(f"行 {i}: 無効な単元IDです: {unit_id}")
                                     unit_id = None
