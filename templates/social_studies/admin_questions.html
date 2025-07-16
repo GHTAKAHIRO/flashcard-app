@@ -403,7 +403,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-primary" onclick="uploadImage()">
+                <button type="button" class="btn btn-primary" id="image-upload-btn">
                     <i class="fas fa-upload me-1"></i>アップロード
                 </button>
             </div>
@@ -717,6 +717,13 @@ function uploadImage() {
     const fileInput = document.getElementById('image-file');
     console.log('ファイル入力要素:', fileInput);
     
+    // ファイル入力要素が存在しない場合のエラーハンドリング
+    if (!fileInput) {
+        console.error('画像ファイル入力要素が見つかりません');
+        alert('画像アップロード機能の初期化に失敗しました。ページを再読み込みしてください。');
+        return;
+    }
+    
     if (!fileInput.files[0]) {
         alert('画像ファイルを選択してください');
         return;
@@ -736,6 +743,12 @@ function uploadImage() {
     
     // アップロードボタンを無効化
     const uploadButton = document.querySelector('#imageUploadModal .btn-primary');
+    if (!uploadButton) {
+        console.error('アップロードボタンが見つかりません');
+        alert('アップロードボタンが見つかりません');
+        return;
+    }
+    
     const originalText = uploadButton.textContent;
     uploadButton.disabled = true;
     uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>アップロード中...';
@@ -755,8 +768,14 @@ function uploadImage() {
         if (data.success) {
             alert('画像をアップロードしました');
             // 現在の画像を更新
-            document.getElementById('current-image').src = data.image_url;
-            document.getElementById('current-image-section').style.display = 'block';
+            const currentImage = document.getElementById('current-image');
+            if (currentImage) {
+                currentImage.src = data.image_url;
+            }
+            const currentImageSection = document.getElementById('current-image-section');
+            if (currentImageSection) {
+                currentImageSection.style.display = 'block';
+            }
             // ファイル入力をリセット
             fileInput.value = '';
         } else {
@@ -769,8 +788,10 @@ function uploadImage() {
     })
     .finally(() => {
         // ボタンを元に戻す
-        uploadButton.disabled = false;
-        uploadButton.innerHTML = originalText;
+        if (uploadButton) {
+            uploadButton.disabled = false;
+            uploadButton.innerHTML = originalText;
+        }
     });
 }
 
@@ -962,11 +983,32 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 画像アップロードボタンのイベントリスナーを設定
-    const imageUploadBtn = document.querySelector('#imageUploadModal .btn-primary');
+    const imageUploadBtn = document.getElementById('image-upload-btn');
     if (imageUploadBtn) {
         imageUploadBtn.addEventListener('click', function(e) {
             e.preventDefault();
             uploadImage();
+        });
+    }
+    
+    // 画像アップロードモーダル表示時の処理
+    const imageModal = document.getElementById('imageUploadModal');
+    if (imageModal) {
+        imageModal.addEventListener('shown.bs.modal', function() {
+            console.log('画像アップロードモーダルが表示されました');
+            // 画像アップロードボタンのイベントリスナーを再設定
+            const imageUploadBtn = document.getElementById('image-upload-btn');
+            if (imageUploadBtn) {
+                // 既存のイベントリスナーを削除
+                imageUploadBtn.replaceWith(imageUploadBtn.cloneNode(true));
+                const newImageUploadBtn = document.getElementById('image-upload-btn');
+                
+                // 新しいイベントリスナーを追加
+                newImageUploadBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    uploadImage();
+                });
+            }
         });
     }
     
