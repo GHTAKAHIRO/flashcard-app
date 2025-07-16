@@ -4501,18 +4501,22 @@ def social_studies_download_csv_template():
             '1-1'  # 画像名
         ])
         
-        # CSVファイルを生成
+        # CSVファイルを生成（BOM付きUTF-8）
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerows(csv_data)
         
+        # BOM付きUTF-8でエンコード
+        csv_content = output.getvalue()
+        csv_bytes = csv_content.encode('utf-8-sig')  # BOM付きUTF-8
+        
         # レスポンスを作成
         response = app.response_class(
-            response=output.getvalue(),
+            response=csv_bytes,
             status=200,
-            mimetype='text/csv',
+            mimetype='text/csv; charset=utf-8',
             headers={
-                'Content-Disposition': 'attachment; filename=social_studies_template_with_structure.csv'
+                'Content-Disposition': 'attachment; filename*=UTF-8\'\'social_studies_template_with_structure.csv'
             }
         )
         
