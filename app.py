@@ -3181,28 +3181,13 @@ def social_studies_submit_answer():
 @app.route('/social_studies/admin')
 @login_required
 def social_studies_admin():
-    """社会科管理画面（管理者のみ）"""
+    """社会科管理画面（管理者のみ）- 統合管理画面にリダイレクト"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
         return redirect(url_for('social_studies_home'))
     
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 統計情報を取得
-                cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions')
-                total_questions = cur.fetchone()['total_questions']
-                
-                cur.execute('SELECT COUNT(*) as total_study_logs FROM social_studies_study_log')
-                total_study_logs = cur.fetchone()['total_study_logs']
-                
-                return render_template('social_studies/admin.html',
-                                     total_questions=total_questions,
-                                     total_study_logs=total_study_logs)
-    except Exception as e:
-        app.logger.error(f"社会科管理画面エラー: {e}")
-        flash('管理者画面の読み込みに失敗しました', 'error')
-        return redirect(url_for('social_studies_home'))
+    # 統合管理画面にリダイレクト
+    return redirect(url_for('social_studies_admin_unified'))
 
 @app.route('/social_studies/admin/textbook/<int:textbook_id>/unified')
 @login_required
