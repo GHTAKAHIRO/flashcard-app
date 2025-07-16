@@ -714,7 +714,15 @@ function showImageUpload(questionId) {
 function uploadImage() {
     console.log('uploadImage関数が呼び出されました');
     
-    const fileInput = document.getElementById('image-file');
+    // モーダル内の要素を取得
+    const modal = document.getElementById('imageUploadModal');
+    if (!modal) {
+        console.error('画像アップロードモーダルが見つかりません');
+        alert('画像アップロードモーダルが見つかりません');
+        return;
+    }
+    
+    const fileInput = modal.querySelector('#image-file');
     console.log('ファイル入力要素:', fileInput);
     
     // ファイル入力要素が存在しない場合のエラーハンドリング
@@ -742,7 +750,7 @@ function uploadImage() {
     formData.append('image', fileInput.files[0]);
     
     // アップロードボタンを無効化
-    const uploadButton = document.querySelector('#imageUploadModal .btn-primary');
+    const uploadButton = modal.querySelector('#image-upload-btn');
     if (!uploadButton) {
         console.error('アップロードボタンが見つかりません');
         alert('アップロードボタンが見つかりません');
@@ -768,11 +776,11 @@ function uploadImage() {
         if (data.success) {
             alert('画像をアップロードしました');
             // 現在の画像を更新
-            const currentImage = document.getElementById('current-image');
+            const currentImage = modal.querySelector('#current-image');
             if (currentImage) {
                 currentImage.src = data.image_url;
             }
-            const currentImageSection = document.getElementById('current-image-section');
+            const currentImageSection = modal.querySelector('#current-image-section');
             if (currentImageSection) {
                 currentImageSection.style.display = 'block';
             }
