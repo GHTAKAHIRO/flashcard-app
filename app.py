@@ -4907,6 +4907,192 @@ def social_studies_download_csv_template():
         app.logger.error(f"CSVテンプレートダウンロードエラー: {e}")
         return jsonify({'error': 'CSVテンプレートの生成に失敗しました'}), 500
 
+@app.route('/social_studies/admin/download_units_csv/<int:textbook_id>', methods=['GET'])
+@login_required
+def download_units_csv(textbook_id):
+    """指定された教材の単元一覧をCSVでダウンロード（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        # 教材情報を取得
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT name, subject, grade, publisher
+                    FROM social_studies_textbooks 
+                    WHERE id = %s
+                ''', (textbook_id,))
+                textbook = cur.fetchone()
+                
+                if not textbook:
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                # 単元一覧を取得
+                cur.execute('''
+                    SELECT name, chapter_number, description
+                    FROM social_studies_units 
+                    WHERE textbook_id = %s
+                    ORDER BY chapter_number, name
+                ''', (textbook_id,))
+                units = cur.fetchall()
+        
+        # CSVデータを作成
+        csv_data = []
+        
+        # ヘッダー行
+        csv_data.append(['単元名', '小番号', '説明'])
+        
+        # 既存の単元データ
+        for unit in units:
+            csv_data.append([
+                unit['name'] or '',
+                unit['chapter_number'] or '',
+                unit['description'] or ''
+            ])
+        
+        # 空のテンプレート行を追加（新しい単元追加用）
+        csv_data.append(['新しい単元名', '1', '新しい単元の説明'])
+        csv_data.append(['', '2', ''])
+        csv_data.append(['', '3', ''])
+        
+        # CSVファイルを生成（BOM付きUTF-8）
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerows(csv_data)
+        
+        # BOM付きUTF-8でエンコード
+        csv_content = output.getvalue()
+        csv_bytes = csv_content.encode('utf-8-sig')  # BOM付きUTF-8
+        
+        # ファイル名に教材名を含める
+        safe_textbook_name = re.sub(r'[^\w\s-]', '', textbook['name']).strip()
+        safe_textbook_name = re.sub(r'[-\s]+', '-', safe_textbook_name)
+        filename = f"{safe_textbook_name}_units_template.csv"
+        
+        # レスポンスを作成
+        response = app.response_class(
+            response=csv_bytes,
+            status=200,
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename*=UTF-8\'\'{filename}'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        app.logger.error(f"単元CSVダウンロードエラー: {e}")
+        return jsonify({'error': '単元CSVの生成に失敗しました'}), 500
+
+@app.route('/social_studies/admin/download_questions_csv/<int:textbook_id>', methods=['GET'])
+@login_required
+def download_questions_csv(textbook_id):
+    """指定された教材の問題一覧をCSVでダウンロード（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        # 教材情報を取得
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT name, subject, grade, publisher
+                    FROM social_studies_textbooks 
+                    WHERE id = %s
+                ''', (textbook_id,))
+                textbook = cur.fetchone()
+                
+                if not textbook:
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                # 問題一覧を取得（単元情報も含む）
+                cur.execute('''
+                    SELECT q.id, q.question, q.correct_answer, q.acceptable_answers, 
+                           q.answer_suffix, q.explanation, q.difficulty_level, q.image_url,
+                           u.name as unit_name, u.chapter_number,
+                           q.created_at
+                    FROM social_studies_questions q
+                    LEFT JOIN social_studies_units u ON q.unit_id = u.id
+                    WHERE q.textbook_id = %s
+                    ORDER BY u.chapter_number, u.name, q.id
+                ''', (textbook_id,))
+                questions = cur.fetchall()
+        
+        # CSVデータを作成
+        csv_data = []
+        
+        # ヘッダー行
+        csv_data.append([
+            '単元名', '章番号', '問題文', '正解', '許容回答', '解答欄の補足', 
+            '解説', '難易度', '画像URL', '登録日'
+        ])
+        
+        # 既存の問題データ
+        for question in questions:
+            # 難易度を日本語に変換
+            difficulty_map = {
+                'basic': '基本',
+                'intermediate': '中級', 
+                'advanced': '上級'
+            }
+            difficulty = difficulty_map.get(question['difficulty_level'], '未設定')
+            
+            # 登録日をフォーマット
+            created_date = question['created_at'].strftime('%Y/%m/%d') if question['created_at'] else ''
+            
+            csv_data.append([
+                question['unit_name'] or '',
+                question['chapter_number'] or '',
+                question['question'] or '',
+                question['correct_answer'] or '',
+                question['acceptable_answers'] or '',
+                question['answer_suffix'] or '',
+                question['explanation'] or '',
+                difficulty,
+                question['image_url'] or '',
+                created_date
+            ])
+        
+        # 空のテンプレート行を追加（新しい問題追加用）
+        csv_data.append([
+            '単元名', '1', '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
+            '解答欄の補足', '解説', '基本', '', ''
+        ])
+        csv_data.append(['', '2', '', '', '', '', '', '基本', '', ''])
+        csv_data.append(['', '3', '', '', '', '', '', '基本', '', ''])
+        
+        # CSVファイルを生成（BOM付きUTF-8）
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerows(csv_data)
+        
+        # BOM付きUTF-8でエンコード
+        csv_content = output.getvalue()
+        csv_bytes = csv_content.encode('utf-8-sig')  # BOM付きUTF-8
+        
+        # ファイル名に教材名を含める
+        safe_textbook_name = re.sub(r'[^\w\s-]', '', textbook['name']).strip()
+        safe_textbook_name = re.sub(r'[-\s]+', '-', safe_textbook_name)
+        filename = f"{safe_textbook_name}_questions_template.csv"
+        
+        # レスポンスを作成
+        response = app.response_class(
+            response=csv_bytes,
+            status=200,
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename*=UTF-8\'\'{filename}'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        app.logger.error(f"問題CSVダウンロードエラー: {e}")
+        return jsonify({'error': '問題CSVの生成に失敗しました'}), 500
+
 if __name__ == '__main__':
     # データベース接続プールを初期化
     try:
