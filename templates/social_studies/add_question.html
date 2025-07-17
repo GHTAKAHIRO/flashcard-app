@@ -264,10 +264,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     {% if textbook_info and unit_info %}
     // 教材と単元が固定されている場合は、単元の章番号に基づいて画像パス情報を設定
-    setTimeout(function() {
-        const unitId = '{{ unit_info.id }}';
-        updateUnitImagePathInfo(unitId);
-    }, 500);
+    const unitId = '{{ unit_info.id }}';
+    console.log('固定表示モード: 単元ID =', unitId);
+    updateUnitImagePathInfo(unitId);
     {% else %}
     // 通常の選択形式の場合
     {% if textbook_id %}
