@@ -5242,6 +5242,44 @@ def social_studies_upload_unit_questions_csv():
         app.logger.error(f"単元問題CSVアップロードエラー: {e}")
         return jsonify({'error': f'単元問題CSVアップロードに失敗しました: {str(e)}'}), 500
 
+@app.route('/social_studies/admin/unit_questions/<int:textbook_id>/<int:unit_id>')
+@login_required
+def social_studies_admin_unit_questions(textbook_id, unit_id):
+    """単元ごとの問題一覧（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('admin'))
+    
+    textbook_info = None
+    unit_info = None
+    questions = []
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 教材情報取得
+                cur.execute('SELECT id, name FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                textbook_info = cur.fetchone()
+                # 単元情報取得
+                cur.execute('SELECT id, name, chapter_number FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                unit_info = cur.fetchone()
+                # 問題リスト取得
+                cur.execute('''
+                    SELECT * FROM social_studies_questions
+                    WHERE textbook_id = %s AND unit_id = %s
+                    ORDER BY id DESC
+                ''', (textbook_id, unit_id))
+                questions = cur.fetchall()
+    except Exception as e:
+        app.logger.error(f"単元ごとの問題一覧取得エラー: {e}")
+        flash('単元ごとの問題一覧の取得に失敗しました', 'error')
+    
+    return render_template(
+        'social_studies/admin_unit_questions.html',
+        textbook_info=textbook_info,
+        unit_info=unit_info,
+        questions=questions
+    )
+
 if __name__ == '__main__':
     # データベース接続プールを初期化
     try:
