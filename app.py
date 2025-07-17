@@ -3458,7 +3458,15 @@ def social_studies_add_question():
                     
                     conn.commit()
                     flash('問題が追加されました', 'success')
-                    return redirect(url_for('social_studies_admin_questions'))
+                    
+                    # 単元が指定されている場合は単元問題一覧に戻る
+                    if unit_id:
+                        return redirect(url_for('social_studies_admin_unit_questions', textbook_id=textbook_id, unit_id=unit_id))
+                    # 教材が指定されている場合は統一管理画面に戻る
+                    elif textbook_id:
+                        return redirect(url_for('social_studies_admin_textbook_unified', textbook_id=textbook_id))
+                    else:
+                        return redirect(url_for('social_studies_admin_questions'))
         except Exception as e:
             app.logger.error(f"社会科問題追加エラー: {e}")
             flash('問題の追加に失敗しました', 'error')
@@ -3475,7 +3483,7 @@ def social_studies_add_question():
         try:
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute('SELECT id, name FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                    cur.execute('SELECT id, name, subject, wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
                     textbook_info = cur.fetchone()
                     
                     if unit_id:
