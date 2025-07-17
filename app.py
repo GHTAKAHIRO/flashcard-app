@@ -3098,8 +3098,7 @@ def social_studies_admin():
     """社会科管理画面（管理者のみ）- 統合管理画面にリダイレクト"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('admin'))
-    
+        return redirect(url_for('login'))
     # 統合管理画面にリダイレクト
     return redirect(url_for('social_studies_admin_unified'))
 
@@ -4136,8 +4135,7 @@ def admin():
     """メイン管理画面（管理者のみ）"""
     if not current_user.is_admin:
         flash("管理者権限が必要です")
-        return redirect(url_for('admin'))
-    
+        return redirect(url_for('login')) 
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -4158,7 +4156,7 @@ def admin():
     except Exception as e:
         app.logger.error(f"管理画面エラー: {e}")
         flash('管理画面の読み込みに失敗しました', 'error')
-        return redirect(url_for('admin'))
+        return redirect(url_for('login'))
 
 @app.route('/social_studies/admin/upload_csv', methods=['POST'])
 @login_required
