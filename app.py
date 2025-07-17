@@ -3462,7 +3462,12 @@ def social_studies_add_question():
             app.logger.error(f"社会科問題追加エラー: {e}")
             flash('問題の追加に失敗しました', 'error')
     
-    return render_template('social_studies/add_question.html')
+    # GETリクエストの場合、URLパラメータから教材IDと単元IDを取得
+    textbook_id = request.args.get('textbook_id')
+    unit_id = request.args.get('unit_id')
+    
+    return render_template('social_studies/add_question.html', 
+                         textbook_id=textbook_id, unit_id=unit_id)
 
 @app.route('/social_studies/admin/delete_question/<int:question_id>', methods=['POST'])
 @login_required
@@ -3808,6 +3813,58 @@ def social_studies_edit_unit(unit_id):
         except Exception as e:
             app.logger.error(f"単元更新エラー: {e}")
             return jsonify({'error': '単元の更新に失敗しました'}), 500
+
+@app.route('/social_studies/admin/unit/<int:textbook_id>/<int:unit_id>/questions')
+@login_required
+def social_studies_admin_unit_questions(textbook_id, unit_id):
+    """指定された単元の問題管理画面（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 教材情報を取得
+                cur.execute('''
+                    SELECT id, name, subject, grade, publisher, created_at
+                    FROM social_studies_textbooks 
+                    WHERE id = %s
+                ''', (textbook_id,))
+                textbook = cur.fetchone()
+                
+                if not textbook:
+                    flash('教材が見つかりません', 'error')
+                    return redirect(url_for('social_studies_admin'))
+                
+                # 単元情報を取得
+                cur.execute('''
+                    SELECT id, name, chapter_number, description, created_at
+                    FROM social_studies_units 
+                    WHERE id = %s AND textbook_id = %s
+                ''', (unit_id, textbook_id))
+                unit = cur.fetchone()
+                
+                if not unit:
+                    flash('単元が見つかりません', 'error')
+                    return redirect(url_for('social_studies_admin_units', textbook_id=textbook_id))
+                
+                # 単元の問題一覧を取得
+                cur.execute('''
+                    SELECT id, question, correct_answer, acceptable_answers, answer_suffix, 
+                           explanation, difficulty, image_url, image_title, created_at
+                    FROM social_studies_questions
+                    WHERE textbook_id = %s AND unit_id = %s
+                    ORDER BY created_at DESC
+                ''', (textbook_id, unit_id))
+                questions = cur.fetchall()
+        
+        return render_template('social_studies/admin_unit_questions.html', 
+                             textbook=textbook, unit=unit, questions=questions)
+        
+    except Exception as e:
+        app.logger.error(f"単元問題管理画面エラー: {e}")
+        flash('単元問題管理画面の表示に失敗しました', 'error')
+        return redirect(url_for('social_studies_admin_units', textbook_id=textbook_id))
 
 # ========== API エンドポイント ==========
 
@@ -5010,6 +5067,214 @@ def download_questions_csv(textbook_id):
     except Exception as e:
         app.logger.error(f"問題CSVダウンロードエラー: {e}")
         return jsonify({'error': '問題CSVの生成に失敗しました'}), 500
+
+@app.route('/social_studies/admin/download_unit_questions_csv/<int:textbook_id>/<int:unit_id>', methods=['GET'])
+@login_required
+def download_unit_questions_csv(textbook_id, unit_id):
+    """指定された単元の問題一覧をCSVでダウンロード（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        # CSVデータを作成
+        csv_data = []
+        
+        # ヘッダー行（1行目）
+        csv_data.append([
+            '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
+        ])
+        
+        # 入力例行（2行目、コメントアウト）
+        csv_data.append([
+            '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
+            '# 解答欄の補足', '# 解説', '# 基本', '# https://s3.ap-northeast-1.wasabisys.com/so-image/social studies/geography/', '# 1-1.jpg'
+        ])
+        
+        # 教材と単元の情報を取得
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT t.wasabi_folder_path, u.name as unit_name
+                    FROM social_studies_textbooks t
+                    JOIN social_studies_units u ON t.id = u.textbook_id
+                    WHERE t.id = %s AND u.id = %s
+                ''', (textbook_id, unit_id))
+                result = cur.fetchone()
+                
+                if not result:
+                    return jsonify({'error': '教材または単元が見つかりません'}), 404
+                
+                base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{result['wasabi_folder_path'] or 'question_images'}"
+        
+        # テンプレート行を追加（新しい問題追加用）
+        csv_data.append([
+            '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
+            '解答欄の補足', '解説', '基本', f"{base_image_url}/", '1-1.jpg'
+        ])
+        csv_data.append(['', '', '', '', '', '基本', f"{base_image_url}/", '2-1.jpg'])
+        csv_data.append(['', '', '', '', '', '基本', f"{base_image_url}/", '3-1.jpg'])
+        
+        # CSVファイルを生成（BOM付きUTF-8）
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerows(csv_data)
+        
+        # BOM付きUTF-8でエンコード
+        csv_content = output.getvalue()
+        csv_bytes = csv_content.encode('utf-8-sig')  # BOM付きUTF-8
+        
+        # ファイル名を完全に安全な形式に制限
+        filename = f"unit_{unit_id}_questions_template.csv"
+        
+        # レスポンスを作成
+        response = app.response_class(
+            response=csv_bytes,
+            status=200,
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        app.logger.error(f"単元問題CSVダウンロードエラー: {e}")
+        return jsonify({'error': '単元問題CSVの生成に失敗しました'}), 500
+
+@app.route('/social_studies/admin/upload_unit_questions_csv', methods=['POST'])
+@login_required
+def social_studies_upload_unit_questions_csv():
+    """単元ごとの問題CSV一括登録（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        textbook_id = request.form.get('textbook_id', '').strip()
+        unit_id = request.form.get('unit_id', '').strip()
+        
+        if not textbook_id or not unit_id:
+            return jsonify({'error': '教材IDと単元IDが必要です'}), 400
+        
+        try:
+            textbook_id = int(textbook_id)
+            unit_id = int(unit_id)
+        except ValueError:
+            return jsonify({'error': '無効な教材IDまたは単元IDです'}), 400
+        
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        # CSVファイルを読み込み（複数エンコーディング対応）
+        file_content = file.read()
+        csv_data = None
+        
+        # 複数のエンコーディングを試行
+        encodings = ['utf-8-sig', 'utf-8', 'shift_jis', 'cp932', 'euc-jp', 'iso-2022-jp']
+        for encoding in encodings:
+            try:
+                csv_data = file_content.decode(encoding).splitlines()
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if csv_data is None:
+            return jsonify({'error': 'CSVファイルのエンコーディングを認識できませんでした。UTF-8、Shift_JIS、CP932、EUC-JP、ISO-2022-JPのいずれかで保存してください。'}), 400
+        
+        if len(csv_data) < 2:  # ヘッダー行 + データ行が最低1行必要
+            return jsonify({'error': 'CSVファイルにデータが含まれていません'}), 400
+        
+        if len(csv_data) > 1001:  # ヘッダー行 + 最大1000行
+            return jsonify({'error': 'CSVファイルは最大1000行までです'}), 400
+        
+        # 教材と単元が存在するかチェック
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '指定された教材が見つかりません'}), 404
+                
+                cur.execute('SELECT id FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                if not cur.fetchone():
+                    return jsonify({'error': '指定された単元が見つかりません'}), 404
+        
+        reader = csv.DictReader(csv_data)
+        registered_count = 0
+        skipped_count = 0
+        
+        app.logger.info(f"単元問題CSVアップロード開始: 教材{textbook_id}, 単元{unit_id}, {len(csv_data)}行のデータ")
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for row_num, row in enumerate(reader, 1):
+                    app.logger.info(f"行{row_num}を処理中: {row}")
+                    try:
+                        # 必須フィールドの取得
+                        question = row.get('question', '').strip()
+                        correct_answer = row.get('correct_answer', '').strip()
+                        
+                        # バリデーション
+                        if not question or not correct_answer:
+                            app.logger.warning(f"行{row_num}: 必須フィールドが不足 - question: '{question}', correct_answer: '{correct_answer}'")
+                            skipped_count += 1
+                            continue
+                        
+                        # オプションフィールドの取得
+                        acceptable_answers = row.get('acceptable_answers', '').strip()
+                        explanation = row.get('explanation', '').strip()
+                        answer_suffix = row.get('answer_suffix', '').strip()
+                        difficulty = row.get('difficulty', '').strip()
+                        image_url = row.get('image_url', '').strip()
+                        image_title = row.get('image_title', '').strip()
+                        
+                        # 問題が既に存在するかチェック
+                        cur.execute('''
+                            SELECT id FROM social_studies_questions 
+                            WHERE question = %s AND correct_answer = %s AND textbook_id = %s AND unit_id = %s
+                        ''', (question, correct_answer, textbook_id, unit_id))
+                        if cur.fetchone():
+                            app.logger.warning(f"行{row_num}: 同じ問題が既に存在します - {question}")
+                            skipped_count += 1
+                            continue
+                        
+                        # 問題を登録
+                        cur.execute('''
+                            INSERT INTO social_studies_questions 
+                            (textbook_id, unit_id, question, correct_answer, acceptable_answers, 
+                             answer_suffix, explanation, difficulty, image_url, image_title)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ''', (textbook_id, unit_id, question, correct_answer, acceptable_answers,
+                              answer_suffix, explanation, difficulty, image_url, image_title))
+                        
+                        registered_count += 1
+                        app.logger.info(f"行{row_num}: 問題登録完了")
+                        
+                    except Exception as e:
+                        app.logger.error(f"行{row_num}の処理でエラー: {e}")
+                        skipped_count += 1
+                        continue
+                
+                conn.commit()
+        
+        app.logger.info(f"単元問題CSVアップロード完了: 登録{registered_count}件, スキップ{skipped_count}件")
+        
+        return jsonify({
+            'success': True,
+            'message': '単元問題CSVアップロードが完了しました',
+            'registered_count': registered_count,
+            'skipped_count': skipped_count
+        })
+        
+    except Exception as e:
+        app.logger.error(f"単元問題CSVアップロードエラー: {e}")
+        return jsonify({'error': f'単元問題CSVアップロードに失敗しました: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # データベース接続プールを初期化

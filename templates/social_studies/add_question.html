@@ -186,6 +186,29 @@
 </div>
 
 <script>
+// ページ読み込み時にURLパラメータから教材IDと単元IDを設定
+document.addEventListener('DOMContentLoaded', function() {
+    {% if textbook_id %}
+    // 教材IDが指定されている場合、科目を設定して教材を読み込み
+    const urlParams = new URLSearchParams(window.location.search);
+    const subject = urlParams.get('subject');
+    if (subject) {
+        document.getElementById('subject').value = subject;
+        loadTextbooks();
+    }
+    {% endif %}
+    
+    {% if unit_id %}
+    // 単元IDが指定されている場合、単元を設定
+    setTimeout(function() {
+        const unitSelect = document.getElementById('unit_id');
+        if (unitSelect) {
+            unitSelect.value = '{{ unit_id }}';
+        }
+    }, 1000); // 教材と単元の読み込みを待つ
+    {% endif %}
+});
+
 function loadTextbooks() {
     const subject = document.getElementById('subject').value;
     const textbookSelect = document.getElementById('textbook_id');
