@@ -1648,6 +1648,8 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'GET':
+        session.pop('_flashes', None)
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
