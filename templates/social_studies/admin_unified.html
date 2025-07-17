@@ -280,7 +280,10 @@
 <script>
 // 教材編集・削除関連の関数
 function editTextbook(textbookId) {
-    fetch(`/social_studies/api/textbooks/${textbookId}`)
+    // 編集中の教材IDをグローバル変数に保存
+    window.currentEditTextbookId = textbookId;
+    
+    fetch(`/social_studies/api/textbook/${textbookId}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -288,13 +291,12 @@ function editTextbook(textbookId) {
                 return;
             }
             
-            document.getElementById('edit-textbook-id').value = data.id;
             document.getElementById('edit-textbook-name').value = data.name;
             document.getElementById('edit-textbook-subject').value = data.subject;
             document.getElementById('edit-textbook-grade').value = data.grade || '';
             document.getElementById('edit-textbook-publisher').value = data.publisher || '';
             document.getElementById('edit-textbook-description').value = data.description || '';
-            document.getElementById('edit-textbook-wasabi-folder').value = data.wasabi_folder_path || '';
+            document.getElementById('edit-textbook-wasabi-folder-path').value = data.wasabi_folder_path || '';
             
             const modal = new bootstrap.Modal(document.getElementById('editTextbookModal'));
             modal.show();
@@ -310,8 +312,8 @@ function deleteTextbook(textbookId) {
         return;
     }
     
-    fetch(`/social_studies/api/textbooks/${textbookId}`, {
-        method: 'DELETE'
+    fetch(`/social_studies/admin/delete_textbook/${textbookId}`, {
+        method: 'POST'
     })
     .then(response => response.json())
     .then(data => {
@@ -329,25 +331,34 @@ function deleteTextbook(textbookId) {
 }
 
 // 教材編集フォーム送信
-document.getElementById('editTextbookForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+function saveTextbookEdit() {
+    const formData = {
+        name: document.getElementById('edit-textbook-name').value,
+        subject: document.getElementById('edit-textbook-subject').value,
+        grade: document.getElementById('edit-textbook-grade').value,
+        publisher: document.getElementById('edit-textbook-publisher').value,
+        description: document.getElementById('edit-textbook-description').value,
+        wasabi_folder_path: document.getElementById('edit-textbook-wasabi-folder-path').value
+    };
     
-    const formData = new FormData(this);
-    const textbookId = document.getElementById('edit-textbook-id').value;
+    // 必須項目のチェック
+    if (!formData.name || !formData.subject) {
+        alert('教材名と科目は必須です');
+        return;
+    }
     
-    fetch(`/social_studies/api/textbooks/${textbookId}`, {
-        method: 'PUT',
+    // 現在編集中の教材IDを取得（グローバル変数として管理）
+    if (!window.currentEditTextbookId) {
+        alert('編集中の教材が特定できません');
+        return;
+    }
+    
+    fetch(`/social_studies/admin/edit_textbook/${window.currentEditTextbookId}`, {
+        method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            name: formData.get('name'),
-            subject: formData.get('subject'),
-            grade: formData.get('grade'),
-            publisher: formData.get('publisher'),
-            description: formData.get('description'),
-            wasabi_folder_path: formData.get('wasabi_folder_path')
-        })
+        body: JSON.stringify(formData)
     })
     .then(response => response.json())
     .then(data => {
@@ -362,6 +373,6 @@ document.getElementById('editTextbookForm').addEventListener('submit', function(
         console.error('教材更新エラー:', error);
         alert('教材の更新に失敗しました');
     });
-});
+}
 </script>
 {% endblock %} 
