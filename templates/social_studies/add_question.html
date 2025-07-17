@@ -209,10 +209,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         const textbookSelect = document.getElementById('textbook_id');
         if (textbookSelect) {
-            textbookSelect.value = {{ textbook_id }}';
+            textbookSelect.value = '{{ textbook_id }}';
             loadUnits();
         }
-    }, 500;
+    }, 500);
     {% endif %}
     
     {% if unit_id %}
@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         const unitSelect = document.getElementById('unit_id');
         if (unitSelect) {
-            unitSelect.value = {{ unit_id }}';
+            unitSelect.value = '{{ unit_id }}';
         }
     }, 1500); // 教材と単元の読み込みを待つ
     {% endif %}

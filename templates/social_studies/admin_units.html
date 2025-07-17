@@ -57,8 +57,6 @@
                     <tr>
                         <th>章番号</th>
                         <th>単元名</th>
-                        <th>説明</th>
-                        <th>登録日</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -76,24 +74,10 @@
                             <div class="fw-bold">{{ unit.name }}</div>
                         </td>
                         <td>
-                            {% if unit.description %}
-                                <div class="text-truncate" style="max-width: 300px;" title="{{ unit.description }}">
-                                    {{ unit.description }}
-                                </div>
-                            {% else %}
-                                <span class="text-muted">説明なし</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <small class="text-muted">
-                                {{ unit.created_at.strftime('%Y/%m/%d') if unit.created_at else '不明' }}
-                            </small>
-                        </td>
-                        <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                <a href="{{ url_for('social_studies_admin_unit_questions', textbook_id=textbook.id, unit_id=unit.id) }}" 
-                                   class="btn btn-info" title="問題一覧">
-                                    <i class="fas fa-list me-1"></i>問題一覧
+                                <a href="{{ url_for('social_studies_add_question', textbook_id=textbook.id, unit_id=unit.id) }}" 
+                                   class="btn btn-success" title="問題追加">
+                                    <i class="fas fa-plus me-1"></i>問題追加
                                 </a>
                                 <button class="btn btn-outline-primary" onclick="editUnit({{ unit.id }})" title="編集">
                                     <i class="fas fa-edit"></i>
