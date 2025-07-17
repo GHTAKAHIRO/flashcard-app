@@ -175,6 +175,53 @@ def init_wasabi_client():
         print(f"❌ エラータイプ: {type(e).__name__}")
         return None
 
+def get_unit_image_folder_path(question_id):
+    """問題IDから単元の章番号に基づいて画像フォルダパスを生成"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 問題の単元情報を取得
+                cur.execute('''
+                    SELECT 
+                        t.subject, 
+                        t.wasabi_folder_path,
+                        u.chapter_number
+                    FROM social_studies_questions q
+                    JOIN social_studies_units u ON q.unit_id = u.id
+                    JOIN social_studies_textbooks t ON u.textbook_id = t.id
+                    WHERE q.id = %s
+                ''', (question_id,))
+                result = cur.fetchone()
+                
+                if result:
+                    subject, textbook_folder, chapter_number = result
+                    
+                    # 科目を英語に変換
+                    subject_map = {
+                        '地理': 'geography',
+                        '歴史': 'history',
+                        '公民': 'civics',
+                        '理科': 'science'
+                    }
+                    subject_en = subject_map.get(subject, 'other')
+                    
+                    # 章番号が設定されている場合は章番号を使用、そうでなければデフォルト
+                    if chapter_number:
+                        folder_path = f"social_studies/{subject_en}/{chapter_number}"
+                    else:
+                        folder_path = f"social_studies/{subject_en}/default"
+                    
+                    print(f"🔍 生成されたフォルダパス: {folder_path}")
+                    return folder_path
+                else:
+                    # 単元が設定されていない場合はデフォルトパス
+                    print(f"⚠️ 問題ID {question_id} の単元情報が見つかりません")
+                    return "social_studies/default"
+                    
+    except Exception as e:
+        app.logger.error(f"フォルダパス生成エラー: {e}")
+        return "social_studies/default"
+
 # 画像アップロード関数
 def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
     """画像をWasabiにアップロード"""
@@ -206,25 +253,11 @@ def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
         if file_extension == 'jpeg':
             file_extension = 'jpg'
         
-        # 教材のWasabiフォルダパスを取得
-        folder_path = 'question_images'  # デフォルト値
-        if textbook_id:
-            try:
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
-                        result = cur.fetchone()
-                        if result and result[0]:
-                            folder_path = result[0]
-                            print(f"🔍 教材フォルダパス: {folder_path}")
-                        else:
-                            print(f"⚠️ 教材ID {textbook_id} のフォルダパスが設定されていません")
-            except Exception as e:
-                app.logger.warning(f"教材フォルダパス取得エラー: {e}")
-                # エラーの場合はデフォルト値を使用
-                pass
+        # 単元の章番号に基づいてフォルダパスを生成
+        folder_path = get_unit_image_folder_path(question_id)
+        print(f"🔍 使用するフォルダパス: {folder_path}")
         
-        filename = f"{folder_path}/{question_id}/{uuid.uuid4()}.{file_extension}"
+        filename = f"{folder_path}/{question_id}_{uuid.uuid4().hex[:8]}.{file_extension}"
         
         # Wasabiにアップロード
         bucket_name = os.getenv('WASABI_BUCKET')
@@ -3875,31 +3908,60 @@ def social_studies_api_units():
 @app.route('/social_studies/api/check_image')
 @login_required
 def social_studies_api_check_image():
-    """画像存在確認API"""
+    """画像存在確認API（単元の章番号に基づくフォルダ検索）"""
     if not current_user.is_admin:
         return jsonify({'error': '管理者権限が必要です'}), 403
     
     try:
         image_name = request.args.get('image_name', '').strip()
-        textbook_id = request.args.get('textbook_id')
+        unit_id = request.args.get('unit_id')
         
-        app.logger.info(f"🔍 画像確認API呼び出し: image_name='{image_name}', textbook_id='{textbook_id}'")
+        app.logger.info(f"🔍 画像確認API呼び出し: image_name='{image_name}', unit_id='{unit_id}'")
         
-        if not image_name or not textbook_id:
+        if not image_name or not unit_id:
             app.logger.warning("❌ パラメータ不足")
-            return jsonify({'exists': False, 'error': '画像名と教材IDが必要です'})
+            return jsonify({'exists': False, 'error': '画像名と単元IDが必要です'})
         
-        # 教材のフォルダパスを取得
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
-                result = cur.fetchone()
-                if not result or not result[0]:
-                    app.logger.warning(f"❌ 教材ID {textbook_id} のフォルダパスが設定されていません")
-                    return jsonify({'exists': False, 'error': '教材のフォルダパスが設定されていません'})
-                
-                folder_path = result[0]
-                app.logger.info(f"📁 教材フォルダパス: {folder_path}")
+        # 単元の章番号に基づいてフォルダパスを生成
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        SELECT 
+                            t.subject, 
+                            u.chapter_number
+                        FROM social_studies_units u
+                        JOIN social_studies_textbooks t ON u.textbook_id = t.id
+                        WHERE u.id = %s
+                    ''', (unit_id,))
+                    result = cur.fetchone()
+                    
+                    if not result:
+                        app.logger.warning(f"❌ 単元ID {unit_id} が見つかりません")
+                        return jsonify({'exists': False, 'error': '単元が見つかりません'})
+                    
+                    subject, chapter_number = result
+                    
+                    # 科目を英語に変換
+                    subject_map = {
+                        '地理': 'geography',
+                        '歴史': 'history',
+                        '公民': 'civics',
+                        '理科': 'science'
+                    }
+                    subject_en = subject_map.get(subject, 'other')
+                    
+                    # 章番号が設定されている場合は章番号を使用、そうでなければデフォルト
+                    if chapter_number:
+                        folder_path = f"social_studies/{subject_en}/{chapter_number}"
+                    else:
+                        folder_path = f"social_studies/{subject_en}/default"
+                    
+                    app.logger.info(f"📁 生成されたフォルダパス: {folder_path}")
+        
+        except Exception as e:
+            app.logger.error(f"フォルダパス生成エラー: {e}")
+            return jsonify({'exists': False, 'error': 'フォルダパスの生成に失敗しました'})
         
         # Wasabiで画像を検索
         s3_client = init_wasabi_client()
