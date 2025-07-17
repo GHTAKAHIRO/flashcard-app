@@ -222,6 +222,51 @@ def get_unit_image_folder_path(question_id):
         app.logger.error(f"フォルダパス生成エラー: {e}")
         return "social_studies/default"
 
+def get_unit_image_folder_path_by_unit_id(unit_id):
+    """単元IDから章番号に基づいて画像フォルダパスを生成"""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 単元情報を取得
+                cur.execute('''
+                    SELECT 
+                        t.subject, 
+                        u.chapter_number
+                    FROM social_studies_units u
+                    JOIN social_studies_textbooks t ON u.textbook_id = t.id
+                    WHERE u.id = %s
+                ''', (unit_id,))
+                result = cur.fetchone()
+                
+                if result:
+                    subject, chapter_number = result
+                    
+                    # 科目を英語に変換
+                    subject_map = {
+                        '地理': 'geography',
+                        '歴史': 'history',
+                        '公民': 'civics',
+                        '理科': 'science'
+                    }
+                    subject_en = subject_map.get(subject, 'other')
+                    
+                    # 章番号が設定されている場合は章番号を使用、そうでなければデフォルト
+                    if chapter_number:
+                        folder_path = f"social_studies/{subject_en}/{chapter_number}"
+                    else:
+                        folder_path = f"social_studies/{subject_en}/default"
+                    
+                    print(f"🔍 単元ID {unit_id} から生成されたフォルダパス: {folder_path}")
+                    return folder_path
+                else:
+                    # 単元が見つからない場合はデフォルトパス
+                    print(f"⚠️ 単元ID {unit_id} が見つかりません")
+                    return "social_studies/default"
+                    
+    except Exception as e:
+        app.logger.error(f"フォルダパス生成エラー: {e}")
+        return "social_studies/default"
+
 # 画像アップロード関数
 def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
     """画像をWasabiにアップロード"""
@@ -3923,45 +3968,7 @@ def social_studies_api_check_image():
             return jsonify({'exists': False, 'error': '画像名と単元IDが必要です'})
         
         # 単元の章番号に基づいてフォルダパスを生成
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute('''
-                        SELECT 
-                            t.subject, 
-                            u.chapter_number
-                        FROM social_studies_units u
-                        JOIN social_studies_textbooks t ON u.textbook_id = t.id
-                        WHERE u.id = %s
-                    ''', (unit_id,))
-                    result = cur.fetchone()
-                    
-                    if not result:
-                        app.logger.warning(f"❌ 単元ID {unit_id} が見つかりません")
-                        return jsonify({'exists': False, 'error': '単元が見つかりません'})
-                    
-                    subject, chapter_number = result
-                    
-                    # 科目を英語に変換
-                    subject_map = {
-                        '地理': 'geography',
-                        '歴史': 'history',
-                        '公民': 'civics',
-                        '理科': 'science'
-                    }
-                    subject_en = subject_map.get(subject, 'other')
-                    
-                    # 章番号が設定されている場合は章番号を使用、そうでなければデフォルト
-                    if chapter_number:
-                        folder_path = f"social_studies/{subject_en}/{chapter_number}"
-                    else:
-                        folder_path = f"social_studies/{subject_en}/default"
-                    
-                    app.logger.info(f"📁 生成されたフォルダパス: {folder_path}")
-        
-        except Exception as e:
-            app.logger.error(f"フォルダパス生成エラー: {e}")
-            return jsonify({'exists': False, 'error': 'フォルダパスの生成に失敗しました'})
+        folder_path = get_unit_image_folder_path_by_unit_id(unit_id)
         
         # Wasabiで画像を検索
         s3_client = init_wasabi_client()

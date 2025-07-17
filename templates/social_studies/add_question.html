@@ -161,14 +161,19 @@
                         </label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="image_name" name="image_name" 
-                                   placeholder="例: 1-2" onchange="checkImageExists()">
+                                   placeholder="{% if textbook_info and unit_info %}例: 2（問題番号のみ）{% else %}例: 1-2{% endif %}" 
+                                   onchange="checkImageExists()">
                             <button type="button" class="btn btn-outline-secondary" onclick="checkImageExists()">
                                 <i class="fas fa-search"></i>確認
                             </button>
                         </div>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            Wasabiに保存されている画像の名前を入力してください（拡張子不要）
+                            {% if textbook_info and unit_info %}
+                                問題番号のみ入力してください（例: 2 → 1章の2番目の問題）
+                            {% else %}
+                                Wasabiに保存されている画像の名前を入力してください（拡張子不要）
+                            {% endif %}
                         </div>
                         <div id="image-preview" class="mt-2" style="display: none;">
                             <div class="alert alert-info">
@@ -236,9 +241,10 @@
 // ページ読み込み時の処理
 document.addEventListener('DOMContentLoaded', function() {
     {% if textbook_info and unit_info %}
-    // 教材と単元が固定されている場合は、画像パス情報を設定
+    // 教材と単元が固定されている場合は、単元の章番号に基づいて画像パス情報を設定
     setTimeout(function() {
-        updateImagePathInfo('{{ textbook_info.wasabi_folder_path or "" }}');
+        const unitId = '{{ unit_info.id }}';
+        updateUnitImagePathInfo(unitId);
     }, 500);
     {% else %}
     // 通常の選択形式の場合
@@ -406,6 +412,60 @@ function updateImagePathInfo(folderPath) {
     } else {
         clearImagePathInfo();
     }
+}
+
+// 単元IDから画像パス情報を取得して表示する関数
+function updateUnitImagePathInfo(unitId) {
+    const imageNameInput = document.getElementById('image_name');
+    const imagePreviewDiv = document.getElementById('image-preview');
+    const statusSpan = document.getElementById('image-status');
+    
+    // 単元の章番号に基づいてフォルダパスを生成
+    fetch(`/social_studies/api/check_image?image_name=test&unit_id=${unitId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.folder_path) {
+                // プレースホルダーを更新（問題番号のみ）
+                imageNameInput.placeholder = '例: 2（問題番号のみ）';
+                
+                // パス情報を表示
+                statusSpan.innerHTML = `<i class="fas fa-info-circle text-info"></i> 画像保存先: <code>${data.folder_path}</code>`;
+                imagePreviewDiv.style.display = 'block';
+                
+                // 画像名欄の下にパス情報を表示
+                const pathInfoDiv = document.getElementById('path-info');
+                if (!pathInfoDiv) {
+                    const newPathInfoDiv = document.createElement('div');
+                    newPathInfoDiv.id = 'path-info';
+                    newPathInfoDiv.className = 'mt-2';
+                    newPathInfoDiv.innerHTML = `
+                        <div class="alert alert-info">
+                            <small>
+                                <i class="fas fa-folder-open me-1"></i>
+                                <strong>画像保存先:</strong> <code>${data.folder_path}</code><br>
+                                <i class="fas fa-info-circle me-1"></i>
+                                問題番号のみ入力してください（例: 2 → ${data.folder_path}/2.jpg）
+                            </small>
+                        </div>
+                    `;
+                    imageNameInput.parentNode.insertBefore(newPathInfoDiv, imageNameInput.nextSibling);
+                } else {
+                    pathInfoDiv.innerHTML = `
+                        <div class="alert alert-info">
+                            <small>
+                                <i class="fas fa-folder-open me-1"></i>
+                                <strong>画像保存先:</strong> <code>${data.folder_path}</code><br>
+                                <i class="fas fa-info-circle me-1"></i>
+                                問題番号のみ入力してください（例: 2 → ${data.folder_path}/2.jpg）
+                            </small>
+                        </div>
+                    `;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('単元画像パス取得エラー:', error);
+        });
 }
 
 // 画像名欄のパス情報をクリアする関数
