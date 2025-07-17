@@ -3577,7 +3577,7 @@ def social_studies_edit_question(question_id):
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute('''
-                        SELECT id, subject, question, correct_answer, acceptable_answers, answer_suffix, explanation
+                        SELECT id, question, correct_answer, explanation, difficulty_level
                         FROM social_studies_questions 
                         WHERE id = %s
                     ''', (question_id,))
@@ -3595,16 +3595,14 @@ def social_studies_edit_question(question_id):
         # 問題データを更新
         try:
             data = request.get_json()
-            subject = data.get('subject', '').strip()
             question_text = data.get('question', '').strip()
             correct_answer = data.get('correct_answer', '').strip()
-            acceptable_answers = data.get('acceptable_answers', '').strip()
-            answer_suffix = data.get('answer_suffix', '').strip()
             explanation = data.get('explanation', '').strip()
+            difficulty_level = data.get('difficulty_level', 'basic')
             
             # バリデーション
-            if not subject or not question_text or not correct_answer:
-                return jsonify({'error': '科目、問題文、正解は必須です'}), 400
+            if not question_text or not correct_answer:
+                return jsonify({'error': '問題文と正解は必須です'}), 400
             
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
@@ -3616,11 +3614,10 @@ def social_studies_edit_question(question_id):
                     # 問題を更新
                     cur.execute('''
                         UPDATE social_studies_questions 
-                        SET subject = %s, question = %s, correct_answer = %s, 
-                            acceptable_answers = %s, answer_suffix = %s, 
-                            explanation = %s, updated_at = CURRENT_TIMESTAMP
+                        SET question = %s, correct_answer = %s, 
+                            explanation = %s, difficulty_level = %s, updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
-                    ''', (subject, question_text, correct_answer, acceptable_answers, answer_suffix, explanation, question_id))
+                    ''', (question_text, correct_answer, explanation, difficulty_level, question_id))
                     conn.commit()
                     
                     return jsonify({'success': True, 'message': '問題が更新されました'})

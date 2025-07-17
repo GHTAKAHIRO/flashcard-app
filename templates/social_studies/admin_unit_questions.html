@@ -18,9 +18,12 @@
             <a href="{{ url_for('social_studies_add_question', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-success me-2">
                 <i class="fas fa-plus me-1"></i>この単元に問題追加
             </a>
+            <button class="btn btn-info me-2" onclick="showCsvUpload()">
+                <i class="fas fa-upload me-1"></i>CSVで問題追加
+            </button>
             <a href="{{ url_for('social_studies_admin_textbook_unified', textbook_id=textbook_info.id) }}" class="btn btn-outline-secondary">
-    <i class="fas fa-arrow-left me-1"></i>単元管理に戻る
-</a>
+                <i class="fas fa-arrow-left me-1"></i>単元管理に戻る
+            </a>
         </div>
     </div>
 </div>
@@ -45,10 +48,10 @@
                         <td>{{ question.correct_answer|e }}</td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                <button class="btn btn-outline-warning" title="編集" disabled>
+                                <button class="btn btn-outline-warning" onclick="editQuestion({{ question.id }})" title="編集">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" title="削除" disabled>
+                                <button class="btn btn-outline-danger" onclick="deleteQuestion({{ question.id }})" title="削除">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -69,4 +72,210 @@
         {% endif %}
     </div>
 </div>
+
+<!-- CSVアップロードモーダル -->
+<div class="modal fade" id="csvUploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">CSVで問題追加</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="csvUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csv-file" class="form-label">CSVファイル</label>
+                        <input type="file" class="form-control" id="csv-file" name="csv_file" accept=".csv" required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            CSVファイルの形式: 問題文,正解,解説,難易度<br>
+                            <small class="text-muted">※ 単元IDは自動的に設定されます</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="uploadCsv()">アップロード</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 問題編集モーダル -->
+<div class="modal fade" id="editQuestionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">問題編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editQuestionForm">
+                    <div class="mb-3">
+                        <label for="edit-question-text" class="form-label">問題文 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="edit-question-text" name="question" rows="3" required placeholder="問題文を入力してください"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-question-answer" class="form-label">正解 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-question-answer" name="correct_answer" required placeholder="正解を入力してください">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-question-explanation" class="form-label">解説</label>
+                        <textarea class="form-control" id="edit-question-explanation" name="explanation" rows="3" placeholder="解説を入力してください"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-question-difficulty" class="form-label">難易度</label>
+                        <select class="form-select" id="edit-question-difficulty" name="difficulty_level">
+                            <option value="basic">基本</option>
+                            <option value="intermediate">中級</option>
+                            <option value="advanced">上級</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuestionEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentEditQuestionId = null;
+
+function showCsvUpload() {
+    const modal = new bootstrap.Modal(document.getElementById('csvUploadModal'));
+    modal.show();
+}
+
+function uploadCsv() {
+    const formData = new FormData();
+    const fileInput = document.getElementById('csv-file');
+    
+    if (!fileInput.files[0]) {
+        alert('CSVファイルを選択してください');
+        return;
+    }
+    
+    formData.append('csv_file', fileInput.files[0]);
+    formData.append('textbook_id', '{{ textbook_info.id }}');
+    formData.append('unit_id', '{{ unit_info.id }}');
+    
+    fetch('/social_studies/admin/upload_unit_questions_csv', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラー: ' + data.error);
+        } else {
+            alert('CSVアップロードが完了しました。' + data.message);
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('CSVアップロードエラー:', error);
+        alert('CSVアップロードに失敗しました');
+    });
+}
+
+function editQuestion(questionId) {
+    currentEditQuestionId = questionId;
+    
+    // 問題データを取得
+    fetch(`/social_studies/admin/edit_question/${questionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            
+            // モーダルのフォームにデータを設定
+            document.getElementById('edit-question-text').value = data.question || '';
+            document.getElementById('edit-question-answer').value = data.correct_answer || '';
+            document.getElementById('edit-question-explanation').value = data.explanation || '';
+            document.getElementById('edit-question-difficulty').value = data.difficulty_level || 'basic';
+            
+            // モーダルを表示
+            const modal = new bootstrap.Modal(document.getElementById('editQuestionModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('問題データ取得エラー:', error);
+            alert('問題データの取得に失敗しました');
+        });
+}
+
+function saveQuestionEdit() {
+    if (!currentEditQuestionId) {
+        alert('編集する問題が選択されていません');
+        return;
+    }
+    
+    // フォームデータを取得
+    const formData = {
+        question: document.getElementById('edit-question-text').value,
+        correct_answer: document.getElementById('edit-question-answer').value,
+        explanation: document.getElementById('edit-question-explanation').value,
+        difficulty_level: document.getElementById('edit-question-difficulty').value
+    };
+    
+    // 必須項目のチェック
+    if (!formData.question || !formData.correct_answer) {
+        alert('問題文と正解は必須です');
+        return;
+    }
+    
+    // データを送信
+    fetch(`/social_studies/admin/edit_question/${currentEditQuestionId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert('問題を更新しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('問題更新エラー:', error);
+        alert('問題の更新に失敗しました');
+    });
+}
+
+function deleteQuestion(questionId) {
+    if (!confirm('この問題を削除しますか？')) {
+        return;
+    }
+    
+    fetch(`/social_studies/admin/delete_question/${questionId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert('問題を削除しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('問題削除エラー:', error);
+        alert('問題の削除に失敗しました');
+    });
+}
+</script>
 {% endblock %} 
