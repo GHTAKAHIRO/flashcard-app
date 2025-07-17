@@ -4793,17 +4793,37 @@ def social_studies_download_csv_template():
         # CSVデータを作成
         csv_data = []
         
-        # ヘッダー行
+        # ヘッダー行（1行目）
         csv_data.append([
             'subject', 'textbook_id', 'textbook_name', 'textbook_grade', 'textbook_publisher', 
             'textbook_wasabi_folder', 'unit_id', 'unit_name', 'unit_chapter', 
             'question', 'correct_answer', 'acceptable_answers', 'answer_suffix', 'explanation', 'image_url', 'image_title'
         ])
         
+        # 入力例行（2行目、コメントアウト）
+        csv_data.append([
+            '# 地理',  # 科目
+            '# ',  # 教材ID
+            '# 新しい教材名',  # 教材名
+            '# 中学1年',  # 学年
+            '# 出版社名',  # 出版社
+            '# 社会/新しい教材/地理',  # Wasabiフォルダパス
+            '# ',  # 単元ID
+            '# 新しい単元名',  # 単元名
+            '# 1',  # 章番号
+            '# 新しい問題文',  # 問題文
+            '# 新しい正解',  # 正解
+            '# 新しい許容回答1,新しい許容回答2',  # 許容回答
+            '# 新しい解答欄の補足',  # 解答欄の補足
+            '# 新しい解説',  # 解説
+            '# https://s3.ap-northeast-1.wasabisys.com/so-image/social studies/geography/',  # 画像URL
+            '# 1-1.jpg'  # 画像タイトル
+        ])
+        
         # 基本画像URL
         base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/question_images"
         
-        # テンプレート行を追加
+        # 実際のテンプレート行を追加
         csv_data.append([
             '地理',  # 科目
             '',  # 教材ID
@@ -4819,8 +4839,8 @@ def social_studies_download_csv_template():
             '新しい許容回答1,新しい許容回答2',  # 許容回答
             '新しい解答欄の補足',  # 解答欄の補足
             '新しい解説',  # 解説
-            f"{base_image_url}/1-1.jpg",  # 画像URL
-            '画像タイトル'  # 画像タイトル
+            f"{base_image_url}/",  # 画像URL（ベースURLのみ）
+            '1-1.jpg'  # 画像タイトル
         ])
         
         # 追加のテンプレート行
@@ -4839,8 +4859,8 @@ def social_studies_download_csv_template():
             '',  # 許容回答
             '',  # 解答欄の補足
             '',  # 解説
-            f"{base_image_url}/2-1.jpg",  # 画像URL
-            ''  # 画像タイトル
+            f"{base_image_url}/",  # 画像URL（ベースURLのみ）
+            '2-1.jpg'  # 画像タイトル
         ])
         
         # CSVファイルを生成（BOM付きUTF-8）
@@ -4851,6 +4871,9 @@ def social_studies_download_csv_template():
         # BOM付きUTF-8でエンコード
         csv_content = output.getvalue()
         csv_bytes = csv_content.encode('utf-8-sig')  # BOM付きUTF-8
+        
+        # ファイル名を設定
+        filename = 'social_studies_template.csv'
         
         # レスポンスを作成
         response = app.response_class(
@@ -4879,8 +4902,11 @@ def download_units_csv(textbook_id):
         # CSVデータを作成
         csv_data = []
         
-        # ヘッダー行
-        csv_data.append(['単元名', '小番号', '説明'])
+        # ヘッダー行（1行目）
+        csv_data.append(['単元名', '章番号', '説明'])
+        
+        # 入力例行（2行目、コメントアウト）
+        csv_data.append(['# 新しい単元名', '# 1', '# 新しい単元の説明'])
         
         # テンプレート行を追加（新しい単元追加用）
         csv_data.append(['新しい単元名', '1', '新しい単元の説明'])
@@ -4926,10 +4952,16 @@ def download_questions_csv(textbook_id):
         # CSVデータを作成
         csv_data = []
         
-        # ヘッダー行
+        # ヘッダー行（1行目）
         csv_data.append([
             '単元名', '章番号', '問題文', '正解', '許容回答', '解答欄の補足', 
             '解説', '難易度', '画像URL', '画像タイトル', '登録日'
+        ])
+        
+        # 入力例行（2行目、コメントアウト）
+        csv_data.append([
+            '# 単元名', '# 1', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
+            '# 解答欄の補足', '# 解説', '# 基本', '# https://s3.ap-northeast-1.wasabisys.com/so-image/social studies/geography/', '# 1-1.jpg', '# '
         ])
         
         # 教材の画像URLを取得
@@ -4946,10 +4978,10 @@ def download_questions_csv(textbook_id):
         # テンプレート行を追加（新しい問題追加用）
         csv_data.append([
             '単元名', '1', '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
-            '解答欄の補足', '解説', '基本', f"{base_image_url}/1-1.jpg", '画像タイトル', ''
+            '解答欄の補足', '解説', '基本', f"{base_image_url}/", '1-1.jpg', ''
         ])
-        csv_data.append(['', '2', '', '', '', '', '', '基本', f"{base_image_url}/2-1.jpg", '', ''])
-        csv_data.append(['', '3', '', '', '', '', '', '基本', f"{base_image_url}/3-1.jpg", '', ''])
+        csv_data.append(['', '2', '', '', '', '', '', '基本', f"{base_image_url}/", '2-1.jpg', ''])
+        csv_data.append(['', '3', '', '', '', '', '', '基本', f"{base_image_url}/", '3-1.jpg', ''])
         
         # CSVファイルを生成（BOM付きUTF-8）
         output = io.StringIO()

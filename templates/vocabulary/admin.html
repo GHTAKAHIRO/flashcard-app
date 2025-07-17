@@ -379,7 +379,7 @@
 
         // テンプレートダウンロード
         function downloadTemplate() {
-            const csvContent = 'word,meaning,example\nhello,こんにちは,Hello, how are you?\nworld,世界,The world is beautiful.\nstudy,勉強する,I study English every day.';
+            const csvContent = 'word,meaning,example\n# hello,# こんにちは,# Hello, how are you?\nhello,こんにちは,Hello, how are you?\nworld,世界,The world is beautiful.\nstudy,勉強する,I study English every day.';
             // BOM付きUTF-8でエンコード
             const bom = '\uFEFF';
             const csvWithBom = bom + csvContent;

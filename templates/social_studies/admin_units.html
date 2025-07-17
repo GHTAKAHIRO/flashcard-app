@@ -312,7 +312,7 @@ function showCsvUploadModal() {
 }
 
 function downloadCsvTemplate() {
-    const csvContent = '単元名,章番号,説明\n地理の基礎,1,地理学習の基礎となる内容\n日本の地形,2,日本の地形と気候について\n世界の国々,3,世界各国の地理的特徴';
+    const csvContent = '単元名,章番号,説明\n# 地理の基礎,# 1,# 地理学習の基礎となる内容\n地理の基礎,1,地理学習の基礎となる内容\n日本の地形,2,日本の地形と気候について\n世界の国々,3,世界各国の地理的特徴';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
