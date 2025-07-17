@@ -449,17 +449,20 @@ function checkImageExists() {
     const statusSpan = document.getElementById('image-status');
     const containerDiv = document.getElementById('image-preview-container');
     
-    console.log('🔍 画像確認開始:', { imageName, textbookId: document.getElementById('textbook_id').value });
+    // 単元IDを取得（固定表示の場合はhidden inputから、選択の場合はselectから）
+    const unitIdElement = document.getElementById('unit_id');
+    const unitId = unitIdElement ? unitIdElement.value : null;
+    
+    console.log('🔍 画像確認開始:', { imageName, unitId: unitId });
     
     if (!imageName) {
         previewDiv.style.display = 'none';
         return;
     }
     
-    // 選択された教材のフォルダパスを取得
-    const textbookId = document.getElementById('textbook_id').value;
-    if (!textbookId) {
-        statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> 教材を選択してください`;
+    // 単元IDが取得できない場合
+    if (!unitId) {
+        statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> 単元を選択してください`;
         previewDiv.style.display = 'block';
         return;
     }
@@ -470,7 +473,7 @@ function checkImageExists() {
     previewDiv.style.display = 'block';
     
     // 画像存在確認APIを呼び出し
-    fetch(`/social_studies/api/check_image?image_name=${encodeURIComponent(imageName)}&textbook_id=${textbookId}`)
+    fetch(`/social_studies/api/check_image?image_name=${encodeURIComponent(imageName)}&unit_id=${unitId}`)
         .then(response => {
             console.log('🔍 APIレスポンス:', response.status, response.statusText);
             return response.json();
