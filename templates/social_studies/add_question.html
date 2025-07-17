@@ -9,11 +9,27 @@
             <h2 class="fw-bold">
                 <i class="fas fa-plus me-2"></i>問題追加
             </h2>
-            <p class="text-muted">新しい社会科問題を追加します</p>
+            <p class="text-muted">
+                {% if textbook_info and unit_info %}
+                    {{ textbook_info.name }} - {{ unit_info.name }}
+                    {% if unit_info.chapter_number %}(第{{ unit_info.chapter_number }}章){% endif %}
+                {% elif textbook_info %}
+                    {{ textbook_info.name }}
+                {% else %}
+                    新しい社会科問題を追加します
+                {% endif %}
+            </p>
         </div>
-        <a href="{{ url_for('social_studies_admin_questions') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i>問題一覧に戻る
-        </a>
+        <div>
+            {% if textbook_info and unit_info %}
+                <a href="{{ url_for('social_studies_admin_unit_questions', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-arrow-left me-1"></i>単元に戻る
+                </a>
+            {% endif %}
+            <a href="{{ url_for('social_studies_admin_questions') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>問題一覧に戻る
+            </a>
+        </div>
     </div>
 </div>
 
@@ -189,13 +205,14 @@
 // ページ読み込み時にURLパラメータから教材IDと単元IDを設定
 document.addEventListener('DOMContentLoaded', function() {
     {% if textbook_id %}
-    // 教材IDが指定されている場合、科目を設定して教材を読み込み
-    const urlParams = new URLSearchParams(window.location.search);
-    const subject = urlParams.get('subject');
-    if (subject) {
-        document.getElementById('subject').value = subject;
-        loadTextbooks();
-    }
+    // 教材IDが指定されている場合、教材を自動選択
+    setTimeout(function() {
+        const textbookSelect = document.getElementById('textbook_id');
+        if (textbookSelect) {
+            textbookSelect.value = {{ textbook_id }}';
+            loadUnits();
+        }
+    }, 500;
     {% endif %}
     
     {% if unit_id %}
@@ -203,9 +220,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         const unitSelect = document.getElementById('unit_id');
         if (unitSelect) {
-            unitSelect.value = '{{ unit_id }}';
+            unitSelect.value = {{ unit_id }}';
         }
-    }, 1000); // 教材と単元の読み込みを待つ
+    }, 1500); // 教材と単元の読み込みを待つ
     {% endif %}
 });
 

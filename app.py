@@ -3466,8 +3466,26 @@ def social_studies_add_question():
     textbook_id = request.args.get('textbook_id')
     unit_id = request.args.get('unit_id')
     
+    # 教材と単元の情報を取得
+    textbook_info = None
+    unit_info = None
+    
+    if textbook_id:
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute('SELECT id, name FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                    textbook_info = cur.fetchone()
+                    
+                    if unit_id:
+                        cur.execute('SELECT id, name, chapter_number FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                        unit_info = cur.fetchone()
+        except Exception as e:
+            app.logger.error(f"教材・単元情報取得エラー: {e}")
+    
     return render_template('social_studies/add_question.html', 
-                         textbook_id=textbook_id, unit_id=unit_id)
+                         textbook_id=textbook_id, unit_id=unit_id,
+                         textbook_info=textbook_info, unit_info=unit_info)
 
 @app.route('/social_studies/admin/delete_question/<int:question_id>', methods=['POST'])
 @login_required

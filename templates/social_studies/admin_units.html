@@ -99,6 +99,10 @@
                                    class="btn btn-outline-success" title="問題管理">
                                     <i class="fas fa-question-circle"></i>
                                 </a>
+                                <a href="{{ url_for('social_studies_add_question') }}?textbook_id={{ textbook.id }}&unit_id={{ unit.id }}" 
+                                   class="btn btn-outline-info" title="問題追加">
+                                    <i class="fas fa-plus"></i>
+                                </a>
                                 <button class="btn btn-outline-primary" onclick="editUnit({{ unit.id }})" title="編集">
                                     <i class="fas fa-edit"></i>
                                 </button>
