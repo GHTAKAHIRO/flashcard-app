@@ -91,9 +91,9 @@
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                <a href="{{ url_for('social_studies_add_question') }}?textbook_id={{ textbook.id }}&unit_id={{ unit.id }}" 
-                                   class="btn btn-success" title="問題追加">
-                                    <i class="fas fa-plus me-1"></i>問題追加
+                                <a href="{{ url_for('social_studies_admin_unit_questions', textbook_id=textbook.id, unit_id=unit.id) }}" 
+                                   class="btn btn-info" title="問題一覧">
+                                    <i class="fas fa-list me-1"></i>問題一覧
                                 </a>
                                 <button class="btn btn-outline-primary" onclick="editUnit({{ unit.id }})" title="編集">
                                     <i class="fas fa-edit"></i>
