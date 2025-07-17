@@ -3832,58 +3832,6 @@ def social_studies_edit_unit(unit_id):
             app.logger.error(f"単元更新エラー: {e}")
             return jsonify({'error': '単元の更新に失敗しました'}), 500
 
-@app.route('/social_studies/admin/unit/<int:textbook_id>/<int:unit_id>/questions')
-@login_required
-def social_studies_admin_unit_questions(textbook_id, unit_id):
-    """指定された単元の問題管理画面（管理者のみ）"""
-    if not current_user.is_admin:
-        return jsonify({'error': '管理者権限が必要です'}), 403
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 教材情報を取得
-                cur.execute('''
-                    SELECT id, name, subject, grade, publisher, created_at
-                    FROM social_studies_textbooks 
-                    WHERE id = %s
-                ''', (textbook_id,))
-                textbook = cur.fetchone()
-                
-                if not textbook:
-                    flash('教材が見つかりません', 'error')
-                    return redirect(url_for('social_studies_admin'))
-                
-                # 単元情報を取得
-                cur.execute('''
-                    SELECT id, name, chapter_number, description, created_at
-                    FROM social_studies_units 
-                    WHERE id = %s AND textbook_id = %s
-                ''', (unit_id, textbook_id))
-                unit = cur.fetchone()
-                
-                if not unit:
-                    flash('単元が見つかりません', 'error')
-                    return redirect(url_for('social_studies_admin_units', textbook_id=textbook_id))
-                
-                # 単元の問題一覧を取得
-                cur.execute('''
-                    SELECT id, question, correct_answer, acceptable_answers, answer_suffix, 
-                           explanation, difficulty, image_url, image_title, created_at
-                    FROM social_studies_questions
-                    WHERE textbook_id = %s AND unit_id = %s
-                    ORDER BY created_at DESC
-                ''', (textbook_id, unit_id))
-                questions = cur.fetchall()
-        
-        return render_template('social_studies/admin_unit_questions.html', 
-                             textbook=textbook, unit=unit, questions=questions)
-        
-    except Exception as e:
-        app.logger.error(f"単元問題管理画面エラー: {e}")
-        flash('単元問題管理画面の表示に失敗しました', 'error')
-        return redirect(url_for('social_studies_admin_units', textbook_id=textbook_id))
-
 # ========== API エンドポイント ==========
 
 @app.route('/social_studies/api/textbooks')
