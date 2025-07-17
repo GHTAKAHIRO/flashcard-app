@@ -3641,49 +3641,7 @@ def social_studies_edit_question(question_id):
 
 # ========== 単元管理 ==========
 
-@app.route('/social_studies/admin/units/<int:textbook_id>')
-@login_required
-def social_studies_admin_units(textbook_id):
-    """単元一覧（管理者のみ）"""
-    if not current_user.is_admin:
-        flash("管理者権限が必要です")
-        return redirect(url_for('admin'))
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 教材情報を取得
-                cur.execute('SELECT * FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
-                textbook = cur.fetchone()
-                
-                if not textbook:
-                    flash('教材が見つかりません', 'error')
-                    return redirect(url_for('social_studies_admin_unified'))
-                
-                # 単元一覧を取得（問題数も含む）
-                cur.execute('''
-                    SELECT 
-                        u.*,
-                        COUNT(q.id) as question_count
-                    FROM social_studies_units u
-                    LEFT JOIN social_studies_questions q ON u.id = q.unit_id
-                    WHERE u.textbook_id = %s
-                    GROUP BY u.id
-                    ORDER BY u.chapter_number, u.name
-                ''', (textbook_id,))
-                units = cur.fetchall()
-                
-                # 教材の問題数も取得
-                cur.execute('SELECT COUNT(*) as question_count FROM social_studies_questions WHERE textbook_id = %s', (textbook_id,))
-                textbook_question_count = cur.fetchone()['question_count']
-                textbook['question_count'] = textbook_question_count
-                
-                return render_template('social_studies/admin_units.html', 
-                                     textbook=textbook, units=units)
-    except Exception as e:
-        app.logger.error(f"単元一覧エラー: {e}")
-        flash('単元一覧の取得に失敗しました', 'error')
-        return redirect(url_for('social_studies_admin_unified'))
+# 単元管理ルートは削除 - 統一管理画面で代替
 
 @app.route('/social_studies/admin/add_unit/<int:textbook_id>', methods=['GET', 'POST'])
 @login_required
@@ -3721,13 +3679,13 @@ def social_studies_add_unit(textbook_id):
                     ''', (textbook_id, name, chapter_number, description))
                     conn.commit()
                     flash('単元が追加されました', 'success')
-                    return redirect(url_for('social_studies_admin_units', textbook_id=textbook_id))
+                    return redirect(url_for('social_studies_admin_textbook_unified', textbook_id=textbook_id))
                 
                 return render_template('social_studies/add_unit.html', textbook=textbook)
     except Exception as e:
         app.logger.error(f"単元追加エラー: {e}")
         flash('単元の追加に失敗しました', 'error')
-        return redirect(url_for('social_studies_admin_units', textbook_id=textbook_id))
+        return redirect(url_for('social_studies_admin_textbook_unified', textbook_id=textbook_id))
 
 @app.route('/social_studies/admin/delete_unit/<int:unit_id>', methods=['POST'])
 @login_required
