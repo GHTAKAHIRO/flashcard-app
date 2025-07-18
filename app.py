@@ -5188,15 +5188,10 @@ def download_unit_questions_csv(textbook_id, unit_id):
             '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
         ])
         
-        # 入力例行（2行目、コメントアウト）
-        csv_data.append([
-            '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
-            '# 解答欄の補足', '# 解説', '# 基本', '# https://s3.ap-northeast-1.wasabisys.com/so-image/social studies/geography/', '# 1-1.jpg'
-        ])
-        
         # 教材と単元の情報を取得
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 教材と単元の情報を取得
                 cur.execute('''
                     SELECT t.wasabi_folder_path, u.name as unit_name
                     FROM social_studies_textbooks t
@@ -5209,8 +5204,31 @@ def download_unit_questions_csv(textbook_id, unit_id):
                     return jsonify({'error': '教材または単元が見つかりません'}), 404
                 
                 base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{result['wasabi_folder_path'] or 'question_images'}"
+                
+                # 既存の問題データを取得
+                cur.execute('''
+                    SELECT question, correct_answer, acceptable_answers, answer_suffix, 
+                           explanation, difficulty, image_url, image_title
+                    FROM social_studies_questions
+                    WHERE textbook_id = %s AND unit_id = %s
+                    ORDER BY id
+                ''', (textbook_id, unit_id))
+                existing_questions = cur.fetchall()
         
-        # テンプレート行を追加（新しい問題追加用）
+        # 既存の問題データを追加
+        for question in existing_questions:
+            csv_data.append([
+                question['question'] or '',
+                question['correct_answer'] or '',
+                question['acceptable_answers'] or '',
+                question['answer_suffix'] or '',
+                question['explanation'] or '',
+                question['difficulty'] or '基本',
+                question['image_url'] or f"{base_image_url}/",
+                question['image_title'] or ''
+            ])
+        
+        # 新しい問題追加用のテンプレート行を追加
         csv_data.append([
             '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
             '解答欄の補足', '解説', '基本', f"{base_image_url}/", '1-1.jpg'
@@ -5320,9 +5338,9 @@ def social_studies_upload_unit_questions_csv():
                 for row_num, row in enumerate(reader, 1):
                     app.logger.info(f"行{row_num}を処理中: {row}")
                     try:
-                        # 必須フィールドの取得
-                        question = row.get('question', '').strip()
-                        correct_answer = row.get('correct_answer', '').strip()
+                        # 必須フィールドの取得（日本語ヘッダー対応）
+                        question = row.get('問題文', '').strip()
+                        correct_answer = row.get('正解', '').strip()
                         
                         # バリデーション
                         if not question or not correct_answer:
@@ -5330,13 +5348,13 @@ def social_studies_upload_unit_questions_csv():
                             skipped_count += 1
                             continue
                         
-                        # オプションフィールドの取得
-                        acceptable_answers = row.get('acceptable_answers', '').strip()
-                        explanation = row.get('explanation', '').strip()
-                        answer_suffix = row.get('answer_suffix', '').strip()
-                        difficulty = row.get('difficulty', '').strip()
-                        image_url = row.get('image_url', '').strip()
-                        image_title = row.get('image_title', '').strip()
+                        # オプションフィールドの取得（日本語ヘッダー対応）
+                        acceptable_answers = row.get('許容回答', '').strip()
+                        explanation = row.get('解説', '').strip()
+                        answer_suffix = row.get('解答欄の補足', '').strip()
+                        difficulty = row.get('難易度', '').strip()
+                        image_url = row.get('画像URL', '').strip()
+                        image_title = row.get('画像タイトル', '').strip()
                         
                         # 問題が既に存在するかチェック
                         cur.execute('''
