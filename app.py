@@ -5456,36 +5456,60 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
 @app.route('/social_studies/admin/update_image_path/<int:textbook_id>/<int:unit_id>', methods=['POST'])
 @login_required
 def update_unit_image_path(textbook_id, unit_id):
-    """単元の画像パスを更新（管理者のみ）"""
+    """単元の画像URLを更新（管理者のみ）"""
     if not current_user.is_admin:
         return jsonify({'error': '管理者権限が必要です'}), 403
     
     try:
         data = request.get_json()
-        new_wasabi_folder_path = data.get('wasabi_folder_path', '').strip()
+        new_image_url = data.get('image_url', '').strip()
         
-        if not new_wasabi_folder_path:
-            return jsonify({'error': 'Wasabiフォルダパスが必要です'}), 400
+        if not new_image_url:
+            return jsonify({'error': '画像URLが必要です'}), 400
+        
+        if not new_image_url.startswith('https://'):
+            return jsonify({'error': '有効なURLを入力してください（https://で始まる必要があります）'}), 400
         
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # 教材のWasabiフォルダパスを更新（URLからパスを抽出）
+                # URLの形式: https://s3.ap-northeast-1-ntt.wasabisys.com/so-image/path/to/folder
+                url_parts = new_image_url.split('/')
+                if len(url_parts) >= 6:
+                    # so-image以降のパスを取得
+                    bucket_index = url_parts.index('so-image') if 'so-image' in url_parts else -1
+                    if bucket_index != -1 and bucket_index + 1 < len(url_parts):
+                        folder_path = '/'.join(url_parts[bucket_index + 1:])
+                        # 章番号を除いたパスを取得
+                        path_parts = folder_path.split('/')
+                        if len(path_parts) > 1:
+                            # 最後の部分（章番号）を除く
+                            wasabi_folder_path = '/'.join(path_parts[:-1])
+                        else:
+                            wasabi_folder_path = folder_path
+                    else:
+                        wasabi_folder_path = ''
+                else:
+                    wasabi_folder_path = ''
+                
                 # 教材のWasabiフォルダパスを更新
                 cur.execute('''
                     UPDATE social_studies_textbooks 
                     SET wasabi_folder_path = %s 
                     WHERE id = %s
-                ''', (new_wasabi_folder_path, textbook_id))
+                ''', (wasabi_folder_path, textbook_id))
                 conn.commit()
         
         return jsonify({
             'success': True,
-            'message': '画像パスを更新しました',
-            'new_path': new_wasabi_folder_path
+            'message': '画像URLを更新しました',
+            'new_url': new_image_url,
+            'new_path': wasabi_folder_path
         })
         
     except Exception as e:
-        app.logger.error(f"画像パス更新エラー: {e}")
-        return jsonify({'error': f'画像パスの更新に失敗しました: {str(e)}'}), 500
+        app.logger.error(f"画像URL更新エラー: {e}")
+        return jsonify({'error': f'画像URLの更新に失敗しました: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # データベース接続プールを初期化

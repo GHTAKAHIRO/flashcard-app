@@ -162,15 +162,11 @@
                     <input type="text" class="form-control" value="{{ image_path_info.base_url if image_path_info else '' }}" readonly>
                 </div>
                 <div class="mb-4">
-                    <label for="new-wasabi-path" class="form-label">新しいWasabiフォルダパス</label>
-                    <input type="text" class="form-control" id="new-wasabi-path" placeholder="例: geography/final" value="{{ image_path_info.wasabi_folder_path if image_path_info else '' }}">
+                    <label for="new-image-url" class="form-label">新しい画像URL</label>
+                    <input type="text" class="form-control" id="new-image-url" placeholder="https://s3.ap-northeast-1-ntt.wasabisys.com/so-image/..." style="width: 100%;">
                     <div class="form-text">
-                        <small class="text-muted">※ スラッシュ区切りでパスを入力してください（例: geography/final, history/final, civics/final）</small>
+                        <small class="text-muted">※ 完全なURLを入力してください（例: https://s3.ap-northeast-1-ntt.wasabisys.com/so-image/geography/final/1）</small>
                     </div>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">新しい画像URL（プレビュー）</label>
-                    <input type="text" class="form-control" id="preview-image-url" readonly>
                 </div>
             </div>
             <div class="modal-footer">
@@ -194,36 +190,22 @@ function showCsvUpload() {
 function showImagePathSettings() {
     const modal = new bootstrap.Modal(document.getElementById('imagePathModal'));
     modal.show();
-    
-    // プレビューURLを更新
-    updatePreviewUrl();
-    
-    // 入力フィールドの変更を監視
-    document.getElementById('new-wasabi-path').addEventListener('input', updatePreviewUrl);
-}
-
-function updatePreviewUrl() {
-    const newPath = document.getElementById('new-wasabi-path').value;
-    const chapterNumber = {{ image_path_info.chapter_number if image_path_info else 1 }};
-    const bucket = '{{ "so-image" }}';
-    
-    if (newPath) {
-        const previewUrl = `https://s3.ap-northeast-1-ntt.wasabisys.com/${bucket}/${newPath}/${chapterNumber}`;
-        document.getElementById('preview-image-url').value = previewUrl;
-    } else {
-        document.getElementById('preview-image-url').value = '';
-    }
 }
 
 function updateImagePath() {
-    const newPath = document.getElementById('new-wasabi-path').value.trim();
+    const newUrl = document.getElementById('new-image-url').value.trim();
     
-    if (!newPath) {
-        alert('Wasabiフォルダパスを入力してください');
+    if (!newUrl) {
+        alert('新しい画像URLを入力してください');
         return;
     }
     
-    if (!confirm('画像パスを更新しますか？この変更はCSVダウンロードに反映されます。')) {
+    if (!newUrl.startsWith('https://')) {
+        alert('有効なURLを入力してください（https://で始まる必要があります）');
+        return;
+    }
+    
+    if (!confirm('画像URLを更新しますか？この変更はCSVダウンロードに反映されます。')) {
         return;
     }
     
@@ -233,7 +215,7 @@ function updateImagePath() {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            wasabi_folder_path: newPath
+            image_url: newUrl
         })
     })
     .then(response => response.json())
@@ -241,13 +223,13 @@ function updateImagePath() {
         if (data.error) {
             alert('エラー: ' + data.error);
         } else {
-            alert('画像パスを更新しました');
+            alert('画像URLを更新しました');
             location.reload();
         }
     })
     .catch(error => {
-        console.error('画像パス更新エラー:', error);
-        alert('画像パスの更新に失敗しました');
+        console.error('画像URL更新エラー:', error);
+        alert('画像URLの更新に失敗しました');
     });
 }
 
