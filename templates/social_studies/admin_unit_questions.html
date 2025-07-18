@@ -150,59 +150,27 @@
 
 <!-- 画像パス設定モーダル -->
 <div class="modal fade" id="imagePathModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">画像パス設定</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>現在の設定</h6>
-                        <div class="mb-3">
-                            <label class="form-label">教材名</label>
-                            <input type="text" class="form-control" value="{{ textbook_info.name if textbook_info }}" readonly>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">単元名</label>
-                            <input type="text" class="form-control" value="{{ unit_info.name if unit_info }}" readonly>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">章番号</label>
-                            <input type="text" class="form-control" value="{{ image_path_info.chapter_number if image_path_info else '1' }}" readonly>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">現在のWasabiフォルダパス</label>
-                            <input type="text" class="form-control" id="current-wasabi-path" value="{{ image_path_info.wasabi_folder_path if image_path_info else '' }}" readonly>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">現在の画像URL</label>
-                            <input type="text" class="form-control" value="{{ image_path_info.base_url if image_path_info else '' }}" readonly>
-                        </div>
+                <div class="mb-4">
+                    <label class="form-label">現在の画像URL</label>
+                    <input type="text" class="form-control" value="{{ image_path_info.base_url if image_path_info else '' }}" readonly>
+                </div>
+                <div class="mb-4">
+                    <label for="new-wasabi-path" class="form-label">新しいWasabiフォルダパス</label>
+                    <input type="text" class="form-control" id="new-wasabi-path" placeholder="例: geography/final" value="{{ image_path_info.wasabi_folder_path if image_path_info else '' }}">
+                    <div class="form-text">
+                        <small class="text-muted">※ スラッシュ区切りでパスを入力してください（例: geography/final, history/final, civics/final）</small>
                     </div>
-                    <div class="col-md-6">
-                        <h6>新しい設定</h6>
-                        <div class="mb-3">
-                            <label for="new-wasabi-path" class="form-label">新しいWasabiフォルダパス</label>
-                            <input type="text" class="form-control" id="new-wasabi-path" placeholder="例: geography/final" value="{{ image_path_info.wasabi_folder_path if image_path_info else '' }}">
-                            <div class="form-text">
-                                <small class="text-muted">※ スラッシュ区切りでパスを入力してください</small><br>
-                                <small class="text-muted">※ 例: geography/final, history/final, civics/final</small>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">新しい画像URL（プレビュー）</label>
-                            <input type="text" class="form-control" id="preview-image-url" readonly>
-                        </div>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-1"></i>
-                            <strong>設定例:</strong><br>
-                            • 地理: <code>geography/final</code><br>
-                            • 歴史: <code>history/final</code><br>
-                            • 公民: <code>civics/final</code>
-                        </div>
-                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">新しい画像URL（プレビュー）</label>
+                    <input type="text" class="form-control" id="preview-image-url" readonly>
                 </div>
             </div>
             <div class="modal-footer">
