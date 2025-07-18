@@ -90,19 +90,19 @@
                     <div class="mb-3">
                         <label for="question" class="form-label">問題文 <span class="text-danger">*</span></label>
                         <textarea class="form-control" id="question" name="question" rows="3" 
-                                  placeholder="例: 日本の首都はどこですか？" required>{{ question.question or '' }}</textarea>
+                                  required>{{ question.question or '' }}</textarea>
                     </div>
                     
                     <div class="mb-3">
                         <label for="correct_answer" class="form-label">正解 <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="correct_answer" name="correct_answer" 
-                               placeholder="例: 東京" value="{{ question.correct_answer or '' }}" required>
+                               value="{{ question.correct_answer or '' }}" required>
                     </div>
                     
                     <div class="mb-3">
                         <label for="acceptable_answers" class="form-label">許容回答（カンマ区切り）</label>
                         <input type="text" class="form-control" id="acceptable_answers" name="acceptable_answers" 
-                               placeholder="例: 東京都, Tokyo" value="{{ question.acceptable_answers or '' }}">
+                               value="{{ question.acceptable_answers or '' }}">
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
                             正解以外でも正解として扱いたい回答があれば入力してください
@@ -114,7 +114,6 @@
                             <i class="fas fa-plus me-1"></i>解答欄の後補足
                         </label>
                         <input type="text" class="form-control" id="answer_suffix" name="answer_suffix" 
-                               placeholder="例: 大陸（「オーストラリア大陸」の場合）、年（「1868年」の場合）"
                                value="{{ question.answer_suffix or '' }}" oninput="updatePreview()">
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
@@ -133,8 +132,7 @@
                         <label for="explanation" class="form-label">
                             <i class="fas fa-lightbulb me-1"></i>解説
                         </label>
-                        <textarea class="form-control" id="explanation" name="explanation" rows="3" 
-                                  placeholder="例: 東京は日本の首都として、政治・経済・文化の中心地となっています。">{{ question.explanation or '' }}</textarea>
+                        <textarea class="form-control" id="explanation" name="explanation" rows="3">{{ question.explanation or '' }}</textarea>
                     </div>
                     
                     {% if textbook_info and unit_info %}
@@ -161,7 +159,6 @@
                         </label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="image_name" name="image_name" 
-                                   placeholder="{% if textbook_info and unit_info %}例: 2（問題番号のみ）{% else %}例: 1-2{% endif %}" 
                                    value="{{ question.image_name or '' }}" onchange="checkImageExists()">
                             <button type="button" class="btn btn-outline-secondary" onclick="checkImageExists()">
                                 <i class="fas fa-search"></i>確認
@@ -171,7 +168,6 @@
                         <div id="image-preview" class="mt-2" style="display: none;">
                             <div class="alert alert-info">
                                 <small>
-                                    <strong>画像プレビュー:</strong> 
                                     <span id="image-status"></span>
                                     <div id="image-preview-container" class="mt-2 text-center"></div>
                                 </small>
@@ -182,11 +178,11 @@
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         {% if question.unit_id %}
                             <a href="{{ url_for('social_studies_admin_unit_questions', textbook_id=question.textbook_id or 1, unit_id=question.unit_id) }}" class="btn btn-secondary me-md-2">
-                                <i class="fas fa-arrow-left me-1"></i>単元に戻る
+                                <i class="fas fa-times me-1"></i>キャンセル
                             </a>
                         {% else %}
                             <a href="{{ url_for('social_studies_admin_questions') }}" class="btn btn-secondary me-md-2">
-                                <i class="fas fa-arrow-left me-1"></i>戻る
+                                <i class="fas fa-times me-1"></i>キャンセル
                             </a>
                         {% endif %}
                         <button type="submit" class="btn btn-primary">
@@ -221,11 +217,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusSpan = document.getElementById('image-status');
     
     if (imageNameInput) {
-        imageNameInput.placeholder = '例: 2（問題番号のみ）';
+        imageNameInput.placeholder = '';
     }
     
     if (statusSpan) {
-        statusSpan.innerHTML = `<i class="fas fa-info-circle text-info"></i> 画像保存先: <code>{{ image_path_info.base_url }}</code>`;
+        statusSpan.innerHTML = '';
     }
     
     if (imagePreviewDiv) {
@@ -367,10 +363,10 @@ function updateImagePathInfo(folderPath) {
     
     if (folderPath) {
         // プレースホルダーを更新
-        imageNameInput.placeholder = `例: 1-2 (保存先: ${folderPath})`;
+        imageNameInput.placeholder = '';
         
         // パス情報を表示
-        statusSpan.innerHTML = `<i class="fas fa-info-circle text-info"></i> 画像保存先: <code>${folderPath}</code>`;
+        statusSpan.innerHTML = '';
         imagePreviewDiv.style.display = 'block';
         
 
@@ -400,10 +396,10 @@ function updateUnitImagePathInfo(unitId) {
                 }
                 
                 // プレースホルダーを更新（問題番号のみ）
-                imageNameInput.placeholder = '例: 2（問題番号のみ）';
+                imageNameInput.placeholder = '';
                 
                 // パス情報を表示
-                statusSpan.innerHTML = `<i class="fas fa-info-circle text-info"></i> 画像保存先: <code>${data.folder_path}</code>`;
+                statusSpan.innerHTML = '';
                 imagePreviewDiv.style.display = 'block';
                 
                 // 画像名欄の下にパス情報を表示
@@ -484,7 +480,7 @@ function clearImagePathInfo() {
     const statusSpan = document.getElementById('image-status');
     
     // プレースホルダーを元に戻す
-    imageNameInput.placeholder = '例: 1-2';
+    imageNameInput.placeholder = '';
     
     // パス情報をクリア
     statusSpan.innerHTML = '';
