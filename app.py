@@ -5185,7 +5185,13 @@ def download_unit_questions_csv(textbook_id, unit_id):
         
         # ヘッダー行（1行目）
         csv_data.append([
-            '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
+            '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
+        ])
+        
+        # 固定情報行（2行目、コメントアウト）
+        csv_data.append([
+            f'# {textbook_name}', f'# {unit_name}', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
+            '# 解答欄の補足', '# 解説', '# 基本', f'# {base_image_url}/1.jpg', '# 1.jpg'
         ])
         
         # 教材と単元の情報を取得
@@ -5193,7 +5199,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 教材と単元の情報を取得
                 cur.execute('''
-                    SELECT t.wasabi_folder_path, u.name as unit_name
+                    SELECT t.name as textbook_name, t.wasabi_folder_path, u.name as unit_name, u.chapter_number
                     FROM social_studies_textbooks t
                     JOIN social_studies_units u ON t.id = u.textbook_id
                     WHERE t.id = %s AND u.id = %s
@@ -5203,7 +5209,10 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 if not result:
                     return jsonify({'error': '教材または単元が見つかりません'}), 404
                 
-                base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{result['wasabi_folder_path'] or 'question_images'}"
+                textbook_name = result['textbook_name']
+                unit_name = result['unit_name']
+                chapter_number = result['chapter_number'] or 1
+                base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{result['wasabi_folder_path'] or 'question_images'}/{chapter_number}"
                 
                 # 既存の問題データを取得
                 cur.execute('''
@@ -5218,23 +5227,25 @@ def download_unit_questions_csv(textbook_id, unit_id):
         # 既存の問題データを追加
         for question in existing_questions:
             csv_data.append([
+                textbook_name,
+                unit_name,
                 question['question'] or '',
                 question['correct_answer'] or '',
                 question['acceptable_answers'] or '',
                 question['answer_suffix'] or '',
                 question['explanation'] or '',
                 question['difficulty_level'] or '基本',
-                question['image_url'] or f"{base_image_url}/",
+                question['image_url'] or base_image_url,
                 question['image_title'] or ''
             ])
         
         # 新しい問題追加用のテンプレート行を追加
         csv_data.append([
-            '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
-            '解答欄の補足', '解説', '基本', f"{base_image_url}/", '1-1.jpg'
+            textbook_name, unit_name, '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
+            '解答欄の補足', '解説', '基本', f"{base_image_url}/1.jpg", '1.jpg'
         ])
-        csv_data.append(['', '', '', '', '', '基本', f"{base_image_url}/", '2-1.jpg'])
-        csv_data.append(['', '', '', '', '', '基本', f"{base_image_url}/", '3-1.jpg'])
+        csv_data.append([textbook_name, unit_name, '', '', '', '', '', '基本', f"{base_image_url}/2.jpg", '2.jpg'])
+        csv_data.append([textbook_name, unit_name, '', '', '', '', '', '基本', f"{base_image_url}/3.jpg", '3.jpg'])
         
         # CSVファイルを生成（BOM付きUTF-8）
         output = io.StringIO()
@@ -5341,8 +5352,12 @@ def social_studies_upload_unit_questions_csv():
                 for row_num, row in enumerate(reader, 1):
                     app.logger.info(f"行{row_num}を処理中: {row}")
                     try:
-                        # 必須フィールドの取得（日本語ヘッダー対応）
+                        # コメント行をスキップ
                         question = row.get('問題文', '').strip()
+                        if question.startswith('#') or not question:
+                            app.logger.info(f"行{row_num}: コメント行または空行をスキップ")
+                            continue
+                        
                         correct_answer = row.get('正解', '').strip()
                         
                         # バリデーション
@@ -5350,6 +5365,10 @@ def social_studies_upload_unit_questions_csv():
                             app.logger.warning(f"行{row_num}: 必須フィールドが不足 - question: '{question}', correct_answer: '{correct_answer}'")
                             skipped_count += 1
                             continue
+                        
+                        # 教材名と単元名の取得（オプション）
+                        csv_textbook_name = row.get('教材名', '').strip()
+                        csv_unit_name = row.get('単元名', '').strip()
                         
                         # オプションフィールドの取得（日本語ヘッダー対応）
                         acceptable_answers = row.get('許容回答', '').strip()

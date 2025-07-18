@@ -88,8 +88,10 @@
                         <input type="file" class="form-control" id="csv-file" name="csv_file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            CSVファイルの形式: 問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像タイトル<br>
+                            CSVファイルの形式: 教材名,単元名,問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像タイトル<br>
                             <small class="text-muted">※ 問題文と正解は必須項目です</small><br>
+                            <small class="text-muted">※ 教材名と単元名は自動的に設定されます</small><br>
+                            <small class="text-muted">※ 2行目のコメント行（#で始まる行）は自動的にスキップされます</small><br>
                             <small class="text-muted">※ 既存の問題データはCSVダウンロードで取得できます</small>
                         </div>
                     </div>
