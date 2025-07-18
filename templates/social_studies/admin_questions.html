@@ -204,9 +204,9 @@
                             </small>
                         </td>
                         <td class="action-buttons">
-                            <button class="btn btn-sm btn-outline-primary" onclick="editQuestion({{ question.id }})">
+                            <a href="{{ url_for('social_studies_edit_question_page', question_id=question.id) }}" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-edit"></i>
-                            </button>
+                            </a>
                             <button class="btn btn-sm btn-outline-info" onclick="showImageUpload({{ question.id }})">
                                 <i class="fas fa-image"></i>
                             </button>

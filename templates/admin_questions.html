@@ -58,9 +58,9 @@
                                 <button class="btn btn-outline-info" onclick="viewQuestion({{ question.id }})" title="詳細表示">
                                     <i class="fas fa-eye"></i>
                                 </button>
-                                <button class="btn btn-outline-warning" onclick="editQuestion({{ question.id }})" title="編集">
+                                <a href="{{ url_for('social_studies_edit_question_page', question_id=question.id) }}" class="btn btn-outline-warning" title="編集">
                                     <i class="fas fa-edit"></i>
-                                </button>
+                                </a>
                                 <button class="btn btn-outline-danger" onclick="deleteQuestion({{ question.id }})" title="削除">
                                     <i class="fas fa-trash"></i>
                                 </button>

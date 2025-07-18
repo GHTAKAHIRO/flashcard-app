@@ -3650,6 +3650,55 @@ def social_studies_bulk_delete_questions():
         app.logger.error(f"社会科問題一括削除エラー: {e}")
         return jsonify({'error': '問題の一括削除に失敗しました'}), 500
 
+@app.route('/social_studies/admin/edit_question_page/<int:question_id>', methods=['GET'])
+@login_required
+def social_studies_edit_question_page(question_id):
+    """問題編集ページ表示（管理者のみ）"""
+    if not current_user.is_admin:
+        flash("管理者権限が必要です")
+        return redirect(url_for('admin'))
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # 問題データを取得
+                cur.execute('''
+                    SELECT q.id, q.subject, q.textbook_id, q.unit_id, q.question, q.correct_answer, 
+                           q.acceptable_answers, q.answer_suffix, q.explanation, q.difficulty_level,
+                           q.image_name, q.image_url, t.name as textbook_name, u.name as unit_name,
+                           t.subject as textbook_subject, u.chapter_number
+                    FROM social_studies_questions q
+                    LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
+                    LEFT JOIN social_studies_units u ON q.unit_id = u.id
+                    WHERE q.id = %s
+                ''', (question_id,))
+                question = cur.fetchone()
+                
+                if not question:
+                    flash('問題が見つかりません', 'error')
+                    return redirect(url_for('social_studies_admin_questions'))
+                
+                # 教材と単元の情報を取得
+                textbook_info = None
+                unit_info = None
+                
+                if question['textbook_id']:
+                    cur.execute('SELECT * FROM social_studies_textbooks WHERE id = %s', (question['textbook_id'],))
+                    textbook_info = cur.fetchone()
+                
+                if question['unit_id']:
+                    cur.execute('SELECT * FROM social_studies_units WHERE id = %s', (question['unit_id'],))
+                    unit_info = cur.fetchone()
+                
+                return render_template('social_studies/edit_question.html', 
+                                     question=question, 
+                                     textbook_info=textbook_info, 
+                                     unit_info=unit_info)
+    except Exception as e:
+        app.logger.error(f"問題編集ページ表示エラー: {e}")
+        flash('問題編集ページの表示に失敗しました', 'error')
+        return redirect(url_for('social_studies_admin_questions'))
+
 @app.route('/social_studies/admin/edit_question/<int:question_id>', methods=['GET', 'POST'])
 @login_required
 def social_studies_edit_question(question_id):
@@ -3663,9 +3712,13 @@ def social_studies_edit_question(question_id):
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute('''
-                        SELECT id, question, correct_answer, explanation, difficulty_level
-                        FROM social_studies_questions 
-                        WHERE id = %s
+                        SELECT q.id, q.subject, q.textbook_id, q.unit_id, q.question, q.correct_answer, 
+                               q.acceptable_answers, q.answer_suffix, q.explanation, q.difficulty_level,
+                               q.image_name, q.image_url, t.name as textbook_name, u.name as unit_name
+                        FROM social_studies_questions q
+                        LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
+                        LEFT JOIN social_studies_units u ON q.unit_id = u.id
+                        WHERE q.id = %s
                     ''', (question_id,))
                     question = cur.fetchone()
                     
@@ -3681,10 +3734,16 @@ def social_studies_edit_question(question_id):
         # 問題データを更新
         try:
             data = request.get_json()
+            subject = data.get('subject', '').strip()
+            textbook_id = data.get('textbook_id')
+            unit_id = data.get('unit_id')
             question_text = data.get('question', '').strip()
             correct_answer = data.get('correct_answer', '').strip()
+            acceptable_answers = data.get('acceptable_answers', '').strip()
+            answer_suffix = data.get('answer_suffix', '').strip()
             explanation = data.get('explanation', '').strip()
             difficulty_level = data.get('difficulty_level', 'basic')
+            image_name = data.get('image_name', '').strip()
             
             # バリデーション
             if not question_text or not correct_answer:
@@ -3700,10 +3759,56 @@ def social_studies_edit_question(question_id):
                     # 問題を更新
                     cur.execute('''
                         UPDATE social_studies_questions 
-                        SET question = %s, correct_answer = %s, 
-                            explanation = %s, difficulty_level = %s, updated_at = CURRENT_TIMESTAMP
+                        SET subject = %s, textbook_id = %s, unit_id = %s, question = %s, 
+                            correct_answer = %s, acceptable_answers = %s, answer_suffix = %s,
+                            explanation = %s, difficulty_level = %s, image_name = %s, 
+                            updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
-                    ''', (question_text, correct_answer, explanation, difficulty_level, question_id))
+                    ''', (subject, textbook_id, unit_id, question_text, correct_answer, 
+                          acceptable_answers, answer_suffix, explanation, difficulty_level, 
+                          image_name, question_id))
+                    
+                    # 画像名が指定されている場合、Wasabiから画像URLを取得して更新
+                    if image_name and textbook_id:
+                        try:
+                            # 教材のフォルダパスを取得
+                            cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                            result = cur.fetchone()
+                            if result and result[0]:
+                                folder_path = result[0]
+                                
+                                # Wasabiで画像を検索
+                                s3_client = init_wasabi_client()
+                                if s3_client:
+                                    bucket_name = os.getenv('WASABI_BUCKET')
+                                    endpoint = os.getenv('WASABI_ENDPOINT')
+                                    
+                                    # 複数の拡張子で試行
+                                    extensions = ['jpg', 'jpeg', 'png', 'gif']
+                                    found_image_url = None
+                                    
+                                    for ext in extensions:
+                                        try:
+                                            image_key = f"{folder_path}/{image_name}.{ext}"
+                                            s3_client.head_object(Bucket=bucket_name, Key=image_key)
+                                            found_image_url = f"{endpoint}/{bucket_name}/{image_key}"
+                                            break
+                                        except Exception:
+                                            continue
+                                    
+                                    if found_image_url:
+                                        # 問題に画像URLを設定
+                                        cur.execute('''
+                                            UPDATE social_studies_questions 
+                                            SET image_url = %s 
+                                            WHERE id = %s
+                                        ''', (found_image_url, question_id))
+                                        app.logger.info(f"問題ID {question_id} に画像URLを設定: {found_image_url}")
+                                    else:
+                                        app.logger.warning(f"画像が見つかりません: {image_name} in {folder_path}")
+                        except Exception as e:
+                            app.logger.error(f"画像URL設定エラー: {e}")
+                    
                     conn.commit()
                     
                     return jsonify({'success': True, 'message': '問題が更新されました'})
