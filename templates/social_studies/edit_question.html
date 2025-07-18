@@ -43,10 +43,16 @@
                             <label class="form-label">
                                 <i class="fas fa-folder-open me-1"></i>画像データのパス
                             </label>
-                            <input type="text" class="form-control" id="image_path_display" value="読み込み中..." readonly>
+                            <input type="text" class="form-control" id="image_path_display" value="{{ image_path_info.base_url if image_path_info else '読み込み中...' }}" readonly>
                             <div class="form-text">
                                 <i class="fas fa-info-circle me-1"></i>
                                 この単元の画像は上記のパスに保存されます
+                                {% if image_path_info and image_path_info.image_questions_count > 0 %}
+                                <br><small class="text-info">
+                                    <i class="fas fa-image me-1"></i>
+                                    この単元には {{ image_path_info.image_questions_count }} 件の問題に画像が設定されています
+                                </small>
+                                {% endif %}
                             </div>
                         </div>
                     {% else %}
@@ -218,10 +224,58 @@ document.addEventListener('DOMContentLoaded', function() {
     updatePreview();
     
     {% if textbook_info and unit_info %}
-    // 教材と単元が固定されている場合は、単元の章番号に基づいて画像パス情報を設定
+    // 教材と単元が固定されている場合は、バックエンドから渡された画像パス情報を使用
+    {% if image_path_info %}
+    console.log('固定表示モード: バックエンドから画像パス情報を取得');
+    // バックエンドから渡された画像パス情報を設定
+    const imagePathDisplay = document.getElementById('image_path_display');
+    if (imagePathDisplay) {
+        imagePathDisplay.value = '{{ image_path_info.base_url }}';
+    }
+    
+    // 画像名欄のプレースホルダーとパス情報を更新
+    const imageNameInput = document.getElementById('image_name');
+    const imagePreviewDiv = document.getElementById('image-preview');
+    const statusSpan = document.getElementById('image-status');
+    
+    if (imageNameInput) {
+        imageNameInput.placeholder = '例: 2（問題番号のみ）';
+    }
+    
+    if (statusSpan) {
+        statusSpan.innerHTML = `<i class="fas fa-info-circle text-info"></i> 画像保存先: <code>{{ image_path_info.base_url }}</code>`;
+    }
+    
+    if (imagePreviewDiv) {
+        imagePreviewDiv.style.display = 'block';
+    }
+    
+    // 画像名欄の下にパス情報を表示
+    const pathInfoDiv = document.getElementById('path-info');
+    if (!pathInfoDiv) {
+        const newPathInfoDiv = document.createElement('div');
+        newPathInfoDiv.id = 'path-info';
+        newPathInfoDiv.className = 'mt-2';
+        newPathInfoDiv.innerHTML = `
+            <div class="alert alert-info">
+                <small>
+                    <i class="fas fa-folder-open me-1"></i>
+                    <strong>画像保存先:</strong> <code>{{ image_path_info.base_url }}</code><br>
+                    <i class="fas fa-info-circle me-1"></i>
+                    問題番号のみ入力してください（例: 2 → {{ image_path_info.base_url }}/2.jpg）
+                </small>
+            </div>
+        `;
+        if (imageNameInput) {
+            imageNameInput.parentNode.insertBefore(newPathInfoDiv, imageNameInput.nextSibling);
+        }
+    }
+    {% else %}
+    // バックエンドから画像パス情報が取得できない場合は、APIから取得
     const unitId = '{{ unit_info.id }}';
-    console.log('固定表示モード: 単元ID =', unitId);
+    console.log('固定表示モード: APIから画像パス情報を取得');
     updateUnitImagePathInfo(unitId);
+    {% endif %}
     {% else %}
     // 通常の選択形式の場合
     {% if question.textbook_id %}

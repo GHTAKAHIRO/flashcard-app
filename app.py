@@ -3681,6 +3681,7 @@ def social_studies_edit_question_page(question_id):
                 # 教材と単元の情報を取得
                 textbook_info = None
                 unit_info = None
+                image_path_info = None
                 
                 if question['textbook_id']:
                     cur.execute('SELECT * FROM social_studies_textbooks WHERE id = %s', (question['textbook_id'],))
@@ -3690,10 +3691,31 @@ def social_studies_edit_question_page(question_id):
                     cur.execute('SELECT * FROM social_studies_units WHERE id = %s', (question['unit_id'],))
                     unit_info = cur.fetchone()
                 
+                # 画像パス情報を生成
+                if textbook_info and unit_info:
+                    chapter_number = unit_info['chapter_number'] or 1
+                    base_image_url = f"https://s3.ap-northeast-1-ntt.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{textbook_info['wasabi_folder_path']}/{chapter_number}"
+                    
+                    # この単元に画像が設定されている問題数を取得
+                    cur.execute('''
+                        SELECT COUNT(*) as count
+                        FROM social_studies_questions
+                        WHERE textbook_id = %s AND unit_id = %s AND image_url IS NOT NULL AND image_url != ''
+                    ''', (question['textbook_id'], question['unit_id']))
+                    image_questions_count = cur.fetchone()['count']
+                    
+                    image_path_info = {
+                        'base_url': base_image_url,
+                        'chapter_number': chapter_number,
+                        'wasabi_folder_path': textbook_info['wasabi_folder_path'],
+                        'image_questions_count': image_questions_count
+                    }
+                
                 return render_template('social_studies/edit_question.html', 
                                      question=question, 
                                      textbook_info=textbook_info, 
-                                     unit_info=unit_info)
+                                     unit_info=unit_info,
+                                     image_path_info=image_path_info)
     except Exception as e:
         app.logger.error(f"問題編集ページ表示エラー: {e}")
         flash('問題編集ページの表示に失敗しました', 'error')
