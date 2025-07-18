@@ -5436,10 +5436,20 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
                 if textbook_info and unit_info:
                     chapter_number = unit_info['chapter_number'] or 1
                     base_image_url = f"https://s3.ap-northeast-1-ntt.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{textbook_info['wasabi_folder_path']}/{chapter_number}"
+                    
+                    # この単元に画像が設定されている問題数を取得
+                    cur.execute('''
+                        SELECT COUNT(*) as count
+                        FROM social_studies_questions
+                        WHERE textbook_id = %s AND unit_id = %s AND image_url IS NOT NULL AND image_url != ''
+                    ''', (textbook_id, unit_id))
+                    image_questions_count = cur.fetchone()['count']
+                    
                     image_path_info = {
                         'base_url': base_image_url,
                         'chapter_number': chapter_number,
-                        'wasabi_folder_path': textbook_info['wasabi_folder_path']
+                        'wasabi_folder_path': textbook_info['wasabi_folder_path'],
+                        'image_questions_count': image_questions_count
                     }
     except Exception as e:
         app.logger.error(f"単元ごとの問題一覧取得エラー: {e}")
@@ -5463,6 +5473,7 @@ def update_unit_image_path(textbook_id, unit_id):
     try:
         data = request.get_json()
         new_image_url = data.get('image_url', '').strip()
+        update_questions = data.get('update_questions', False)  # 問題の画像パスも更新するかどうか
         
         if not new_image_url:
             return jsonify({'error': '画像URLが必要です'}), 400
@@ -5498,13 +5509,46 @@ def update_unit_image_path(textbook_id, unit_id):
                     SET wasabi_folder_path = %s 
                     WHERE id = %s
                 ''', (wasabi_folder_path, textbook_id))
+                
+                # 問題の画像パスも更新する場合
+                updated_questions_count = 0
+                if update_questions:
+                    # 単元に登録されている問題の画像URLを更新
+                    cur.execute('''
+                        SELECT id, image_url FROM social_studies_questions
+                        WHERE textbook_id = %s AND unit_id = %s AND image_url IS NOT NULL AND image_url != ''
+                    ''', (textbook_id, unit_id))
+                    
+                    questions = cur.fetchall()
+                    for question_id, old_image_url in questions:
+                        if old_image_url:
+                            # 古いURLから画像ファイル名を抽出
+                            old_url_parts = old_image_url.split('/')
+                            if len(old_url_parts) > 0:
+                                image_filename = old_url_parts[-1]  # 最後の部分がファイル名
+                                # 新しいURLを構築
+                                new_question_image_url = f"{new_image_url}/{image_filename}"
+                                
+                                # 問題の画像URLを更新
+                                cur.execute('''
+                                    UPDATE social_studies_questions
+                                    SET image_url = %s
+                                    WHERE id = %s
+                                ''', (new_question_image_url, question_id))
+                                updated_questions_count += 1
+                
                 conn.commit()
+        
+        message = '画像URLを更新しました'
+        if update_questions and updated_questions_count > 0:
+            message += f'（{updated_questions_count}件の問題の画像パスも更新しました）'
         
         return jsonify({
             'success': True,
-            'message': '画像URLを更新しました',
+            'message': message,
             'new_url': new_image_url,
-            'new_path': wasabi_folder_path
+            'new_path': wasabi_folder_path,
+            'updated_questions_count': updated_questions_count
         })
         
     except Exception as e:

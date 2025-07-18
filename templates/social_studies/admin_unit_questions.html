@@ -40,6 +40,7 @@
                         <th>ID</th>
                         <th>問題文</th>
                         <th>正解</th>
+                        <th>画像</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -50,10 +51,21 @@
                         <td>{{ question.question|e }}</td>
                         <td>{{ question.correct_answer|e }}</td>
                         <td>
+                            {% if question.image_url %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-image me-1"></i>あり
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-times me-1"></i>なし
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
                             <div class="btn-group btn-group-sm" role="group">
-                                                            <a href="{{ url_for('social_studies_edit_question_page', question_id=question.id) }}" class="btn btn-outline-warning" title="編集">
-                                <i class="fas fa-edit"></i>
-                            </a>
+                                <a href="{{ url_for('social_studies_edit_question_page', question_id=question.id) }}" class="btn btn-outline-warning" title="編集">
+                                    <i class="fas fa-edit"></i>
+                                </a>
                                 <button class="btn btn-outline-danger" onclick="deleteQuestion({{ question.id }})" title="削除">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -160,6 +172,14 @@
                 <div class="mb-4">
                     <label class="form-label">現在の画像URL</label>
                     <input type="text" class="form-control" value="{{ image_path_info.base_url if image_path_info else '' }}" readonly>
+                    {% if image_path_info and image_path_info.image_questions_count > 0 %}
+                    <div class="form-text">
+                        <small class="text-info">
+                            <i class="fas fa-image me-1"></i>
+                            この単元には {{ image_path_info.image_questions_count }} 件の問題に画像が設定されています
+                        </small>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="mb-4">
                     <label for="new-image-url" class="form-label">新しい画像URL</label>
@@ -167,6 +187,22 @@
                     <div class="form-text">
                         <small class="text-muted">※ 完全なURLを入力してください（例: https://s3.ap-northeast-1-ntt.wasabisys.com/so-image/geography/final/1）</small>
                     </div>
+                </div>
+                <div class="mb-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="update-questions-checkbox">
+                        <label class="form-check-label" for="update-questions-checkbox">
+                            <strong>この単元に登録されている問題の画像パスも一括で更新する</strong>
+                        </label>
+                        <div class="form-text">
+                            <small class="text-muted">※ チェックを入れると、この単元の全問題の画像URLが新しいパスに更新されます</small><br>
+                            <small class="text-muted">※ 画像ファイル名は保持されます（例: 1.jpg → 新しいパス/1.jpg）</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>注意:</strong> この操作により、この単元の画像パスが変更されます。問題の画像パスも更新する場合は、既存の問題の画像URLが新しいパスに変更されます。
                 </div>
             </div>
             <div class="modal-footer">
@@ -194,6 +230,7 @@ function showImagePathSettings() {
 
 function updateImagePath() {
     const newUrl = document.getElementById('new-image-url').value.trim();
+    const updateQuestions = document.getElementById('update-questions-checkbox').checked;
     
     if (!newUrl) {
         alert('新しい画像URLを入力してください');
@@ -205,7 +242,12 @@ function updateImagePath() {
         return;
     }
     
-    if (!confirm('画像URLを更新しますか？この変更はCSVダウンロードに反映されます。')) {
+    let confirmMessage = '画像URLを更新しますか？この変更はCSVダウンロードに反映されます。';
+    if (updateQuestions) {
+        confirmMessage = '画像URLを更新し、この単元の全問題の画像パスも一括で更新しますか？この操作は元に戻せません。';
+    }
+    
+    if (!confirm(confirmMessage)) {
         return;
     }
     
@@ -215,7 +257,8 @@ function updateImagePath() {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            image_url: newUrl
+            image_url: newUrl,
+            update_questions: updateQuestions
         })
     })
     .then(response => response.json())
@@ -223,7 +266,11 @@ function updateImagePath() {
         if (data.error) {
             alert('エラー: ' + data.error);
         } else {
-            alert('画像URLを更新しました');
+            let message = data.message;
+            if (data.updated_questions_count > 0) {
+                message += `\n\n更新された問題数: ${data.updated_questions_count}件`;
+            }
+            alert(message);
             location.reload();
         }
     })
