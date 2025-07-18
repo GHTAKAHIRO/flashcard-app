@@ -446,6 +446,9 @@ function updateUnitImagePathInfo(unitId) {
     fetch(`/social_studies/api/check_image?image_name=test&unit_id=${unitId}`)
         .then(response => response.json())
         .then(data => {
+            console.log('🔍 APIレスポンス:', data);
+            
+            // folder_pathが存在する場合（画像が見つかった場合も見つからなかった場合も）
             if (data.folder_path) {
                 // 画像パス表示フィールドを更新
                 if (imagePathDisplay) {
@@ -488,10 +491,20 @@ function updateUnitImagePathInfo(unitId) {
                         </div>
                     `;
                 }
+            } else {
+                // folder_pathが存在しない場合のフォールバック
+                console.warn('❌ folder_pathが取得できませんでした');
+                if (imagePathDisplay) {
+                    imagePathDisplay.value = 'social_studies/default';
+                }
             }
         })
         .catch(error => {
             console.error('単元画像パス取得エラー:', error);
+            // エラーが発生した場合でも、デフォルトのフォルダパスを表示
+            if (imagePathDisplay) {
+                imagePathDisplay.value = 'social_studies/default';
+            }
         });
 }
 

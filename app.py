@@ -4011,6 +4011,7 @@ def social_studies_api_check_image():
             app.logger.warning(f"❌ 画像未発見: フォルダ「{folder_path}」に「{image_name}」の画像が見つかりません")
             return jsonify({
                 'exists': False,
+                'folder_path': folder_path,
                 'message': f'フォルダ「{folder_path}」に「{image_name}」の画像が見つかりません'
             })
                 
