@@ -5188,12 +5188,6 @@ def download_unit_questions_csv(textbook_id, unit_id):
             '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
         ])
         
-        # 固定情報行（2行目、コメントアウト）
-        csv_data.append([
-            f'# {textbook_name}', f'# {unit_name}', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
-            '# 解答欄の補足', '# 解説', '# 基本', f'# {base_image_url}/1.jpg', '# 1.jpg'
-        ])
-        
         # 教材と単元の情報を取得
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -5213,6 +5207,12 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 unit_name = result['unit_name']
                 chapter_number = result['chapter_number'] or 1
                 base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{result['wasabi_folder_path'] or 'question_images'}/{chapter_number}"
+                
+                # 固定情報行（2行目、コメントアウト）
+                csv_data.append([
+                    f'# {textbook_name}', f'# {unit_name}', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
+                    '# 解答欄の補足', '# 解説', '# 基本', f'# {base_image_url}/1.jpg', '# 1.jpg'
+                ])
                 
                 # 既存の問題データを取得
                 cur.execute('''
