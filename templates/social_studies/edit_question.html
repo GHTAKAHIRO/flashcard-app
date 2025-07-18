@@ -85,17 +85,6 @@
                             <i class="fas fa-spinner fa-spin me-2"></i>
                             <span id="status-text">読み込み中...</span>
                         </div>
-                        
-                        <div class="mb-3" id="image_path_section" style="display: none;">
-                            <label class="form-label">
-                                <i class="fas fa-folder-open me-1"></i>画像データのパス
-                            </label>
-                            <input type="text" class="form-control" id="image_path_display" value="" readonly>
-                            <div class="form-text">
-                                <i class="fas fa-info-circle me-1"></i>
-                                選択した単元の画像は上記のパスに保存されます
-                            </div>
-                        </div>
                     {% endif %}
                     
                     <div class="mb-3">
@@ -156,6 +145,20 @@
                         <textarea class="form-control" id="explanation" name="explanation" rows="3" 
                                   placeholder="例: 東京は日本の首都として、政治・経済・文化の中心地となっています。">{{ question.explanation or '' }}</textarea>
                     </div>
+                    
+                    {% if not textbook_info or not unit_info %}
+                    <!-- 通常の選択形式の場合のみ画像パスを表示 -->
+                    <div class="mb-3" id="image_path_section" style="display: none;">
+                        <label class="form-label">
+                            <i class="fas fa-folder-open me-1"></i>画像データのパス
+                        </label>
+                        <input type="text" class="form-control" id="image_path_display" value="" readonly>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            選択した単元の画像は上記のパスに保存されます
+                        </div>
+                    </div>
+                    {% endif %}
                     
                     <div class="mb-3">
                         <label for="image_name" class="form-label">
