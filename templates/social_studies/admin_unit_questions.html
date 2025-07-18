@@ -17,10 +17,13 @@
             </a>
             <button class="btn btn-info" onclick="showCsvUpload()">
                 <i class="fas fa-upload me-1"></i>CSVで問題追加
-            </button>
+            </a>
             <a href="{{ url_for('download_unit_questions_csv', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-warning">
                 <i class="fas fa-download me-1"></i>CSVダウンロード
             </a>
+            <button class="btn btn-outline-primary" onclick="showImagePathSettings()">
+                <i class="fas fa-image me-1"></i>画像パス設定
+            </button>
             <a href="{{ url_for('social_studies_admin_textbook_unified', textbook_id=textbook_info.id) }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i>単元管理に戻る
             </a>
@@ -144,6 +147,71 @@
         </div>
     </div>
 </div>
+
+<!-- 画像パス設定モーダル -->
+<div class="modal fade" id="imagePathModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">画像パス設定</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>現在の設定</h6>
+                        <div class="mb-3">
+                            <label class="form-label">教材名</label>
+                            <input type="text" class="form-control" value="{{ textbook_info.name if textbook_info }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">単元名</label>
+                            <input type="text" class="form-control" value="{{ unit_info.name if unit_info }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">章番号</label>
+                            <input type="text" class="form-control" value="{{ image_path_info.chapter_number if image_path_info else '1' }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">現在のWasabiフォルダパス</label>
+                            <input type="text" class="form-control" id="current-wasabi-path" value="{{ image_path_info.wasabi_folder_path if image_path_info else '' }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">現在の画像URL</label>
+                            <input type="text" class="form-control" value="{{ image_path_info.base_url if image_path_info else '' }}" readonly>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>新しい設定</h6>
+                        <div class="mb-3">
+                            <label for="new-wasabi-path" class="form-label">新しいWasabiフォルダパス</label>
+                            <input type="text" class="form-control" id="new-wasabi-path" placeholder="例: geography/final" value="{{ image_path_info.wasabi_folder_path if image_path_info else '' }}">
+                            <div class="form-text">
+                                <small class="text-muted">※ スラッシュ区切りでパスを入力してください</small><br>
+                                <small class="text-muted">※ 例: geography/final, history/final, civics/final</small>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">新しい画像URL（プレビュー）</label>
+                            <input type="text" class="form-control" id="preview-image-url" readonly>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>設定例:</strong><br>
+                            • 地理: <code>geography/final</code><br>
+                            • 歴史: <code>history/final</code><br>
+                            • 公民: <code>civics/final</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="updateImagePath()">更新</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -153,6 +221,66 @@ let currentEditQuestionId = null;
 function showCsvUpload() {
     const modal = new bootstrap.Modal(document.getElementById('csvUploadModal'));
     modal.show();
+}
+
+function showImagePathSettings() {
+    const modal = new bootstrap.Modal(document.getElementById('imagePathModal'));
+    modal.show();
+    
+    // プレビューURLを更新
+    updatePreviewUrl();
+    
+    // 入力フィールドの変更を監視
+    document.getElementById('new-wasabi-path').addEventListener('input', updatePreviewUrl);
+}
+
+function updatePreviewUrl() {
+    const newPath = document.getElementById('new-wasabi-path').value;
+    const chapterNumber = {{ image_path_info.chapter_number if image_path_info else 1 }};
+    const bucket = '{{ "so-image" }}';
+    
+    if (newPath) {
+        const previewUrl = `https://s3.ap-northeast-1-ntt.wasabisys.com/${bucket}/${newPath}/${chapterNumber}`;
+        document.getElementById('preview-image-url').value = previewUrl;
+    } else {
+        document.getElementById('preview-image-url').value = '';
+    }
+}
+
+function updateImagePath() {
+    const newPath = document.getElementById('new-wasabi-path').value.trim();
+    
+    if (!newPath) {
+        alert('Wasabiフォルダパスを入力してください');
+        return;
+    }
+    
+    if (!confirm('画像パスを更新しますか？この変更はCSVダウンロードに反映されます。')) {
+        return;
+    }
+    
+    fetch('/social_studies/admin/update_image_path/{{ textbook_info.id }}/{{ unit_info.id }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            wasabi_folder_path: newPath
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラー: ' + data.error);
+        } else {
+            alert('画像パスを更新しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('画像パス更新エラー:', error);
+        alert('画像パスの更新に失敗しました');
+    });
 }
 
 function uploadCsv() {

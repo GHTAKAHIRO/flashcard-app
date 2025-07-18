@@ -5206,7 +5206,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 textbook_name = result['textbook_name']
                 unit_name = result['unit_name']
                 chapter_number = result['chapter_number'] or 1
-                base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{result['wasabi_folder_path'] or 'question_images'}/{chapter_number}"
+                base_image_url = f"https://s3.ap-northeast-1-ntt.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{result['wasabi_folder_path']}/{chapter_number}"
                 
                 # 固定情報行（2行目、コメントアウト）
                 csv_data.append([
@@ -5224,28 +5224,11 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 ''', (textbook_id, unit_id))
                 existing_questions = cur.fetchall()
         
-        # 既存の問題データを追加
-        for question in existing_questions:
+        # 新しい問題追加用の空行を追加（3行目以降）
+        for i in range(1, 11):  # 10行分の空行を追加
             csv_data.append([
-                textbook_name,
-                unit_name,
-                question['question'] or '',
-                question['correct_answer'] or '',
-                question['acceptable_answers'] or '',
-                question['answer_suffix'] or '',
-                question['explanation'] or '',
-                question['difficulty_level'] or '基本',
-                question['image_url'] or base_image_url,
-                question['image_title'] or ''
+                '', '', '', '', '', '', '', '', '', ''
             ])
-        
-        # 新しい問題追加用のテンプレート行を追加
-        csv_data.append([
-            textbook_name, unit_name, '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
-            '解答欄の補足', '解説', '基本', f"{base_image_url}/1.jpg", '1.jpg'
-        ])
-        csv_data.append([textbook_name, unit_name, '', '', '', '', '', '基本', f"{base_image_url}/2.jpg", '2.jpg'])
-        csv_data.append([textbook_name, unit_name, '', '', '', '', '', '基本', f"{base_image_url}/3.jpg", '3.jpg'])
         
         # CSVファイルを生成（BOM付きUTF-8）
         output = io.StringIO()
@@ -5431,11 +5414,12 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
     textbook_info = None
     unit_info = None
     questions = []
+    image_path_info = None
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 教材情報取得
-                cur.execute('SELECT id, name FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                cur.execute('SELECT id, name, wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
                 textbook_info = cur.fetchone()
                 # 単元情報取得
                 cur.execute('SELECT id, name, chapter_number FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
@@ -5447,6 +5431,16 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
                     ORDER BY id DESC
                 ''', (textbook_id, unit_id))
                 questions = cur.fetchall()
+                
+                # 画像パス情報を生成
+                if textbook_info and unit_info:
+                    chapter_number = unit_info['chapter_number'] or 1
+                    base_image_url = f"https://s3.ap-northeast-1-ntt.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{textbook_info['wasabi_folder_path']}/{chapter_number}"
+                    image_path_info = {
+                        'base_url': base_image_url,
+                        'chapter_number': chapter_number,
+                        'wasabi_folder_path': textbook_info['wasabi_folder_path']
+                    }
     except Exception as e:
         app.logger.error(f"単元ごとの問題一覧取得エラー: {e}")
         flash('単元ごとの問題一覧の取得に失敗しました', 'error')
@@ -5455,8 +5449,43 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
         'social_studies/admin_unit_questions.html',
         textbook_info=textbook_info,
         unit_info=unit_info,
-        questions=questions
+        questions=questions,
+        image_path_info=image_path_info
     )
+
+@app.route('/social_studies/admin/update_image_path/<int:textbook_id>/<int:unit_id>', methods=['POST'])
+@login_required
+def update_unit_image_path(textbook_id, unit_id):
+    """単元の画像パスを更新（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        data = request.get_json()
+        new_wasabi_folder_path = data.get('wasabi_folder_path', '').strip()
+        
+        if not new_wasabi_folder_path:
+            return jsonify({'error': 'Wasabiフォルダパスが必要です'}), 400
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # 教材のWasabiフォルダパスを更新
+                cur.execute('''
+                    UPDATE social_studies_textbooks 
+                    SET wasabi_folder_path = %s 
+                    WHERE id = %s
+                ''', (new_wasabi_folder_path, textbook_id))
+                conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '画像パスを更新しました',
+            'new_path': new_wasabi_folder_path
+        })
+        
+    except Exception as e:
+        app.logger.error(f"画像パス更新エラー: {e}")
+        return jsonify({'error': f'画像パスの更新に失敗しました: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # データベース接続プールを初期化
