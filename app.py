@@ -5208,7 +5208,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 # 既存の問題データを取得
                 cur.execute('''
                     SELECT question, correct_answer, acceptable_answers, answer_suffix, 
-                           explanation, difficulty, image_url, image_title
+                           explanation, difficulty_level, image_url, image_title
                     FROM social_studies_questions
                     WHERE textbook_id = %s AND unit_id = %s
                     ORDER BY id
@@ -5223,7 +5223,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 question['acceptable_answers'] or '',
                 question['answer_suffix'] or '',
                 question['explanation'] or '',
-                question['difficulty'] or '基本',
+                question['difficulty_level'] or '基本',
                 question['image_url'] or f"{base_image_url}/",
                 question['image_title'] or ''
             ])
@@ -5262,7 +5262,10 @@ def download_unit_questions_csv(textbook_id, unit_id):
         
     except Exception as e:
         app.logger.error(f"単元問題CSVダウンロードエラー: {e}")
-        return jsonify({'error': '単元問題CSVの生成に失敗しました'}), 500
+        app.logger.error(f"エラーの詳細: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"トレースバック: {traceback.format_exc()}")
+        return jsonify({'error': f'単元問題CSVの生成に失敗しました: {str(e)}'}), 500
 
 @app.route('/social_studies/admin/upload_unit_questions_csv', methods=['POST'])
 @login_required
@@ -5352,7 +5355,7 @@ def social_studies_upload_unit_questions_csv():
                         acceptable_answers = row.get('許容回答', '').strip()
                         explanation = row.get('解説', '').strip()
                         answer_suffix = row.get('解答欄の補足', '').strip()
-                        difficulty = row.get('難易度', '').strip()
+                        difficulty_level = row.get('難易度', '').strip()
                         image_url = row.get('画像URL', '').strip()
                         image_title = row.get('画像タイトル', '').strip()
                         
@@ -5370,10 +5373,10 @@ def social_studies_upload_unit_questions_csv():
                         cur.execute('''
                             INSERT INTO social_studies_questions 
                             (textbook_id, unit_id, question, correct_answer, acceptable_answers, 
-                             answer_suffix, explanation, difficulty, image_url, image_title)
+                             answer_suffix, explanation, difficulty_level, image_url, image_title)
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ''', (textbook_id, unit_id, question, correct_answer, acceptable_answers,
-                              answer_suffix, explanation, difficulty, image_url, image_title))
+                              answer_suffix, explanation, difficulty_level, image_url, image_title))
                         
                         registered_count += 1
                         app.logger.info(f"行{row_num}: 問題登録完了")
