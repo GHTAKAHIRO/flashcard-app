@@ -11,21 +11,18 @@
         <p class="text-muted mb-3">
             教材: {{ textbook_info.name if textbook_info }}
         </p>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
             <a href="{{ url_for('social_studies_add_question', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-success">
                 <i class="fas fa-plus me-1"></i>問題追加
             </a>
             <button class="btn btn-info" onclick="showCsvUpload()">
                 <i class="fas fa-upload me-1"></i>CSVで問題追加
-            </a>
-            <a href="{{ url_for('download_unit_questions_csv', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-warning">
-                <i class="fas fa-download me-1"></i>CSVダウンロード
-            </a>
+            </button>
             <button class="btn btn-outline-primary" onclick="showImagePathSettings()">
                 <i class="fas fa-image me-1"></i>画像パス設定
             </button>
             <a href="{{ url_for('social_studies_admin_textbook_unified', textbook_id=textbook_info.id) }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i>単元管理に戻る
+                <i class="fas fa-arrow-left me-1"></i>単元に戻る
             </a>
         </div>
     </div>
@@ -97,17 +94,30 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">CSVファイルの準備</h6>
+                        <a href="{{ url_for('download_unit_questions_csv', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-download me-1"></i>CSVダウンロード
+                        </a>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>CSVダウンロード</strong>ボタンで既存の問題データをダウンロードできます。<br>
+                        ダウンロードしたCSVファイルを編集して、新しい問題を追加してください。
+                    </div>
+                </div>
                 <form id="csvUploadForm" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label for="csv-file" class="form-label">CSVファイル</label>
                         <input type="file" class="form-control" id="csv-file" name="csv_file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            CSVファイルの形式: 教材名,単元名,問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像タイトル<br>
+                            CSVファイルの形式: 問題番号,教材名,単元名,問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像タイトル<br>
                             <small class="text-muted">※ 問題文と正解は必須項目です</small><br>
                             <small class="text-muted">※ 教材名と単元名は自動的に設定されます</small><br>
-                            <small class="text-muted">※ 2行目のコメント行（#で始まる行）は自動的にスキップされます</small><br>
-                            <small class="text-muted">※ 既存の問題データはCSVダウンロードで取得できます</small>
+                            <small class="text-muted">※ 問題番号を空にすると自動的に割り当てられます</small><br>
+                            <small class="text-muted">※ 既存の問題番号と同じ番号を指定すると上書きされます</small>
                         </div>
                     </div>
                 </form>

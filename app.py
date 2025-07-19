@@ -5085,16 +5085,31 @@ def download_units_csv(textbook_id):
         # CSVデータを作成
         csv_data = []
         
+        # 既存の単元データを取得
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute('''
+                    SELECT name, chapter_number, description
+                    FROM social_studies_units
+                    WHERE textbook_id = %s
+                    ORDER BY chapter_number, id
+                ''', (textbook_id,))
+                existing_units = cur.fetchall()
+        
         # ヘッダー行（1行目）
         csv_data.append(['単元名', '章番号', '説明'])
         
-        # 入力例行（2行目、コメントアウト）
-        csv_data.append(['# 新しい単元名', '# 1', '# 新しい単元の説明'])
+        # 既存の単元データを追加（2行目以降）
+        for unit in existing_units:
+            csv_data.append([
+                unit['name'] or '',  # 単元名
+                str(unit['chapter_number']) if unit['chapter_number'] else '',  # 章番号
+                unit['description'] or ''  # 説明
+            ])
         
-        # テンプレート行を追加（新しい単元追加用）
-        csv_data.append(['新しい単元名', '1', '新しい単元の説明'])
-        csv_data.append(['', '2', ''])
-        csv_data.append(['', '3', ''])
+        # 新しい単元追加用の空行を追加（既存単元の後）
+        for i in range(1, 6):  # 5行分の空行を追加
+            csv_data.append(['', '', ''])
         
         # CSVファイルを生成（BOM付きUTF-8）
         output = io.StringIO()
@@ -5230,11 +5245,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 chapter_number = result['chapter_number'] or 1
                 base_image_url = f"https://s3.ap-northeast-1-ntt.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{result['wasabi_folder_path']}/{chapter_number}"
                 
-                # 固定情報行（2行目、コメントアウト）
-                csv_data.append([
-                    '# 1', f'# {textbook_name}', f'# {unit_name}', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
-                    '# 解答欄の補足', '# 解説', '# 基本', f'# {base_image_url}', '# 1.jpg'
-                ])
+
                 
                 # 既存の問題データを取得
                 cur.execute('''
@@ -5517,7 +5528,7 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
                 cur.execute('''
                     SELECT * FROM social_studies_questions
                     WHERE textbook_id = %s AND unit_id = %s
-                    ORDER BY id DESC
+                    ORDER BY question_number, id
                 ''', (textbook_id, unit_id))
                 questions = cur.fetchall()
                 
