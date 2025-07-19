@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}単元管理 - {{ textbook.name }}{% endblock %}
+{% block title %}{{ textbook.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -81,7 +81,7 @@
     <div class="d-flex justify-content-between align-items-center">
         <div>
             <h2 class="fw-bold">
-                <i class="fas fa-list me-2"></i>単元管理 - {{ textbook.name }}
+                <i class="fas fa-list me-2"></i>{{ textbook.name }}
             </h2>
             <p class="text-muted">{{ textbook.subject }} | {{ textbook.grade or '学年未設定' }} | {{ textbook.publisher or '出版社未設定' }}</p>
         </div>

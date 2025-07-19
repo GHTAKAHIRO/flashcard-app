@@ -37,7 +37,7 @@
             <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
-                        <th>ID</th>
+                        <th>問題番号</th>
                         <th>問題文</th>
                         <th>正解</th>
                         <th>画像</th>
@@ -47,7 +47,7 @@
                 <tbody>
                     {% for question in questions %}
                     <tr>
-                        <td>{{ question.id }}</td>
+                        <td>{{ question.question_number or question.id }}</td>
                         <td>{{ question.question|e }}</td>
                         <td>{{ question.correct_answer|e }}</td>
                         <td>

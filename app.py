@@ -5144,7 +5144,7 @@ def download_questions_csv(textbook_id):
         # 入力例行（2行目、コメントアウト）
         csv_data.append([
             '# 単元名', '# 1', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
-            '# 解答欄の補足', '# 解説', '# 基本', '# https://s3.ap-northeast-1.wasabisys.com/so-image/social studies/geography/', '# 1-1.jpg', '# '
+            '# 解答欄の補足', '# 解説', '# 基本', '# https://s3.ap-northeast-1.wasabisys.com/so-image/geography/final/', '# 1-1.jpg', '# '
         ])
         
         # 教材の画像URLを取得
@@ -5161,10 +5161,10 @@ def download_questions_csv(textbook_id):
         # テンプレート行を追加（新しい問題追加用）
         csv_data.append([
             '単元名', '1', '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
-            '解答欄の補足', '解説', '基本', f"{base_image_url}/", '1-1.jpg', ''
+            '解答欄の補足', '解説', '基本', f"{base_image_url}", '1-1.jpg', ''
         ])
-        csv_data.append(['', '2', '', '', '', '', '', '基本', f"{base_image_url}/", '2-1.jpg', ''])
-        csv_data.append(['', '3', '', '', '', '', '', '基本', f"{base_image_url}/", '3-1.jpg', ''])
+        csv_data.append(['', '2', '', '', '', '', '', '基本', f"{base_image_url}", '2-1.jpg', ''])
+        csv_data.append(['', '3', '', '', '', '', '', '基本', f"{base_image_url}", '3-1.jpg', ''])
         
         # CSVファイルを生成（BOM付きUTF-8）
         output = io.StringIO()
@@ -5207,7 +5207,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
         
         # ヘッダー行（1行目）
         csv_data.append([
-            '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
+            '問題番号', '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
         ])
         
         # 教材と単元の情報を取得
@@ -5232,24 +5232,40 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 
                 # 固定情報行（2行目、コメントアウト）
                 csv_data.append([
-                    f'# {textbook_name}', f'# {unit_name}', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
-                    '# 解答欄の補足', '# 解説', '# 基本', f'# {base_image_url}/1.jpg', '# 1.jpg'
+                    '# 1', f'# {textbook_name}', f'# {unit_name}', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
+                    '# 解答欄の補足', '# 解説', '# 基本', f'# {base_image_url}', '# 1.jpg'
                 ])
                 
                 # 既存の問題データを取得
                 cur.execute('''
-                    SELECT question, correct_answer, acceptable_answers, answer_suffix, 
+                    SELECT id, question_number, question, correct_answer, acceptable_answers, answer_suffix, 
                            explanation, difficulty_level, image_url, image_title
                     FROM social_studies_questions
                     WHERE textbook_id = %s AND unit_id = %s
-                    ORDER BY id
+                    ORDER BY question_number, id
                 ''', (textbook_id, unit_id))
                 existing_questions = cur.fetchall()
         
-        # 新しい問題追加用の空行を追加（3行目以降）
+        # 既存の問題データを追加（3行目以降）
+        for question in existing_questions:
+            csv_data.append([
+                str(question['question_number'] or question['id']),  # 問題番号（単元内番号、なければID）
+                textbook_name,  # 教材名
+                unit_name,      # 単元名
+                question['question'] or '',  # 問題文
+                question['correct_answer'] or '',  # 正解
+                question['acceptable_answers'] or '',  # 許容回答
+                question['answer_suffix'] or '',  # 解答欄の補足
+                question['explanation'] or '',  # 解説
+                question['difficulty_level'] or '基本',  # 難易度
+                question['image_url'] or '',  # 画像URL
+                question['image_title'] or ''  # 画像タイトル
+            ])
+        
+        # 新しい問題追加用の空行を追加（既存問題の後）
         for i in range(1, 11):  # 10行分の空行を追加
             csv_data.append([
-                '', '', '', '', '', '', '', '', '', ''
+                '', '', '', '', '', '', '', '', '', '', ''
             ])
         
         # CSVファイルを生成（BOM付きUTF-8）
@@ -5371,6 +5387,9 @@ def social_studies_upload_unit_questions_csv():
                             skipped_count += 1
                             continue
                         
+                        # 問題番号の取得
+                        question_number = row.get('問題番号', '').strip()
+                        
                         # 教材名と単元名の取得（オプション）
                         csv_textbook_name = row.get('教材名', '').strip()
                         csv_unit_name = row.get('単元名', '').strip()
@@ -5383,26 +5402,74 @@ def social_studies_upload_unit_questions_csv():
                         image_url = row.get('画像URL', '').strip()
                         image_title = row.get('画像タイトル', '').strip()
                         
-                        # 問題が既に存在するかチェック
-                        cur.execute('''
-                            SELECT id FROM social_studies_questions 
-                            WHERE question = %s AND correct_answer = %s AND textbook_id = %s AND unit_id = %s
-                        ''', (question, correct_answer, textbook_id, unit_id))
-                        if cur.fetchone():
-                            app.logger.warning(f"行{row_num}: 同じ問題が既に存在します - {question}")
-                            skipped_count += 1
-                            continue
-                        
-                        # 問題を登録
-                        cur.execute('''
-                            INSERT INTO social_studies_questions 
-                            (textbook_id, unit_id, question, correct_answer, acceptable_answers, 
-                             answer_suffix, explanation, difficulty_level, image_url, image_title)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ''', (textbook_id, unit_id, question, correct_answer, acceptable_answers,
-                              answer_suffix, explanation, difficulty_level, image_url, image_title))
-                        
-                        registered_count += 1
+                        # 問題番号が指定されている場合は、その番号で既存の問題を検索
+                        if question_number and question_number.isdigit():
+                            q_number = int(question_number)
+                            cur.execute('''
+                                SELECT id FROM social_studies_questions 
+                                WHERE question_number = %s AND textbook_id = %s AND unit_id = %s
+                            ''', (q_number, textbook_id, unit_id))
+                            existing_question = cur.fetchone()
+                            
+                            if existing_question:
+                                # 既存の問題を上書き
+                                app.logger.info(f"行{row_num}: 問題番号{q_number}の既存問題を上書きします - {question}")
+                                cur.execute('''
+                                    UPDATE social_studies_questions 
+                                    SET question = %s, correct_answer = %s, acceptable_answers = %s, 
+                                        answer_suffix = %s, explanation = %s, difficulty_level = %s, 
+                                        image_url = %s, image_title = %s
+                                    WHERE id = %s
+                                ''', (question, correct_answer, acceptable_answers, answer_suffix, 
+                                      explanation, difficulty_level, image_url, image_title, existing_question['id']))
+                                registered_count += 1
+                            else:
+                                # 問題番号が存在しない場合は新規登録
+                                app.logger.info(f"行{row_num}: 問題番号{q_number}で新規問題を登録します - {question}")
+                                cur.execute('''
+                                    INSERT INTO social_studies_questions 
+                                    (textbook_id, unit_id, question_number, question, correct_answer, acceptable_answers, 
+                                     answer_suffix, explanation, difficulty_level, image_url, image_title)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ''', (textbook_id, unit_id, q_number, question, correct_answer, acceptable_answers,
+                                      answer_suffix, explanation, difficulty_level, image_url, image_title))
+                                registered_count += 1
+                        else:
+                            # 問題番号が指定されていない場合は、問題文と正解で既存の問題を検索
+                            cur.execute('''
+                                SELECT id FROM social_studies_questions 
+                                WHERE question = %s AND correct_answer = %s AND textbook_id = %s AND unit_id = %s
+                            ''', (question, correct_answer, textbook_id, unit_id))
+                            existing_question = cur.fetchone()
+                            
+                            if existing_question:
+                                # 既存の問題を上書き
+                                app.logger.info(f"行{row_num}: 既存の問題を上書きします - {question}")
+                                cur.execute('''
+                                    UPDATE social_studies_questions 
+                                    SET acceptable_answers = %s, answer_suffix = %s, explanation = %s, 
+                                        difficulty_level = %s, image_url = %s, image_title = %s
+                                    WHERE id = %s
+                                ''', (acceptable_answers, answer_suffix, explanation, difficulty_level, 
+                                      image_url, image_title, existing_question['id']))
+                                registered_count += 1
+                            else:
+                                # 新しい問題を登録（問題番号を自動採番）
+                                cur.execute('''
+                                    SELECT COALESCE(MAX(question_number), 0) + 1
+                                    FROM social_studies_questions
+                                    WHERE textbook_id = %s AND unit_id = %s
+                                ''', (textbook_id, unit_id))
+                                next_number = cur.fetchone()[0]
+                                
+                                cur.execute('''
+                                    INSERT INTO social_studies_questions 
+                                    (textbook_id, unit_id, question_number, question, correct_answer, acceptable_answers, 
+                                     answer_suffix, explanation, difficulty_level, image_url, image_title)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                ''', (textbook_id, unit_id, next_number, question, correct_answer, acceptable_answers,
+                                      answer_suffix, explanation, difficulty_level, image_url, image_title))
+                                registered_count += 1
                         app.logger.info(f"行{row_num}: 問題登録完了")
                         
                     except Exception as e:
