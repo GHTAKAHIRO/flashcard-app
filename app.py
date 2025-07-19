@@ -5412,6 +5412,8 @@ def social_studies_upload_unit_questions_csv():
         skipped_count = 0
         
         app.logger.info(f"単元問題CSVアップロード開始: 教材{textbook_id}, 単元{unit_id}, {len(csv_data)}行のデータ")
+        app.logger.info(f"CSVデータの最初の5行: {csv_data[:5]}")
+        app.logger.info(f"CSVヘッダー: {reader.fieldnames}")
         
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -5473,7 +5475,7 @@ def social_studies_upload_unit_questions_csv():
                                         image_url = %s, image_title = %s
                                     WHERE id = %s
                                 ''', (question, correct_answer, acceptable_answers, answer_suffix, 
-                                      explanation, difficulty_level, image_url, image_title, existing_question['id']))
+                                      explanation, difficulty_level, image_url, image_title, existing_question[0]))
                                 registered_count += 1
                             else:
                                 # 問題番号が存在しない場合は新規登録
@@ -5503,7 +5505,7 @@ def social_studies_upload_unit_questions_csv():
                                         difficulty_level = %s, image_url = %s, image_title = %s
                                     WHERE id = %s
                                 ''', (acceptable_answers, answer_suffix, explanation, difficulty_level, 
-                                      image_url, image_title, existing_question['id']))
+                                      image_url, image_title, existing_question[0]))
                                 registered_count += 1
                             else:
                                 # 新しい問題を登録（問題番号を自動採番）
