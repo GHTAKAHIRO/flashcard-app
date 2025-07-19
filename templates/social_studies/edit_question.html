@@ -155,17 +155,31 @@
                     
                     <div class="mb-3">
                         <label for="image_name" class="form-label">
-                            <i class="fas fa-image me-1"></i>画像名
+                            <i class="fas fa-image me-1"></i>画像タイトル
                         </label>
                         <div class="input-group">
                             <input type="text" class="form-control" id="image_name" name="image_name" 
-                                   value="{{ question.image_name or '' }}" onchange="checkImageExists()">
+                                   value="{{ question.image_title or '' }}" onchange="checkImageExists()">
                             <button type="button" class="btn btn-outline-secondary" onclick="checkImageExists()">
                                 <i class="fas fa-search"></i>確認
                             </button>
                         </div>
-
-
+                        
+                        <!-- 既存の画像表示 -->
+                        {% if question.image_url %}
+                        <div class="mt-2">
+                            <div class="alert alert-info">
+                                <i class="fas fa-image me-1"></i>
+                                <strong>現在の画像:</strong> 
+                                {% if question.image_title %}
+                                    <span class="badge bg-primary">{{ question.image_title }}</span>
+                                {% endif %}
+                                <a href="{{ question.image_url }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+                                    <i class="fas fa-external-link-alt me-1"></i>画像を表示
+                                </a>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
