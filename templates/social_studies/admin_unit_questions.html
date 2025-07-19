@@ -110,7 +110,7 @@
                 <form id="csvUploadForm" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label for="csv-file" class="form-label">CSVファイル</label>
-                        <input type="file" class="form-control" id="csv-file" name="csv_file" accept=".csv" required>
+                        <input type="file" class="form-control" id="csv-file" name="file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
                             CSVファイルの形式: 章番号,問題番号,教材名,単元名,問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像ファイル名<br>
@@ -300,7 +300,7 @@ function uploadCsv() {
         return;
     }
     
-    formData.append('csv_file', fileInput.files[0]);
+    formData.append('file', fileInput.files[0]);
     formData.append('textbook_id', '{{ textbook_info.id }}');
     formData.append('unit_id', '{{ unit_info.id }}');
     
