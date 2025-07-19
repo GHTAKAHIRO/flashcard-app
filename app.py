@@ -5279,10 +5279,15 @@ def download_unit_questions_csv(textbook_id, unit_id):
         
         # 既存の問題データを追加（3行目以降）
         for question in existing_questions:
-            # 画像URLからファイル名を抽出してタイトルとして使用
+            # 画像URLとタイトルを分離
+            image_url_without_number = base_image_url  # 問題番号を含まないURL
             image_title_from_url = ''
-            if question['image_url']:
-                # URLの最後の部分をファイル名として取得
+            
+            if question['question_number']:
+                # 問題番号がある場合は、タイトルとして使用
+                image_title_from_url = str(question['question_number'])
+            elif question['image_url']:
+                # 既存の画像URLがある場合は、そのURLからファイル名を抽出
                 image_url_parts = question['image_url'].split('/')
                 if len(image_url_parts) > 0:
                     image_title_from_url = image_url_parts[-1]
@@ -5298,8 +5303,8 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 question['answer_suffix'] or '',  # 解答欄の補足
                 question['explanation'] or '',  # 解説
                 question['difficulty_level'] or '基本',  # 難易度
-                question['image_url'] or '',  # 画像URL
-                image_title_from_url  # 画像URLから抽出したファイル名をタイトルとして表示
+                image_url_without_number,  # 問題番号を含まないWasabi URL
+                image_title_from_url  # 問題番号またはファイル名
             ])
         
         # 新しい問題追加用の空行を追加（既存問題の後）
@@ -5439,8 +5444,15 @@ def social_studies_upload_unit_questions_csv():
                         explanation = row.get('解説', '').strip()
                         answer_suffix = row.get('解答欄の補足', '').strip()
                         difficulty_level = row.get('難易度', '').strip()
-                        image_url = row.get('画像URL', '').strip()
+                        image_url_base = row.get('画像URL', '').strip()
                         image_title = row.get('画像タイトル', '').strip()
+                        
+                        # 画像URLとタイトルを結合して完全なURLを生成
+                        image_url = ''
+                        if image_url_base and image_title:
+                            image_url = f"{image_url_base}/{image_title}"
+                        elif image_url_base:
+                            image_url = image_url_base
                         
                         # 問題番号が指定されている場合は、その番号で既存の問題を検索
                         if question_number and question_number.isdigit():
