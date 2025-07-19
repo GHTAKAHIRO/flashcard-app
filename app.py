@@ -5456,6 +5456,8 @@ def social_studies_upload_unit_questions_csv():
                         elif image_url_base:
                             image_url = image_url_base
                         
+                        app.logger.info(f"行{row_num}の画像処理: image_url_base='{image_url_base}', image_title='{image_title}', 結合後image_url='{image_url}'")
+                        
                         # 問題番号が指定されている場合は、その番号で既存の問題を検索
                         if question_number and question_number.isdigit():
                             q_number = int(question_number)
@@ -5468,6 +5470,7 @@ def social_studies_upload_unit_questions_csv():
                             if existing_question:
                                 # 既存の問題を上書き
                                 app.logger.info(f"行{row_num}: 問題番号{q_number}の既存問題を上書きします - {question}")
+                                app.logger.info(f"行{row_num}: 保存する値 - image_url='{image_url}', image_title='{image_title}'")
                                 cur.execute('''
                                     UPDATE social_studies_questions 
                                     SET question = %s, correct_answer = %s, acceptable_answers = %s, 
@@ -5480,6 +5483,7 @@ def social_studies_upload_unit_questions_csv():
                             else:
                                 # 問題番号が存在しない場合は新規登録
                                 app.logger.info(f"行{row_num}: 問題番号{q_number}で新規問題を登録します - {question}")
+                                app.logger.info(f"行{row_num}: 保存する値 - image_url='{image_url}', image_title='{image_title}'")
                                 cur.execute('''
                                     INSERT INTO social_studies_questions 
                                     (textbook_id, unit_id, question_number, question, correct_answer, acceptable_answers, 
@@ -5499,6 +5503,7 @@ def social_studies_upload_unit_questions_csv():
                             if existing_question:
                                 # 既存の問題を上書き
                                 app.logger.info(f"行{row_num}: 既存の問題を上書きします - {question}")
+                                app.logger.info(f"行{row_num}: 保存する値 - image_url='{image_url}', image_title='{image_title}'")
                                 cur.execute('''
                                     UPDATE social_studies_questions 
                                     SET acceptable_answers = %s, answer_suffix = %s, explanation = %s, 
@@ -5516,6 +5521,8 @@ def social_studies_upload_unit_questions_csv():
                                 ''', (textbook_id, unit_id))
                                 next_number = cur.fetchone()[0]
                                 
+                                app.logger.info(f"行{row_num}: 新規問題を登録します（問題番号自動採番: {next_number}） - {question}")
+                                app.logger.info(f"行{row_num}: 保存する値 - image_url='{image_url}', image_title='{image_title}'")
                                 cur.execute('''
                                     INSERT INTO social_studies_questions 
                                     (textbook_id, unit_id, question_number, question, correct_answer, acceptable_answers, 
