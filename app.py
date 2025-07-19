@@ -5097,13 +5097,13 @@ def download_units_csv(textbook_id):
                 existing_units = cur.fetchall()
         
         # ヘッダー行（1行目）
-        csv_data.append(['単元名', '章番号', '説明'])
+        csv_data.append(['章番号', '単元名', '説明'])
         
         # 既存の単元データを追加（2行目以降）
         for unit in existing_units:
             csv_data.append([
-                unit['name'] or '',  # 単元名
                 str(unit['chapter_number']) if unit['chapter_number'] else '',  # 章番号
+                unit['name'] or '',  # 単元名
                 unit['description'] or ''  # 説明
             ])
         
@@ -5152,15 +5152,11 @@ def download_questions_csv(textbook_id):
         
         # ヘッダー行（1行目）
         csv_data.append([
-            '単元名', '章番号', '問題文', '正解', '許容回答', '解答欄の補足', 
+            '章番号', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', 
             '解説', '難易度', '画像URL', '画像タイトル', '登録日'
         ])
         
-        # 入力例行（2行目、コメントアウト）
-        csv_data.append([
-            '# 単元名', '# 1', '# 新しい問題文', '# 新しい正解', '# 許容回答1,許容回答2', 
-            '# 解答欄の補足', '# 解説', '# 基本', '# https://s3.ap-northeast-1.wasabisys.com/so-image/geography/final/', '# 1-1.jpg', '# '
-        ])
+
         
         # 教材の画像URLを取得
         with get_db_connection() as conn:
@@ -5173,13 +5169,37 @@ def download_questions_csv(textbook_id):
                 textbook = cur.fetchone()
                 base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{textbook['wasabi_folder_path'] or 'question_images'}" if textbook else "https://s3.ap-northeast-1.wasabisys.com/bucket/question_images"
         
-        # テンプレート行を追加（新しい問題追加用）
-        csv_data.append([
-            '単元名', '1', '新しい問題文', '新しい正解', '許容回答1,許容回答2', 
-            '解答欄の補足', '解説', '基本', f"{base_image_url}", '1-1.jpg', ''
-        ])
-        csv_data.append(['', '2', '', '', '', '', '', '基本', f"{base_image_url}", '2-1.jpg', ''])
-        csv_data.append(['', '3', '', '', '', '', '', '基本', f"{base_image_url}", '3-1.jpg', ''])
+        # 既存の問題データを取得
+        cur.execute('''
+            SELECT u.name as unit_name, u.chapter_number, q.question, q.correct_answer, 
+                   q.acceptable_answers, q.answer_suffix, q.explanation, q.difficulty_level, 
+                   q.image_url, q.image_title, q.created_at
+            FROM social_studies_questions q
+            JOIN social_studies_units u ON q.unit_id = u.id
+            WHERE q.textbook_id = %s
+            ORDER BY u.chapter_number, q.question_number, q.id
+        ''', (textbook_id,))
+        existing_questions = cur.fetchall()
+        
+        # 既存の問題データを追加（2行目以降）
+        for question in existing_questions:
+            csv_data.append([
+                str(question['chapter_number']) if question['chapter_number'] else '',  # 章番号
+                question['unit_name'] or '',  # 単元名
+                question['question'] or '',  # 問題文
+                question['correct_answer'] or '',  # 正解
+                question['acceptable_answers'] or '',  # 許容回答
+                question['answer_suffix'] or '',  # 解答欄の補足
+                question['explanation'] or '',  # 解説
+                question['difficulty_level'] or '基本',  # 難易度
+                question['image_url'] or '',  # 画像URL
+                question['image_title'] or '',  # 画像タイトル
+                question['created_at'].strftime('%Y-%m-%d') if question['created_at'] else ''  # 登録日
+            ])
+        
+        # 新しい問題追加用の空行を追加（既存問題の後）
+        for i in range(1, 6):  # 5行分の空行を追加
+            csv_data.append(['', '', '', '', '', '', '', '', '', '', ''])
         
         # CSVファイルを生成（BOM付きUTF-8）
         output = io.StringIO()
@@ -5222,7 +5242,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
         
         # ヘッダー行（1行目）
         csv_data.append([
-            '問題番号', '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
+            '章番号', '問題番号', '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像タイトル'
         ])
         
         # 教材と単元の情報を取得
@@ -5259,7 +5279,16 @@ def download_unit_questions_csv(textbook_id, unit_id):
         
         # 既存の問題データを追加（3行目以降）
         for question in existing_questions:
+            # 画像URLからファイル名を抽出してタイトルとして使用
+            image_title_from_url = ''
+            if question['image_url']:
+                # URLの最後の部分をファイル名として取得
+                image_url_parts = question['image_url'].split('/')
+                if len(image_url_parts) > 0:
+                    image_title_from_url = image_url_parts[-1]
+            
             csv_data.append([
+                str(chapter_number),  # 章番号
                 str(question['question_number'] or question['id']),  # 問題番号（単元内番号、なければID）
                 textbook_name,  # 教材名
                 unit_name,      # 単元名
@@ -5270,13 +5299,13 @@ def download_unit_questions_csv(textbook_id, unit_id):
                 question['explanation'] or '',  # 解説
                 question['difficulty_level'] or '基本',  # 難易度
                 question['image_url'] or '',  # 画像URL
-                question['image_title'] or ''  # 画像タイトル
+                image_title_from_url  # 画像URLから抽出したファイル名をタイトルとして表示
             ])
         
         # 新しい問題追加用の空行を追加（既存問題の後）
         for i in range(1, 11):  # 10行分の空行を追加
             csv_data.append([
-                '', '', '', '', '', '', '', '', '', '', ''
+                '', '', '', '', '', '', '', '', '', '', '', ''
             ])
         
         # CSVファイルを生成（BOM付きUTF-8）

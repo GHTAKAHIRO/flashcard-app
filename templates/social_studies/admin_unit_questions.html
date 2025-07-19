@@ -113,11 +113,12 @@
                         <input type="file" class="form-control" id="csv-file" name="csv_file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            CSVファイルの形式: 問題番号,教材名,単元名,問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像タイトル<br>
+                            CSVファイルの形式: 章番号,問題番号,教材名,単元名,問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像ファイル名<br>
                             <small class="text-muted">※ 問題文と正解は必須項目です</small><br>
                             <small class="text-muted">※ 教材名と単元名は自動的に設定されます</small><br>
-                            <small class="text-muted">※ 問題番号を空にすると自動的に割り当てられます</small><br>
-                            <small class="text-muted">※ 既存の問題番号と同じ番号を指定すると上書きされます</small>
+                            <small class="text-muted">※ 章番号と問題番号を空にすると自動的に割り当てられます</small><br>
+                            <small class="text-muted">※ 既存の問題番号と同じ番号を指定すると上書きされます</small><br>
+                            <small class="text-muted">※ 画像ファイル名は画像URLから自動的に抽出されます（例: 1.jpg）</small>
                         </div>
                     </div>
                 </form>
