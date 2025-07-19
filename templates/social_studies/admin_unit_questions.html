@@ -38,6 +38,7 @@
                         <th>問題文</th>
                         <th>正解</th>
                         <th>画像</th>
+                        <th>画像タイトル</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -56,6 +57,13 @@
                                 <span class="badge bg-secondary">
                                     <i class="fas fa-times me-1"></i>なし
                                 </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if question.image_title %}
+                                <span class="badge bg-info">{{ question.image_title }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                         <td>
