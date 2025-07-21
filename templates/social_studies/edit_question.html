@@ -375,15 +375,10 @@ function showCurrentImage() {
                 containerDiv.innerHTML = '';
                 containerDiv.appendChild(img);
             } else {
-                // 画像が見つからない場合
+                // 画像が見つからない場合は「なし」と表示
                 statusDiv.className = 'alert alert-warning';
                 statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">なし</span>';
-                containerDiv.innerHTML = `
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i> 
-                        指定された画像が見つかりませんでした。
-                    </div>
-                `;
+                containerDiv.innerHTML = '';
             }
         })
         .catch(error => {
@@ -471,10 +466,9 @@ function checkImageExists() {
                 containerDiv.innerHTML = '';
                 containerDiv.appendChild(img);
             } else {
-                statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> ${data.message || '画像が見つかりません'}`;
-                containerDiv.innerHTML = '';
+                // 画像が見つからない場合は何も表示しない
+                previewDiv.style.display = 'none';
             }
-            previewDiv.style.display = 'block';
         })
         .catch(error => {
             console.error('画像確認エラー:', error);
