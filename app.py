@@ -27,6 +27,9 @@ import boto3
 from botocore.exceptions import ClientError
 from PIL import Image
 import uuid
+from routes.auth import auth_bp
+from models.user import User
+from utils.db import get_db_connection
 
 # ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
@@ -417,58 +420,6 @@ print("📋 Redis除去版アプリ - 基本設定完了")
 
 # ========== Redis除去版 パート2: データベース接続とインデックス最適化 ==========
 
-@contextmanager
-def get_db_connection():
-    """プール化された接続を取得（最適化版）"""
-    global db_pool
-    if db_pool is None:
-        try:
-            init_connection_pool()
-        except Exception as e:
-            app.logger.error(f"接続プール初期化エラー: {e}")
-            # フォールバック：直接接続
-            pass
-    
-    conn = None
-    try:
-        if db_pool:  # 🔥 追加: プールが存在するかチェック
-            try:
-                conn = db_pool.getconn()
-            except Exception as e:
-                app.logger.error(f"プールから接続取得エラー: {e}")
-                conn = None
-        
-        if conn:
-            conn.autocommit = False
-            yield conn
-        else:
-            # フォールバック：直接接続
-            app.logger.warning("プール接続失敗、直接接続を試行")
-            conn = psycopg2.connect(
-                host=DB_HOST, port=DB_PORT, database=DB_NAME,
-                user=DB_USER, password=DB_PASSWORD
-            )
-            yield conn
-    except Exception as e:
-        if conn:
-            try:
-                conn.rollback()
-            except:
-                pass
-        app.logger.error(f"DB接続エラー: {e}")
-        app.logger.error(f"接続情報: host={DB_HOST}, port={DB_PORT}, dbname={DB_NAME}, user={DB_USER}")
-        raise
-    finally:
-        if conn and db_pool:
-            try:
-                db_pool.putconn(conn)
-            except Exception as e:
-                app.logger.error(f"DB接続返却エラー: {e}")
-                if conn:
-                    conn.close()
-        elif conn:
-            conn.close()
-
 def optimize_database_indexes():
     """🔥 データベースインデックス最適化（修正版）"""
     indexes = [
@@ -603,14 +554,6 @@ def parse_page_range(page_range_str):
     return list(pages)
 
 # ========== User関連（Flask-Login用） ==========
-
-class User(UserMixin):
-    def __init__(self, id, username, password_hash, full_name, is_admin):
-        self.id = id
-        self.username = username
-        self.password_hash = password_hash
-        self.full_name = full_name
-        self.is_admin = is_admin
 
 @login_manager.user_loader
 def load_user(user_id):
