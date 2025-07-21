@@ -223,14 +223,15 @@ def get_unit_image_folder_path(question_id):
         return "social_studies/default"
 
 def get_unit_image_folder_path_by_unit_id(unit_id):
-    """単元IDから章番号に基づいて画像フォルダパスを生成"""
+    """単元IDから教材のWasabiフォルダパスと章番号に基づいて画像フォルダパスを生成"""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # 単元情報を取得
+                # 単元情報と教材のWasabiフォルダパスを取得
                 cur.execute('''
                     SELECT 
                         t.subject, 
+                        t.wasabi_folder_path,
                         u.chapter_number
                     FROM social_studies_units u
                     JOIN social_studies_textbooks t ON u.textbook_id = t.id
@@ -239,22 +240,28 @@ def get_unit_image_folder_path_by_unit_id(unit_id):
                 result = cur.fetchone()
                 
                 if result:
-                    subject, chapter_number = result
+                    subject, wasabi_folder_path, chapter_number = result
                     
-                    # 科目を英語に変換
-                    subject_map = {
-                        '地理': 'geography',
-                        '歴史': 'history',
-                        '公民': 'civics',
-                        '理科': 'science'
-                    }
-                    subject_en = subject_map.get(subject, 'other')
-                    
-                    # 章番号が設定されている場合は章番号を使用、そうでなければデフォルト
-                    if chapter_number:
-                        folder_path = f"social_studies/{subject_en}/{chapter_number}"
+                    # 教材のWasabiフォルダパスが設定されている場合はそれを使用
+                    if wasabi_folder_path:
+                        if chapter_number:
+                            folder_path = f"{wasabi_folder_path}/{chapter_number}"
+                        else:
+                            folder_path = f"{wasabi_folder_path}/default"
                     else:
-                        folder_path = f"social_studies/{subject_en}/default"
+                        # フォールバック: 科目を英語に変換
+                        subject_map = {
+                            '地理': 'geography',
+                            '歴史': 'history',
+                            '公民': 'civics',
+                            '理科': 'science'
+                        }
+                        subject_en = subject_map.get(subject, 'other')
+                        
+                        if chapter_number:
+                            folder_path = f"social_studies/{subject_en}/{chapter_number}"
+                        else:
+                            folder_path = f"social_studies/{subject_en}/default"
                     
                     print(f"🔍 単元ID {unit_id} から生成されたフォルダパス: {folder_path}")
                     return folder_path
