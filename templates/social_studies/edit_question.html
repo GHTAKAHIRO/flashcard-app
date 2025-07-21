@@ -313,15 +313,27 @@ function checkImageExists() {
     const statusSpan = document.getElementById('image-status');
     const containerDiv = document.getElementById('image-preview-container');
     
+    // 単元IDを取得（固定表示の場合はhidden inputから、選択の場合はselectから）
+    let unitId = null;
     const unitIdElement = document.getElementById('unit_id');
-    const unitId = unitIdElement ? unitIdElement.value : null;
+    if (unitIdElement) {
+        unitId = unitIdElement.value;
+    }
+    
+    // デバッグ情報をコンソールに出力
+    console.log('🔍 checkImageExists デバッグ情報:');
+    console.log('  imageName:', imageName);
+    console.log('  unitIdElement:', unitIdElement);
+    console.log('  unitId:', unitId);
     
     if (!imageName) {
+        console.log('❌ 画像名が入力されていません');
         previewDiv.style.display = 'none';
         return;
     }
     
     if (!unitId) {
+        console.log('❌ 単元IDが取得できません');
         statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> 単元を選択してください`;
         previewDiv.style.display = 'block';
         return;
