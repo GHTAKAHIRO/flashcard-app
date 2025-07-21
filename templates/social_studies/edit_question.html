@@ -350,6 +350,7 @@ function checkImageExists() {
         })
         .then(data => {
             console.log('🔍 APIデータ:', data);
+            console.log('🔍 APIデータ詳細:', JSON.stringify(data, null, 2));
             
             if (data.exists) {
                 statusSpan.innerHTML = `<i class="fas fa-check-circle text-success"></i> 画像が見つかりました`;
