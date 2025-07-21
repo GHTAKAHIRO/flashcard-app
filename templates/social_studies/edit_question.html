@@ -156,18 +156,17 @@
                                 <i class="fas fa-image me-1"></i>
                                 <strong>現在の画像:</strong> 
                                 <span class="badge bg-primary">{{ question.image_title }}</span>
-                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="showCurrentImage()">
-                                    <i class="fas fa-eye me-1"></i>現在の画像を表示
-                                </button>
                             </div>
                             <!-- 現在の画像プレビュー -->
-                            <div id="current-image-preview" class="text-center mt-2" style="display: none;">
+                            <div id="current-image-preview" class="text-center mt-2">
                                 <div id="current-image-status" class="alert alert-success">
                                     <i class="fas fa-check-circle me-1"></i>
                                     <strong>現在の画像:</strong>
                                 </div>
                                 <div id="current-image-container">
-                                    <!-- 現在の画像がここに表示されます -->
+                                    <div class="text-center">
+                                        <i class="fas fa-spinner fa-spin"></i> 画像を読み込み中...
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -176,7 +175,7 @@
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle me-1"></i>
                                 <strong>現在の画像:</strong> 
-                                <span class="badge bg-secondary">該当なし</span>
+                                <span class="badge bg-secondary">なし</span>
                             </div>
                         </div>
                         {% endif %}
@@ -218,6 +217,11 @@
 // ページ読み込み時の処理
 document.addEventListener('DOMContentLoaded', function() {
     updatePreview();
+    
+    // 現在の画像がある場合は自動的に表示
+    {% if question.image_title %}
+    showCurrentImage();
+    {% endif %}
     
     // 画像確認は手動で行うため、自動実行しない
     // const imageNameInput = document.getElementById('image_name');
@@ -331,12 +335,12 @@ function showCurrentImage() {
     const containerDiv = document.getElementById('current-image-container');
     
     if (!imageTitle || !unitId) {
-        alert('画像タイトルまたは単元IDが設定されていません');
+        console.log('画像タイトルまたは単元IDが設定されていません');
         return;
     }
     
+    // プレビューエリアは既に表示されているので、ローディング表示のみ更新
     containerDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 画像を読み込み中...</div>';
-    previewDiv.style.display = 'block';
     
     fetch(`/social_studies/api/check_image?image_name=${encodeURIComponent(imageTitle)}&unit_id=${unitId}`)
         .then(response => response.json())
@@ -373,7 +377,7 @@ function showCurrentImage() {
             } else {
                 // 画像が見つからない場合
                 statusDiv.className = 'alert alert-warning';
-                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">該当なし</span>';
+                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">なし</span>';
                 containerDiv.innerHTML = `
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i> 
