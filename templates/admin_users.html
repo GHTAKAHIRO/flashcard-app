@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+
+{% block title %}ユーザー管理 - 社会科一問一答アプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold">
+                <i class="fas fa-users me-2"></i>ユーザー管理
+            </h2>
+            <p class="text-muted">ユーザーの一覧表示と新規登録を行います</p>
+        </div>
+        <div>
+            <a href="{{ url_for('admin') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>管理画面に戻る
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 統計カード -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                <h6 class="card-title">総ユーザー数</h6>
+                <p class="card-text h4">{{ total_users }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-user-check fa-2x text-success mb-2"></i>
+                <h6 class="card-title">アクティブユーザー</h6>
+                <p class="card-text h4">{{ active_users }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-user-plus fa-2x text-info mb-2"></i>
+                <h6 class="card-title">今月の新規登録</h6>
+                <p class="card-text h4">{{ new_users_this_month }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 操作ボタン -->
+<div class="mb-3">
+    <button class="btn btn-success me-2" onclick="showAddUserModal()">
+        <i class="fas fa-user-plus me-1"></i>新規ユーザー登録
+    </button>
+    <button class="btn btn-outline-primary me-2" onclick="exportUsers()">
+        <i class="fas fa-download me-1"></i>ユーザー一覧エクスポート
+    </button>
+</div>
+
+<!-- ユーザー一覧テーブル -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>ユーザー名</th>
+                        <th>メールアドレス</th>
+                        <th>登録日</th>
+                        <th>最終ログイン</th>
+                        <th>ステータス</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>
+                            <div class="fw-bold">{{ user.username }}</div>
+                            {% if user.is_admin %}
+                                <span class="badge bg-danger">管理者</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.email or '未設定' }}</td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '不明' }}</td>
+                        <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
+                        <td>
+                            {% if user.is_active %}
+                                <span class="badge bg-success">アクティブ</span>
+                            {% else %}
+                                <span class="badge bg-secondary">非アクティブ</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-primary" onclick="editUser({{ user.id }})" title="編集">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                {% if user.is_active %}
+                                    <button class="btn btn-outline-warning" onclick="toggleUserStatus({{ user.id }}, false)" title="無効化">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-outline-success" onclick="toggleUserStatus({{ user.id }}, true)" title="有効化">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                {% endif %}
+                                <button class="btn btn-outline-danger" onclick="deleteUser({{ user.id }})" title="削除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not users %}
+        <div class="text-center py-5">
+            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">まだユーザーが登録されていません</h4>
+            <button class="btn btn-primary" onclick="showAddUserModal()">
+                <i class="fas fa-user-plus me-1"></i>最初のユーザーを登録
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 新規ユーザー登録モーダル -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">新規ユーザー登録</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">ユーザー名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">メールアドレス</label>
+                        <input type="email" class="form-control" id="email" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">パスワード <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">パスワード確認 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin">
+                            <label class="form-check-label" for="is_admin">
+                                管理者権限を付与する
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="addUser()">登録</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ユーザー編集モーダル -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">ユーザー編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <div class="mb-3">
+                        <label for="edit-username" class="form-label">ユーザー名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-email" class="form-label">メールアドレス</label>
+                        <input type="email" class="form-control" id="edit-email" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-password" class="form-label">新しいパスワード</label>
+                        <input type="password" class="form-control" id="edit-password" name="password" placeholder="変更しない場合は空欄">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="edit-is-admin" name="is_admin">
+                            <label class="form-check-label" for="edit-is-admin">
+                                管理者権限を付与する
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveUserEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentEditUserId = null;
+
+function showAddUserModal() {
+    document.getElementById('addUserForm').reset();
+    const modal = new bootstrap.Modal(document.getElementById('addUserModal'));
+    modal.show();
+}
+
+function addUser() {
+    const formData = {
+        username: document.getElementById('username').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        confirm_password: document.getElementById('confirm_password').value,
+        is_admin: document.getElementById('is_admin').checked
+    };
+    
+    if (!formData.username || !formData.password) {
+        alert('ユーザー名とパスワードは必須です');
+        return;
+    }
+    
+    if (formData.password !== formData.confirm_password) {
+        alert('パスワードが一致しません');
+        return;
+    }
+    
+    fetch('/admin/users/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラー: ' + data.error);
+        } else {
+            alert('ユーザーを登録しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('ユーザー登録エラー:', error);
+        alert('ユーザーの登録に失敗しました');
+    });
+}
+
+function editUser(userId) {
+    currentEditUserId = userId;
+    
+    fetch(`/admin/users/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            
+            document.getElementById('edit-username').value = data.username || '';
+            document.getElementById('edit-email').value = data.email || '';
+            document.getElementById('edit-password').value = '';
+            document.getElementById('edit-is-admin').checked = data.is_admin || false;
+            
+            const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('ユーザーデータ取得エラー:', error);
+            alert('ユーザーデータの取得に失敗しました');
+        });
+}
+
+function saveUserEdit() {
+    if (!currentEditUserId) {
+        alert('編集するユーザーが選択されていません');
+        return;
+    }
+    
+    const formData = {
+        username: document.getElementById('edit-username').value.trim(),
+        email: document.getElementById('edit-email').value.trim(),
+        password: document.getElementById('edit-password').value,
+        is_admin: document.getElementById('edit-is-admin').checked
+    };
+    
+    if (!formData.username) {
+        alert('ユーザー名は必須です');
+        return;
+    }
+    
+    fetch(`/admin/users/${currentEditUserId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert('ユーザーを更新しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('ユーザー更新エラー:', error);
+        alert('ユーザーの更新に失敗しました');
+    });
+}
+
+function toggleUserStatus(userId, isActive) {
+    const action = isActive ? '有効化' : '無効化';
+    if (!confirm(`このユーザーを${action}しますか？`)) {
+        return;
+    }
+    
+    fetch(`/admin/users/${userId}/toggle_status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: isActive })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert(`ユーザーを${action}しました`);
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('ユーザーステータス変更エラー:', error);
+        alert('ユーザーステータスの変更に失敗しました');
+    });
+}
+
+function deleteUser(userId) {
+    if (!confirm('このユーザーを削除しますか？この操作は元に戻せません。')) {
+        return;
+    }
+    
+    fetch(`/admin/users/${userId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert('ユーザーを削除しました');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('ユーザー削除エラー:', error);
+        alert('ユーザーの削除に失敗しました');
+    });
+}
+
+function exportUsers() {
+    window.open('/admin/users/export', '_blank');
+}
+</script>
+{% endblock %} 
