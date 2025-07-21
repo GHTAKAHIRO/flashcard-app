@@ -5793,6 +5793,23 @@ def update_unit_image_path(textbook_id, unit_id):
         app.logger.error(f"画像URL更新エラー: {e}")
         return jsonify({'error': f'画像URLの更新に失敗しました: {str(e)}'}), 500
 
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    # 仮のユーザーデータ（本番ではDBから取得）
+    users = []
+    total_users = 0
+    active_users = 0
+    new_users_this_month = 0
+    # TODO: DBからユーザー情報を取得し、上記変数にセット
+    return render_template(
+        'admin_users.html',
+        users=users,
+        total_users=total_users,
+        active_users=active_users,
+        new_users_this_month=new_users_this_month
+    )
+
 if __name__ == '__main__':
     # データベース接続プールを初期化
     try:
