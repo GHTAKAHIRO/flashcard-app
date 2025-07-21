@@ -38,18 +38,16 @@
                             <input type="text" class="form-control" value="{{ unit_info.name if unit_info else '未設定' }}{% if unit_info and unit_info.chapter_number %} (第{{ unit_info.chapter_number }}章){% endif %}" readonly>
                             <input type="hidden" name="unit_id" value="{{ question.unit_id or '' }}">
                         </div>
-                        
-
                     {% else %}
                         <!-- 通常の選択形式 -->
                         <div class="mb-3">
                             <label for="subject" class="form-label">科目 <span class="text-danger">*</span></label>
                             <select class="form-select" id="subject" name="subject" required onchange="loadTextbooks()">
                                 <option value="">科目を選択してください</option>
-                                <option value="地理">地理</option>
-                                <option value="歴史">歴史</option>
-                                <option value="公民">公民</option>
-                                <option value="理科">理科</option>
+                                <option value="地理" {% if question.subject == '地理' %}selected{% endif %}>地理</option>
+                                <option value="歴史" {% if question.subject == '歴史' %}selected{% endif %}>歴史</option>
+                                <option value="公民" {% if question.subject == '公民' %}selected{% endif %}>公民</option>
+                                <option value="理科" {% if question.subject == '理科' %}selected{% endif %}>理科</option>
                             </select>
                         </div>
                         
@@ -66,15 +64,9 @@
                             <label for="unit_id" class="form-label">
                                 <i class="fas fa-list-ol me-1"></i>単元・章
                             </label>
-                            <select class="form-select" id="unit_id" name="unit_id" onchange="updateImagePathOnUnitChange()">
+                            <select class="form-select" id="unit_id" name="unit_id">
                                 <option value="">単元・章を選択してください（オプション）</option>
                             </select>
-                        </div>
-                        
-                        <!-- 選択状況表示 -->
-                        <div id="selection-status" class="alert alert-info" style="display: none;">
-                            <i class="fas fa-spinner fa-spin me-2"></i>
-                            <span id="status-text">読み込み中...</span>
                         </div>
                     {% endif %}
                     
@@ -143,14 +135,6 @@
                         </label>
                         <input type="text" class="form-control" id="image_path_display" value="{{ image_path_info.base_url if image_path_info else '読み込み中...' }}" readonly>
                     </div>
-                    {% else %}
-                    <!-- 通常の選択形式の場合の画像パス -->
-                    <div class="mb-3" id="image_path_section" style="display: none;">
-                        <label class="form-label">
-                            <i class="fas fa-folder-open me-1"></i>画像保存先
-                        </label>
-                        <input type="text" class="form-control" id="image_path_display" value="" readonly>
-                    </div>
                     {% endif %}
                     
                     <div class="mb-3">
@@ -194,8 +178,6 @@
                         </div>
                     </div>
                     
-
-                    
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         {% if question.unit_id %}
                             <a href="{{ url_for('social_studies_admin_unit_questions', textbook_id=question.textbook_id or 1, unit_id=question.unit_id) }}" class="btn btn-secondary me-md-2">
@@ -219,7 +201,6 @@
 <script>
 // ページ読み込み時の処理
 document.addEventListener('DOMContentLoaded', function() {
-    // 既存のデータを初期化
     updatePreview();
     
     // 画像タイトルが設定されている場合は画像プレビューを表示
@@ -228,62 +209,34 @@ document.addEventListener('DOMContentLoaded', function() {
         checkImageExists();
     }
     
+    // 教材と単元が固定されている場合の処理
     {% if textbook_info and unit_info %}
-    // 教材と単元が固定されている場合は、バックエンドから渡された画像パス情報を使用
-    {% if image_path_info %}
-    console.log('固定表示モード: バックエンドから画像パス情報を取得');
-    // バックエンドから渡された画像パス情報を設定
-    const imagePathDisplay = document.getElementById('image_path_display');
-    if (imagePathDisplay) {
-        imagePathDisplay.value = '{{ image_path_info.base_url }}';
-    }
-    
-    // 画像名欄のプレースホルダーとパス情報を更新
-    const imageNameInput = document.getElementById('image_name');
-    const imagePreviewDiv = document.getElementById('image-preview');
-    const statusSpan = document.getElementById('image-status');
-    
-    if (imageNameInput) {
-        imageNameInput.placeholder = '';
-    }
-    
-    if (statusSpan) {
-        statusSpan.innerHTML = '';
-    }
-    
-    if (imagePreviewDiv) {
-        imagePreviewDiv.style.display = 'block';
-    }
-    
-
-    {% else %}
-    // バックエンドから画像パス情報が取得できない場合は、APIから取得
-    const unitId = '{{ unit_info.id }}';
-    console.log('固定表示モード: APIから画像パス情報を取得');
-    updateUnitImagePathInfo(unitId);
-    {% endif %}
-    {% else %}
-    // 通常の選択形式の場合
-    {% if question.textbook_id %}
-    // 教材IDが指定されている場合、教材を自動選択
-    setTimeout(function() {
-        const textbookSelect = document.getElementById('textbook_id');
-        if (textbookSelect) {
-            textbookSelect.value = '{{ question.textbook_id }}';
-            loadUnits();
+        {% if image_path_info %}
+        const imagePathDisplay = document.getElementById('image_path_display');
+        if (imagePathDisplay) {
+            imagePathDisplay.value = '{{ image_path_info.base_url }}';
         }
-    }, 500);
-    {% endif %}
-    
-    {% if question.unit_id %}
-    // 単元IDが指定されている場合、単元を設定
-    setTimeout(function() {
-        const unitSelect = document.getElementById('unit_id');
-        if (unitSelect) {
-            unitSelect.value = '{{ question.unit_id }}';
-        }
-    }, 1500); // 教材と単元の読み込みを待つ
-    {% endif %}
+        {% endif %}
+    {% else %}
+        // 通常の選択形式の場合
+        {% if question.textbook_id %}
+        setTimeout(function() {
+            const textbookSelect = document.getElementById('textbook_id');
+            if (textbookSelect) {
+                textbookSelect.value = '{{ question.textbook_id }}';
+                loadUnits();
+            }
+        }, 500);
+        {% endif %}
+        
+        {% if question.unit_id %}
+        setTimeout(function() {
+            const unitSelect = document.getElementById('unit_id');
+            if (unitSelect) {
+                unitSelect.value = '{{ question.unit_id }}';
+            }
+        }, 1500);
+        {% endif %}
     {% endif %}
 });
 
@@ -292,18 +245,13 @@ function loadTextbooks() {
     const textbookSelect = document.getElementById('textbook_id');
     const unitSelect = document.getElementById('unit_id');
     
-    // 単元セレクトをリセット
     unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
-    
-    // 科目が変更された場合は画像名欄もクリア
-    clearImagePathInfo();
     
     if (!subject) {
         textbookSelect.innerHTML = '<option value="">教材を選択してください（オプション）</option>';
         return;
     }
     
-    // 教材を取得
     fetch(`/social_studies/api/textbooks?subject=${subject}`)
         .then(response => response.json())
         .then(data => {
@@ -323,39 +271,12 @@ function loadTextbooks() {
 function loadUnits() {
     const textbookId = document.getElementById('textbook_id').value;
     const unitSelect = document.getElementById('unit_id');
-    const statusDiv = document.getElementById('selection-status');
-    const statusText = document.getElementById('status-text');
     
     if (!textbookId) {
         unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
-        statusDiv.style.display = 'none';
-        // 教材が選択されていない場合は画像名欄をクリア
-        clearImagePathInfo();
         return;
     }
     
-    // 選択された教材名を取得
-    const selectedTextbook = document.getElementById('textbook_id').options[document.getElementById('textbook_id').selectedIndex].text;
-    statusText.textContent = `教材「${selectedTextbook}」の単元・章を読み込み中...`;
-    statusDiv.style.display = 'block';
-    
-    // 教材の詳細情報を取得（画像フォルダパスを含む）
-    fetch(`/social_studies/api/textbook/${textbookId}`)
-        .then(response => response.json())
-        .then(textbookData => {
-            if (textbookData.error) {
-                console.error('教材詳細取得エラー:', textbookData.error);
-                return;
-            }
-            
-            // 画像名欄にパス情報を表示
-            updateImagePathInfo(textbookData.wasabi_folder_path);
-        })
-        .catch(error => {
-            console.error('教材詳細取得エラー:', error);
-        });
-    
-    // 単元を取得
     fetch(`/social_studies/api/units?textbook_id=${textbookId}`)
         .then(response => response.json())
         .then(data => {
@@ -363,164 +284,16 @@ function loadUnits() {
             data.forEach(unit => {
                 const option = document.createElement('option');
                 option.value = unit.id;
-                // 章番号と単元名を明確に表示
                 const chapterText = unit.chapter_number ? `第${unit.chapter_number}章` : '';
                 option.textContent = `${chapterText} ${unit.name}`;
                 unitSelect.appendChild(option);
             });
-            
-            // 選択状況を更新
-            if (data.length > 0) {
-                statusText.textContent = `教材「${selectedTextbook}」から ${data.length}個の単元・章が見つかりました`;
-            } else {
-                statusText.textContent = `教材「${selectedTextbook}」には単元・章が登録されていません`;
-            }
         })
         .catch(error => {
             console.error('単元取得エラー:', error);
-            statusText.textContent = '単元・章の取得に失敗しました';
         });
 }
 
-// 画像名欄にパス情報を表示する関数
-function updateImagePathInfo(folderPath) {
-    const imageNameInput = document.getElementById('image_name');
-    const imagePreviewDiv = document.getElementById('image-preview');
-    const statusSpan = document.getElementById('image-status');
-    
-    if (folderPath) {
-        // プレースホルダーを更新
-        imageNameInput.placeholder = '';
-        
-        // パス情報を表示
-        statusSpan.innerHTML = '';
-        imagePreviewDiv.style.display = 'block';
-        
-
-    } else {
-        clearImagePathInfo();
-    }
-}
-
-// 単元IDから画像パス情報を取得して表示する関数
-function updateUnitImagePathInfo(unitId) {
-    const imageNameInput = document.getElementById('image_name');
-    const imagePreviewDiv = document.getElementById('image-preview');
-    const statusSpan = document.getElementById('image-status');
-    const imagePathDisplay = document.getElementById('image_path_display');
-    
-    // 単元の章番号に基づいてフォルダパスを生成
-    fetch(`/social_studies/api/check_image?image_name=test&unit_id=${unitId}`)
-        .then(response => response.json())
-        .then(data => {
-            console.log('🔍 APIレスポンス:', data);
-            
-            // folder_pathが存在する場合（画像が見つかった場合も見つからなかった場合も）
-            if (data.folder_path) {
-                // 画像パス表示フィールドを更新
-                if (imagePathDisplay) {
-                    imagePathDisplay.value = data.folder_path;
-                }
-                
-                // プレースホルダーを更新（問題番号のみ）
-                imageNameInput.placeholder = '';
-                
-                // パス情報を表示
-                statusSpan.innerHTML = '';
-                imagePreviewDiv.style.display = 'block';
-                
-                // 画像名欄の下にパス情報を表示
-                const pathInfoDiv = document.getElementById('path-info');
-                if (!pathInfoDiv) {
-                    const newPathInfoDiv = document.createElement('div');
-                    newPathInfoDiv.id = 'path-info';
-                    newPathInfoDiv.className = 'mt-2';
-                    newPathInfoDiv.innerHTML = `
-                        <div class="alert alert-info">
-                            <small>
-                                <i class="fas fa-folder-open me-1"></i>
-                                <strong>画像保存先:</strong> <code>${data.folder_path}</code><br>
-                                <i class="fas fa-info-circle me-1"></i>
-                                問題番号のみ入力してください（例: 2 → ${data.folder_path}/2.jpg）
-                            </small>
-                        </div>
-                    `;
-                    imageNameInput.parentNode.insertBefore(newPathInfoDiv, imageNameInput.nextSibling);
-                } else {
-                    pathInfoDiv.innerHTML = `
-                        <div class="alert alert-info">
-                            <small>
-                                <i class="fas fa-folder-open me-1"></i>
-                                <strong>画像保存先:</strong> <code>${data.folder_path}</code><br>
-                                <i class="fas fa-info-circle me-1"></i>
-                                問題番号のみ入力してください（例: 2 → ${data.folder_path}/2.jpg）
-                            </small>
-                        </div>
-                    `;
-                }
-            } else {
-                // folder_pathが存在しない場合のフォールバック
-                console.warn('❌ folder_pathが取得できませんでした');
-                if (imagePathDisplay) {
-                    imagePathDisplay.value = 'social_studies/default';
-                }
-            }
-        })
-        .catch(error => {
-            console.error('単元画像パス取得エラー:', error);
-            // エラーが発生した場合でも、デフォルトのフォルダパスを表示
-            if (imagePathDisplay) {
-                imagePathDisplay.value = 'social_studies/default';
-            }
-        });
-}
-
-// 単元選択時に画像パスを更新する関数
-function updateImagePathOnUnitChange() {
-    const unitId = document.getElementById('unit_id').value;
-    const imagePathSection = document.getElementById('image_path_section');
-    const imagePathDisplay = document.getElementById('image_path_display');
-    
-    if (unitId) {
-        // 単元が選択された場合、画像パスを取得して表示
-        fetch(`/social_studies/api/check_image?image_name=test&unit_id=${unitId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.folder_path) {
-                    imagePathDisplay.value = data.folder_path;
-                    imagePathSection.style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('画像パス取得エラー:', error);
-            });
-    } else {
-        // 単元が選択されていない場合、画像パスセクションを非表示
-        imagePathSection.style.display = 'none';
-    }
-}
-
-// 画像名欄のパス情報をクリアする関数
-function clearImagePathInfo() {
-    const imageNameInput = document.getElementById('image_name');
-    const imagePreviewDiv = document.getElementById('image-preview');
-    const statusSpan = document.getElementById('image-status');
-    
-    // プレースホルダーを元に戻す
-    imageNameInput.placeholder = '';
-    
-    // パス情報をクリア
-    statusSpan.innerHTML = '';
-    imagePreviewDiv.style.display = 'none';
-    
-    // パス情報表示を削除
-    const pathInfoDiv = document.getElementById('path-info');
-    if (pathInfoDiv) {
-        pathInfoDiv.remove();
-    }
-}
-
-// プレビュー更新機能
 function updatePreview() {
     const suffixInput = document.getElementById('answer_suffix');
     const previewSection = document.getElementById('preview-section');
@@ -534,58 +307,43 @@ function updatePreview() {
     }
 }
 
-// 画像存在確認機能
 function checkImageExists() {
     const imageName = document.getElementById('image_name').value.trim();
     const previewDiv = document.getElementById('image-preview');
     const statusSpan = document.getElementById('image-status');
     const containerDiv = document.getElementById('image-preview-container');
     
-    // 単元IDを取得（固定表示の場合はhidden inputから、選択の場合はselectから）
     const unitIdElement = document.getElementById('unit_id');
     const unitId = unitIdElement ? unitIdElement.value : null;
-    
-    console.log('🔍 画像確認開始:', { imageName, unitId: unitId });
     
     if (!imageName) {
         previewDiv.style.display = 'none';
         return;
     }
     
-    // 単元IDが取得できない場合
     if (!unitId) {
         statusSpan.innerHTML = `<i class="fas fa-exclamation-triangle text-warning"></i> 単元を選択してください`;
         previewDiv.style.display = 'block';
         return;
     }
     
-    // ローディング表示
     statusSpan.innerHTML = `<i class="fas fa-spinner fa-spin text-info"></i> 画像を確認中...`;
     containerDiv.innerHTML = '';
     previewDiv.style.display = 'block';
     
-    // 画像存在確認APIを呼び出し
     fetch(`/social_studies/api/check_image?image_name=${encodeURIComponent(imageName)}&unit_id=${unitId}`)
-        .then(response => {
-            console.log('🔍 APIレスポンス:', response.status, response.statusText);
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('🔍 APIデータ:', data);
-            
             if (data.exists) {
                 statusSpan.innerHTML = `<i class="fas fa-check-circle text-success"></i> 画像が見つかりました`;
                 
-                // 画像要素を作成
                 const img = document.createElement('img');
                 img.src = data.image_url;
                 img.className = 'img-fluid';
                 img.style.maxHeight = '200px';
                 img.alt = '画像プレビュー';
                 
-                // 画像読み込みエラーハンドリング
                 img.onerror = function() {
-                    console.error('❌ 画像読み込みエラー:', data.image_url);
                     containerDiv.innerHTML = `
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle"></i> 
@@ -593,11 +351,6 @@ function checkImageExists() {
                             URL: ${data.image_url}
                         </div>
                     `;
-                };
-                
-                // 画像読み込み成功
-                img.onload = function() {
-                    console.log('✅ 画像読み込み成功:', data.image_url);
                 };
                 
                 containerDiv.innerHTML = '';
@@ -609,7 +362,7 @@ function checkImageExists() {
             previewDiv.style.display = 'block';
         })
         .catch(error => {
-            console.error('❌ 画像確認エラー:', error);
+            console.error('画像確認エラー:', error);
             statusSpan.innerHTML = `<i class="fas fa-times-circle text-danger"></i> 画像確認に失敗しました`;
             containerDiv.innerHTML = `
                 <div class="alert alert-danger">
@@ -621,52 +374,9 @@ function checkImageExists() {
         });
 }
 
-
-
-// 全角文字を半角に自動変換する機能（IME重複入力を防ぐため、blur時のみ実行）
-function normalizeInput(input) {
-    let value = input.value;
-    
-    // 全角数字を半角に変換
-    value = value.replace(/[０-９]/g, function(s) {
-        return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
-    
-    // 全角英字を半角に変換
-    value = value.replace(/[Ａ-Ｚａ-ｚ]/g, function(s) {
-        return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-    });
-    
-    // 全角記号を半角に変換
-    const fullwidthSymbols = {
-        '！': '!', '＠': '@', '＃': '#', '＄': '$', '％': '%', '＾': '^', '＆': '&', '＊': '*',
-        '（': '(', '）': ')', '＿': '_', '＋': '+', '－': '-', '＝': '=', '｛': '{', '｝': '}',
-        '｜': '|', '：': ':', '；': ';', '＂': '"', '＇': "'", '＜': '<', '＞': '>', '？': '?',
-        '、': ',', '。': '.', '・': '·', '～': '~', '　': ' '
-    };
-    
-    for (let full in fullwidthSymbols) {
-        value = value.replace(new RegExp(full, 'g'), fullwidthSymbols[full]);
-    }
-    
-    input.value = value;
-}
-
-// すべての入力フィールドに変換機能を追加（IME重複入力を防ぐため、blur時のみ実行）
-document.addEventListener('DOMContentLoaded', function() {
-    const inputs = document.querySelectorAll('input[type="text"], textarea');
-    inputs.forEach(input => {
-        input.addEventListener('blur', function() {
-            normalizeInput(this);
-        });
-    });
-});
-
-// 問題保存機能
 function saveQuestion(event) {
     event.preventDefault();
     
-    // フォームデータを取得
     const formData = {
         subject: document.querySelector('input[name="subject"]').value,
         textbook_id: document.querySelector('input[name="textbook_id"]').value || null,
@@ -680,7 +390,6 @@ function saveQuestion(event) {
         image_name: document.getElementById('image_name').value.trim()
     };
     
-    // バリデーション
     if (!formData.question) {
         alert('問題文を入力してください');
         return;
@@ -690,13 +399,11 @@ function saveQuestion(event) {
         return;
     }
     
-    // 保存ボタンを無効化
     const submitButton = document.querySelector('button[type="submit"]');
     const originalText = submitButton.innerHTML;
     submitButton.disabled = true;
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>更新中...';
     
-    // APIに送信
     fetch('{{ url_for("social_studies_edit_question", question_id=question.id) }}', {
         method: 'POST',
         headers: {
@@ -710,7 +417,6 @@ function saveQuestion(event) {
             alert(data.error);
         } else {
             alert('問題を更新しました');
-            // 問題一覧ページに戻る
             window.location.href = '{{ url_for("social_studies_admin_questions") }}';
         }
     })
@@ -719,7 +425,6 @@ function saveQuestion(event) {
         alert('問題の更新に失敗しました');
     })
     .finally(() => {
-        // ボタンを元に戻す
         submitButton.disabled = false;
         submitButton.innerHTML = originalText;
     });
