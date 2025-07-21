@@ -4209,13 +4209,12 @@ def social_studies_api_set_image_public(question_id):
     try:
         # 問題の画像URLを取得
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
-            cur.execute('SELECT image_url FROM social_studies_questions WHERE id = %s', (question_id,))
-            result = cur.fetchone()
-            if not result or not result[0]:
-                return jsonify({'error': 'この問題には画像が設定されていません'}), 404
-            
-            image_url = result[0]
+                cur.execute('SELECT image_url FROM social_studies_questions WHERE id = %s', (question_id,))
+                result = cur.fetchone()
+                if not result or not result[0]:
+                    return jsonify({'error': 'この問題には画像が設定されていません'}), 404
+                
+                image_url = result[0]
         
         # 公開アクセス権限を設定
         success, error = set_image_public_access(image_url)
