@@ -150,21 +150,33 @@
                         </div>
                         
                         <!-- 既存の画像表示 -->
-                        {% if question.image_url %}
+                        {% if question.image_title %}
                         <div class="mt-2">
                             <div class="alert alert-info">
                                 <i class="fas fa-image me-1"></i>
                                 <strong>現在の画像:</strong> 
-                                {% if question.image_title %}
-                                    <span class="badge bg-primary">{{ question.image_title }}</span>
-                                {% endif %}
-                                <a href="{{ question.image_url }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
-                                    <i class="fas fa-external-link-alt me-1"></i>画像を表示
-                                </a>
+                                <span class="badge bg-primary">{{ question.image_title }}</span>
+                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="showCurrentImage()">
+                                    <i class="fas fa-eye me-1"></i>現在の画像を表示
+                                </button>
                             </div>
-                            <!-- 画像プレビュー -->
-                            <div class="text-center mt-2">
-                                <img src="{{ question.image_url }}" alt="現在の画像" class="img-fluid" style="max-height: 300px; border: 1px solid #dee2e6; border-radius: 0.375rem;">
+                            <!-- 現在の画像プレビュー -->
+                            <div id="current-image-preview" class="text-center mt-2" style="display: none;">
+                                <div id="current-image-status" class="alert alert-success">
+                                    <i class="fas fa-check-circle me-1"></i>
+                                    <strong>現在の画像:</strong>
+                                </div>
+                                <div id="current-image-container">
+                                    <!-- 現在の画像がここに表示されます -->
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="mt-2">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                <strong>現在の画像:</strong> 
+                                <span class="badge bg-secondary">該当なし</span>
                             </div>
                         </div>
                         {% endif %}
@@ -207,11 +219,11 @@
 document.addEventListener('DOMContentLoaded', function() {
     updatePreview();
     
-    // 画像タイトルが設定されている場合は画像プレビューを表示
-    const imageNameInput = document.getElementById('image_name');
-    if (imageNameInput && imageNameInput.value.trim()) {
-        checkImageExists();
-    }
+    // 画像確認は手動で行うため、自動実行しない
+    // const imageNameInput = document.getElementById('image_name');
+    // if (imageNameInput && imageNameInput.value.trim()) {
+    //     checkImageExists();
+    // }
     
     // 教材と単元が固定されている場合の処理
     {% if textbook_info and unit_info %}
@@ -309,6 +321,80 @@ function updatePreview() {
     } else {
         previewSection.style.display = 'none';
     }
+}
+
+function showCurrentImage() {
+    const imageTitle = '{{ question.image_title or "" }}';
+    const unitId = '{{ question.unit_id or "" }}';
+    const previewDiv = document.getElementById('current-image-preview');
+    const statusDiv = document.getElementById('current-image-status');
+    const containerDiv = document.getElementById('current-image-container');
+    
+    if (!imageTitle || !unitId) {
+        alert('画像タイトルまたは単元IDが設定されていません');
+        return;
+    }
+    
+    containerDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 画像を読み込み中...</div>';
+    previewDiv.style.display = 'block';
+    
+    fetch(`/social_studies/api/check_image?image_name=${encodeURIComponent(imageTitle)}&unit_id=${unitId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.exists) {
+                // 画像が見つかった場合
+                statusDiv.className = 'alert alert-success';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle me-1"></i><strong>現在の画像:</strong>';
+                
+                const img = document.createElement('img');
+                img.src = data.image_url;
+                img.className = 'img-fluid';
+                img.style.maxHeight = '300px';
+                img.style.border = '1px solid #dee2e6';
+                img.style.borderRadius = '0.375rem';
+                img.alt = '現在の画像';
+                
+                img.onerror = function() {
+                    containerDiv.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            画像が見つかりましたが、表示できませんでした。<br>
+                            URL: ${data.image_url}
+                        </div>
+                    `;
+                };
+                
+                img.onload = function() {
+                    console.log('✅ 現在の画像読み込み成功:', data.image_url);
+                };
+                
+                containerDiv.innerHTML = '';
+                containerDiv.appendChild(img);
+            } else {
+                // 画像が見つからない場合
+                statusDiv.className = 'alert alert-warning';
+                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">該当なし</span>';
+                containerDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        指定された画像が見つかりませんでした。<br>
+                        画像タイトル: ${imageTitle}<br>
+                        単元ID: ${unitId}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('現在の画像取得エラー:', error);
+            statusDiv.className = 'alert alert-danger';
+            statusDiv.innerHTML = '<i class="fas fa-times-circle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-danger">エラー</span>';
+            containerDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    画像の取得に失敗しました: ${error.message}
+                </div>
+            `;
+        });
 }
 
 function checkImageExists() {
@@ -444,7 +530,12 @@ function saveQuestion(event) {
             alert(data.error);
         } else {
             alert('問題を更新しました');
-            window.location.href = '{{ url_for("social_studies_admin_questions") }}';
+            // 単元の問題画面に戻る
+            {% if question.unit_id %}
+                window.location.href = '{{ url_for("social_studies_admin_unit_questions", textbook_id=question.textbook_id or 1, unit_id=question.unit_id) }}';
+            {% else %}
+                window.location.href = '{{ url_for("social_studies_admin_questions") }}';
+            {% endif %}
         }
     })
     .catch(error => {
