@@ -180,7 +180,21 @@
                             </div>
                         </div>
                         {% endif %}
+                        
+                        <!-- 画像プレビューセクション -->
+                        <div id="image-preview" class="mt-2" style="display: none;">
+                            <div class="alert alert-info">
+                                <i class="fas fa-search me-1"></i>
+                                <strong>画像確認結果:</strong> 
+                                <span id="image-status"></span>
+                            </div>
+                            <div id="image-preview-container" class="text-center">
+                                <!-- 画像プレビューがここに表示されます -->
+                            </div>
+                        </div>
                     </div>
+                    
+
                     
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         {% if question.unit_id %}
@@ -207,6 +221,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 既存のデータを初期化
     updatePreview();
+    
+    // 画像タイトルが設定されている場合は画像プレビューを表示
+    const imageNameInput = document.getElementById('image_name');
+    if (imageNameInput && imageNameInput.value.trim()) {
+        checkImageExists();
+    }
     
     {% if textbook_info and unit_info %}
     // 教材と単元が固定されている場合は、バックエンドから渡された画像パス情報を使用
@@ -600,6 +620,8 @@ function checkImageExists() {
             previewDiv.style.display = 'block';
         });
 }
+
+
 
 // 全角文字を半角に自動変換する機能（IME重複入力を防ぐため、blur時のみ実行）
 function normalizeInput(input) {

@@ -3665,7 +3665,7 @@ def social_studies_edit_question_page(question_id):
                 cur.execute('''
                     SELECT q.id, q.subject, q.textbook_id, q.unit_id, q.question, q.correct_answer, 
                            q.acceptable_answers, q.answer_suffix, q.explanation, q.difficulty_level,
-                           q.image_name, q.image_url, t.name as textbook_name, u.name as unit_name,
+                           q.image_name, q.image_url, q.image_title, t.name as textbook_name, u.name as unit_name,
                            t.subject as textbook_subject, u.chapter_number
                     FROM social_studies_questions q
                     LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
@@ -3736,7 +3736,7 @@ def social_studies_edit_question(question_id):
                     cur.execute('''
                         SELECT q.id, q.subject, q.textbook_id, q.unit_id, q.question, q.correct_answer, 
                                q.acceptable_answers, q.answer_suffix, q.explanation, q.difficulty_level,
-                               q.image_name, q.image_url, t.name as textbook_name, u.name as unit_name
+                               q.image_name, q.image_url, q.image_title, t.name as textbook_name, u.name as unit_name
                         FROM social_studies_questions q
                         LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
                         LEFT JOIN social_studies_units u ON q.unit_id = u.id
@@ -3766,6 +3766,7 @@ def social_studies_edit_question(question_id):
             explanation = data.get('explanation', '').strip()
             difficulty_level = data.get('difficulty_level', 'basic')
             image_name = data.get('image_name', '').strip()
+            image_title = data.get('image_name', '').strip()  # image_nameをimage_titleとしても使用
             
             # バリデーション
             if not question_text or not correct_answer:
@@ -3783,12 +3784,12 @@ def social_studies_edit_question(question_id):
                         UPDATE social_studies_questions 
                         SET subject = %s, textbook_id = %s, unit_id = %s, question = %s, 
                             correct_answer = %s, acceptable_answers = %s, answer_suffix = %s,
-                            explanation = %s, difficulty_level = %s, image_name = %s, 
+                            explanation = %s, difficulty_level = %s, image_name = %s, image_title = %s,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
                     ''', (subject, textbook_id, unit_id, question_text, correct_answer, 
                           acceptable_answers, answer_suffix, explanation, difficulty_level, 
-                          image_name, question_id))
+                          image_name, image_title, question_id))
                     
                     # 画像名が指定されている場合、Wasabiから画像URLを取得して更新
                     if image_name and textbook_id:
