@@ -344,8 +344,13 @@ function checkImageExists() {
     previewDiv.style.display = 'block';
     
     fetch(`/social_studies/api/check_image?image_name=${encodeURIComponent(imageName)}&unit_id=${unitId}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('🔍 APIレスポンス:', response.status, response.statusText);
+            return response.json();
+        })
         .then(data => {
+            console.log('🔍 APIデータ:', data);
+            
             if (data.exists) {
                 statusSpan.innerHTML = `<i class="fas fa-check-circle text-success"></i> 画像が見つかりました`;
                 
@@ -356,6 +361,7 @@ function checkImageExists() {
                 img.alt = '画像プレビュー';
                 
                 img.onerror = function() {
+                    console.error('❌ 画像読み込みエラー:', data.image_url);
                     containerDiv.innerHTML = `
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle"></i> 
@@ -363,6 +369,10 @@ function checkImageExists() {
                             URL: ${data.image_url}
                         </div>
                     `;
+                };
+                
+                img.onload = function() {
+                    console.log('✅ 画像読み込み成功:', data.image_url);
                 };
                 
                 containerDiv.innerHTML = '';
