@@ -4858,25 +4858,27 @@ def social_studies_upload_questions_csv():
                                 app.logger.warning(f"行{row_num}: 画像URL取得エラー: {e}")
                         
                         # 重複チェック（同じ問題文と正解の組み合わせ）
-                    cur.execute('''
-                            SELECT id FROM social_studies_questions 
-                            WHERE question = %s AND correct_answer = %s
-                        ''', (question, correct_answer))
-                        
-                        if cur.fetchone():
-                            app.logger.warning(f"行{row_num}: 重複データ - question: '{question}', correct_answer: '{correct_answer}'")
+                        try:
+                            cur.execute('''
+                                SELECT id FROM social_studies_questions 
+                                WHERE question = %s AND correct_answer = %s
+                            ''', (question, correct_answer))
+                            if cur.fetchone():
+                                app.logger.warning(f"行{row_num}: 重複データ - question: '{question}', correct_answer: '{correct_answer}'")
+                                skipped_count += 1
+                                continue
+                            # 問題を登録
+                            cur.execute('''
+                                INSERT INTO social_studies_questions 
+                                (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url, image_title)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url, image_title))
+                            app.logger.info(f"行{row_num}: 問題を登録しました - subject: '{subject}', question: '{question}'")
+                            registered_count += 1
+                        except Exception as e:
+                            app.logger.error(f"行{row_num}処理エラー: {e}, データ: {row}")
                             skipped_count += 1
                             continue
-                        
-                        # 問題を登録
-                        cur.execute('''
-                            INSERT INTO social_studies_questions 
-                            (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url, image_title)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url, image_title))
-                        
-                        app.logger.info(f"行{row_num}: 問題を登録しました - subject: '{subject}', question: '{question}'")
-                        registered_count += 1
                         
                     except Exception as e:
                         app.logger.error(f"行{row_num}処理エラー: {e}, データ: {row}")
@@ -4944,15 +4946,15 @@ def social_studies_upload_image(question_id):
                     SET image_url = %s, updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
                 ''', (image_url, question_id))
-                    conn.commit()
-                    
+                conn.commit()
+                
         return jsonify({
             'success': True, 
             'message': '画像をアップロードしました',
             'image_url': image_url
         })
         
-        except Exception as e:
+    except Exception as e:
         app.logger.error(f"画像アップロードエラー: {e}")
         return jsonify({'error': f'画像アップロードに失敗しました: {str(e)}'}), 500
 
