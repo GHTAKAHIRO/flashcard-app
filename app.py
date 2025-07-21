@@ -4427,8 +4427,8 @@ def social_studies_upload_csv():
         imported_count = 0
         error_count = 0
         
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
                 for i, line in enumerate(data_lines, 2):
                     try:
                         # カンマで分割（ただし、ダブルクォート内のカンマは無視）
@@ -4507,11 +4507,11 @@ def social_studies_upload_csv():
                                 unit_id = None
                         
                         # 問題を挿入
-                    cur.execute('''
-                            INSERT INTO social_studies_questions 
-                            (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ''', (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level))
+                        cur.execute('''
+                                INSERT INTO social_studies_questions 
+                                (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ''', (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level))
                         
                         imported_count += 1
                         
@@ -4520,7 +4520,7 @@ def social_studies_upload_csv():
                         error_count += 1
                         continue
                 
-                    conn.commit()
+                conn.commit()
         
         if error_count > 0:
             return jsonify({
@@ -4534,7 +4534,7 @@ def social_studies_upload_csv():
                 'message': f'{imported_count}件の問題をインポートしました'
             })
             
-        except Exception as e:
+    except Exception as e:
         app.logger.error(f"CSVアップロードエラー: {e}")
         return jsonify({'error': 'CSVファイルの処理に失敗しました'}), 500
 
@@ -4628,7 +4628,7 @@ def social_studies_upload_units_csv():
                         
                         imported_count += 1
                         
-    except Exception as e:
+                    except Exception as e:
                         app.logger.error(f"行 {i} の処理エラー: {e}")
                         error_count += 1
                         continue
@@ -4700,8 +4700,8 @@ def social_studies_upload_questions_csv():
         
         app.logger.info(f"CSVアップロード開始: {len(csv_data)}行のデータ")
             
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
                 for row_num, row in enumerate(reader, 1):
                     app.logger.info(f"行{row_num}を処理中: {row}")
                     try:
@@ -5470,8 +5470,8 @@ def social_studies_upload_unit_questions_csv():
             return jsonify({'error': 'CSVファイルは最大1000行までです'}), 400
         
         # 教材と単元が存在するかチェック
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
                 cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
                 if not cur.fetchone():
                     return jsonify({'error': '指定された教材が見つかりません'}), 404
@@ -5557,8 +5557,8 @@ def social_studies_upload_unit_questions_csv():
                                 # 問題番号が存在しない場合は新規登録
                                 app.logger.info(f"行{row_num}: 問題番号{q_number}で新規問題を登録します - {question}")
                                 app.logger.info(f"行{row_num}: 保存する値 - image_url='{image_url}', image_title='{image_title}'")
-                    cur.execute('''
-                        INSERT INTO social_studies_questions 
+                                cur.execute('''
+                                    INSERT INTO social_studies_questions 
                                     (textbook_id, unit_id, question_number, question, correct_answer, acceptable_answers, 
                                      answer_suffix, explanation, difficulty_level, image_url, image_title)
                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -5753,10 +5753,10 @@ def update_unit_image_path(textbook_id, unit_id):
                                 new_question_image_url = f"{new_image_url}/{image_filename}"
                                 
                                 # 問題の画像URLを更新
-                                        cur.execute('''
-                                            UPDATE social_studies_questions 
-                                            SET image_url = %s 
-                                            WHERE id = %s
+                                cur.execute('''
+                                    UPDATE social_studies_questions 
+                                    SET image_url = %s 
+                                    WHERE id = %s
                                 ''', (new_question_image_url, question_id))
                                 updated_questions_count += 1
                 
@@ -5774,7 +5774,7 @@ def update_unit_image_path(textbook_id, unit_id):
             'updated_questions_count': updated_questions_count
         })
         
-                        except Exception as e:
+    except Exception as e:
         app.logger.error(f"画像URL更新エラー: {e}")
         return jsonify({'error': f'画像URLの更新に失敗しました: {str(e)}'}), 500
 
