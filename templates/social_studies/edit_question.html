@@ -366,10 +366,7 @@ function showCurrentImage() {
                 containerDiv.innerHTML = '';
                 containerDiv.appendChild(img);
             } else {
-                // 画像が見つからない場合は「なし」と表示
-                previewDiv.style.display = 'block';
-                
-                // ヘッダー部分も「なし」に変更
+                // 画像が見つからない場合はヘッダー部分のみ「なし」に変更し、プレビューエリアは非表示
                 const headerDiv = document.getElementById('current-image-header');
                 const titleSpan = document.getElementById('current-image-title');
                 if (headerDiv && titleSpan) {
@@ -377,9 +374,8 @@ function showCurrentImage() {
                     headerDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">なし</span>';
                 }
                 
-                statusDiv.className = 'alert alert-warning';
-                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">なし</span>';
-                containerDiv.innerHTML = '';
+                // プレビューエリアは非表示
+                previewDiv.style.display = 'none';
             }
         })
         .catch(error => {
