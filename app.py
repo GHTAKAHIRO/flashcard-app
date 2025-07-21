@@ -3883,17 +3883,7 @@ def social_studies_edit_question(question_id):
 
 # ========== 教材管理 ==========
 
-
-
-
-
-
-
-
-
-# ========== 単元管理 ==========
-
-# 単元管理ルートは削除 - 統一管理画面で代替
+# 教材管理ルートは削除 - 統一管理画面で代替
 
 @app.route('/social_studies/admin/add_unit/<int:textbook_id>', methods=['GET', 'POST'])
 @login_required
@@ -3913,8 +3903,8 @@ def social_studies_add_unit(textbook_id):
                 if not textbook:
                     flash('教材が見つかりません', 'error')
                     return redirect(url_for('social_studies_admin_unified'))
-                
-                if request.method == 'POST':
+    
+    if request.method == 'POST':
                     name = request.form['name']
                     chapter_number = request.form.get('chapter_number', '') or None
                     description = request.form.get('description', '')
@@ -4266,7 +4256,7 @@ def social_studies_add_textbook():
         except Exception as e:
             app.logger.error(f"教材追加エラー: {e}")
             flash('教材の追加に失敗しました', 'error')
-    
+        
     return render_template('social_studies/add_textbook.html')
 
 @app.route('/social_studies/admin/edit_textbook/<int:textbook_id>', methods=['GET', 'POST'])
@@ -4442,8 +4432,8 @@ def social_studies_upload_csv():
         imported_count = 0
         error_count = 0
         
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
                 for i, line in enumerate(data_lines, 2):
                     try:
                         # カンマで分割（ただし、ダブルクォート内のカンマは無視）
@@ -4522,7 +4512,7 @@ def social_studies_upload_csv():
                                 unit_id = None
                         
                         # 問題を挿入
-                        cur.execute('''
+                    cur.execute('''
                             INSERT INTO social_studies_questions 
                             (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level)
                             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -4535,7 +4525,7 @@ def social_studies_upload_csv():
                         error_count += 1
                         continue
                 
-                conn.commit()
+                    conn.commit()
         
         if error_count > 0:
             return jsonify({
@@ -4549,7 +4539,7 @@ def social_studies_upload_csv():
                 'message': f'{imported_count}件の問題をインポートしました'
             })
             
-    except Exception as e:
+        except Exception as e:
         app.logger.error(f"CSVアップロードエラー: {e}")
         return jsonify({'error': 'CSVファイルの処理に失敗しました'}), 500
 
@@ -4643,7 +4633,7 @@ def social_studies_upload_units_csv():
                         
                         imported_count += 1
                         
-                    except Exception as e:
+    except Exception as e:
                         app.logger.error(f"行 {i} の処理エラー: {e}")
                         error_count += 1
                         continue
@@ -4714,9 +4704,9 @@ def social_studies_upload_questions_csv():
         skipped_count = 0
         
         app.logger.info(f"CSVアップロード開始: {len(csv_data)}行のデータ")
-        
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
                 for row_num, row in enumerate(reader, 1):
                     app.logger.info(f"行{row_num}を処理中: {row}")
                     try:
@@ -4796,7 +4786,7 @@ def social_studies_upload_questions_csv():
                         unit_chapter = row.get('unit_chapter', '').strip()
                         
                         if unit_name and textbook_id:
-                            # 単元が存在するかチェック
+                    # 単元が存在するかチェック
                             cur.execute('SELECT id FROM social_studies_units WHERE name = %s AND textbook_id = %s', 
                                        (unit_name, textbook_id))
                             existing_unit = cur.fetchone()
@@ -4827,8 +4817,8 @@ def social_studies_upload_questions_csv():
                                 try:
                                     unit_id = int(csv_unit_id)
                                     # 単元IDが存在するかチェック
-                                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
-                                    if not cur.fetchone():
+                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                    if not cur.fetchone():
                                         unit_id = None
                                 except ValueError:
                                     unit_id = None
@@ -4868,7 +4858,7 @@ def social_studies_upload_questions_csv():
                                 app.logger.warning(f"行{row_num}: 画像URL取得エラー: {e}")
                         
                         # 重複チェック（同じ問題文と正解の組み合わせ）
-                        cur.execute('''
+                    cur.execute('''
                             SELECT id FROM social_studies_questions 
                             WHERE question = %s AND correct_answer = %s
                         ''', (question, correct_answer))
@@ -4952,17 +4942,17 @@ def social_studies_upload_image(question_id):
                 cur.execute('''
                     UPDATE social_studies_questions 
                     SET image_url = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
+                        WHERE id = %s
                 ''', (image_url, question_id))
-                conn.commit()
-        
+                    conn.commit()
+                    
         return jsonify({
             'success': True, 
             'message': '画像をアップロードしました',
             'image_url': image_url
         })
         
-    except Exception as e:
+        except Exception as e:
         app.logger.error(f"画像アップロードエラー: {e}")
         return jsonify({'error': f'画像アップロードに失敗しました: {str(e)}'}), 500
 
@@ -5011,12 +5001,12 @@ def social_studies_delete_image(question_id):
                     WHERE id = %s
                 ''', (question_id,))
                 conn.commit()
-        
+                
         return jsonify({
             'success': True, 
             'message': '画像を削除しました'
         })
-        
+                
     except Exception as e:
         app.logger.error(f"画像削除エラー: {e}")
         return jsonify({'error': f'画像削除に失敗しました: {str(e)}'}), 500
@@ -5262,7 +5252,7 @@ def download_questions_csv(textbook_id):
             SELECT u.name as unit_name, u.chapter_number, q.question, q.correct_answer, 
                    q.acceptable_answers, q.answer_suffix, q.explanation, q.difficulty_level, 
                    q.image_url, q.image_title, q.created_at
-            FROM social_studies_questions q
+                    FROM social_studies_questions q
             JOIN social_studies_units u ON q.unit_id = u.id
             WHERE q.textbook_id = %s
             ORDER BY u.chapter_number, q.question_number, q.id
@@ -5485,8 +5475,8 @@ def social_studies_upload_unit_questions_csv():
             return jsonify({'error': 'CSVファイルは最大1000行までです'}), 400
         
         # 教材と単元が存在するかチェック
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
                 cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
                 if not cur.fetchone():
                     return jsonify({'error': '指定された教材が見つかりません'}), 404
@@ -5572,8 +5562,8 @@ def social_studies_upload_unit_questions_csv():
                                 # 問題番号が存在しない場合は新規登録
                                 app.logger.info(f"行{row_num}: 問題番号{q_number}で新規問題を登録します - {question}")
                                 app.logger.info(f"行{row_num}: 保存する値 - image_url='{image_url}', image_title='{image_title}'")
-                                cur.execute('''
-                                    INSERT INTO social_studies_questions 
+                    cur.execute('''
+                        INSERT INTO social_studies_questions 
                                     (textbook_id, unit_id, question_number, question, correct_answer, acceptable_answers, 
                                      answer_suffix, explanation, difficulty_level, image_url, image_title)
                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -5768,10 +5758,10 @@ def update_unit_image_path(textbook_id, unit_id):
                                 new_question_image_url = f"{new_image_url}/{image_filename}"
                                 
                                 # 問題の画像URLを更新
-                                cur.execute('''
-                                    UPDATE social_studies_questions
-                                    SET image_url = %s
-                                    WHERE id = %s
+                                        cur.execute('''
+                                            UPDATE social_studies_questions 
+                                            SET image_url = %s 
+                                            WHERE id = %s
                                 ''', (new_question_image_url, question_id))
                                 updated_questions_count += 1
                 
@@ -5789,7 +5779,7 @@ def update_unit_image_path(textbook_id, unit_id):
             'updated_questions_count': updated_questions_count
         })
         
-    except Exception as e:
+                        except Exception as e:
         app.logger.error(f"画像URL更新エラー: {e}")
         return jsonify({'error': f'画像URLの更新に失敗しました: {str(e)}'}), 500
 
@@ -5832,7 +5822,7 @@ def admin_add_user():
                     INSERT INTO users (student_number, username, email, password_hash, is_admin, is_active, created_at)
                     VALUES (%s, %s, %s, %s, %s, %s, NOW())
                 ''', (student_number, username, email, password_hash, is_admin, True))
-                conn.commit()
+                    conn.commit()
         return jsonify({'success': True})
     except Exception as e:
         app.logger.error(f"ユーザー追加エラー: {e}")
@@ -5874,6 +5864,22 @@ def admin_upload_users_csv():
     except Exception as e:
         app.logger.error(f"CSVユーザー登録エラー: {e}")
         return jsonify({'error': f'CSVユーザー登録に失敗しました: {str(e)}'}), 500
+
+@app.route('/admin/users/csv_template')
+@login_required
+def admin_users_csv_template():
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['生徒番号', 'ユーザー名', '学年', 'メールアドレス', '管理者フラグ'])
+    writer.writerow(['10001', '山田太郎', '小4', 'taro@example.com', '0'])
+    writer.writerow(['10002', '佐藤花子', '中1', 'hanako@example.com', '1'])
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8-sig')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='user_template.csv'
+    )
 
 if __name__ == '__main__':
     # データベース接続プールを初期化

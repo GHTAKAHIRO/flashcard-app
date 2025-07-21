@@ -56,7 +56,7 @@
         <i class="fas fa-user-plus me-1"></i>新規ユーザー登録
     </button>
     <button class="btn btn-outline-primary me-2" onclick="exportUsers()">
-        <i class="fas fa-download me-1"></i>ユーザー一覧エクスポート
+        <i class="fas fa-download me-1"></i>エクスポート
     </button>
     <button class="btn btn-outline-info me-2" onclick="showCsvUserUploadModal()">
         <i class="fas fa-upload me-1"></i>CSV一括登録
@@ -73,6 +73,7 @@
                         <th>ID</th>
                         <th>生徒番号</th>
                         <th>ユーザー名</th>
+                        <th>学年</th>
                         <th>メールアドレス</th>
                         <th>登録日</th>
                         <th>最終ログイン</th>
@@ -91,6 +92,7 @@
                                 <span class="badge bg-danger">管理者</span>
                             {% endif %}
                         </td>
+                        <td>{{ user.grade or '-' }}</td>
                         <td>{{ user.email or '未設定' }}</td>
                         <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '不明' }}</td>
                         <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
@@ -157,6 +159,18 @@
                         <input type="text" class="form-control" id="username" name="username" required>
                     </div>
                     <div class="mb-3">
+                        <label for="grade" class="form-label">学年 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="grade" name="grade" required>
+                            <option value="">選択してください</option>
+                            <option value="小4">小4</option>
+                            <option value="小5">小5</option>
+                            <option value="小6">小6</option>
+                            <option value="中1">中1</option>
+                            <option value="中2">中2</option>
+                            <option value="中3">中3</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label for="email" class="form-label">メールアドレス</label>
                         <input type="email" class="form-control" id="email" name="email">
                     </div>
@@ -202,11 +216,16 @@
                         <input type="file" class="form-control" id="csv-user-file" name="csv_file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            CSV形式: 生徒番号,ユーザー名,メールアドレス,管理者フラグ（1=管理者,0=一般）<br>
+                            CSV形式: 生徒番号,ユーザー名,学年,メールアドレス,管理者フラグ（1=管理者,0=一般）<br>
                             <small class="text-muted">パスワードは自動的に「So-生徒番号」となります</small>
                         </div>
                     </div>
                 </form>
+                <div class="mb-2">
+                    <a href="{{ url_for('admin_users_csv_template') }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+                        <i class="fas fa-download me-1"></i>テンプレートダウンロード
+                    </a>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
@@ -280,14 +299,15 @@ function addUser() {
     const formData = {
         student_number: document.getElementById('student_number').value.trim(),
         username: document.getElementById('username').value.trim(),
+        grade: document.getElementById('grade').value,
         email: document.getElementById('email').value.trim(),
         password: document.getElementById('password').value,
         confirm_password: document.getElementById('confirm_password').value,
         is_admin: document.getElementById('is_admin').checked
     };
     
-    if (!formData.student_number || !formData.username || !formData.password) {
-        alert('生徒番号・ユーザー名・パスワードは必須です');
+    if (!formData.student_number || !formData.username || !formData.password || !formData.grade) {
+        alert('生徒番号・ユーザー名・学年・パスワードは必須です');
         return;
     }
     
