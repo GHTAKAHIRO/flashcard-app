@@ -5810,6 +5810,71 @@ def admin_users():
         new_users_this_month=new_users_this_month
     )
 
+@app.route('/admin/users/add', methods=['POST'])
+@login_required
+def admin_add_user():
+    data = request.get_json()
+    student_number = data.get('student_number')
+    username = data.get('username')
+    email = data.get('email')
+    is_admin = data.get('is_admin', False)
+    password = data.get('password')
+    # パスワードは「So-生徒番号」
+    if not student_number or not username or not password:
+        return jsonify({'error': '生徒番号・ユーザー名・パスワードは必須です'}), 400
+    if password != f'So-{student_number}':
+        return jsonify({'error': 'パスワードは「So-生徒番号」にしてください'}), 400
+    password_hash = generate_password_hash(password)
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    INSERT INTO users (student_number, username, email, password_hash, is_admin, is_active, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                ''', (student_number, username, email, password_hash, is_admin, True))
+                conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"ユーザー追加エラー: {e}")
+        return jsonify({'error': f'ユーザー追加に失敗しました: {str(e)}'}), 500
+
+@app.route('/admin/users/upload_csv', methods=['POST'])
+@login_required
+def admin_upload_users_csv():
+    if 'csv_file' not in request.files:
+        return jsonify({'error': 'CSVファイルがありません'}), 400
+    file = request.files['csv_file']
+    if not file.filename.endswith('.csv'):
+        return jsonify({'error': 'CSVファイルをアップロードしてください'}), 400
+    try:
+        file.stream.seek(0)
+        csv_reader = csv.reader((line.decode('utf-8') for line in file), delimiter=',')
+        count = 0
+        for row in csv_reader:
+            if not row or row[0].startswith('#'):
+                continue
+            # CSV: 生徒番号,ユーザー名,メールアドレス,管理者フラグ
+            student_number = row[0].strip()
+            username = row[1].strip() if len(row) > 1 else ''
+            email = row[2].strip() if len(row) > 2 else ''
+            is_admin = row[3].strip() == '1' if len(row) > 3 else False
+            password = f'So-{student_number}'
+            password_hash = generate_password_hash(password)
+            if not student_number or not username:
+                continue
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute('''
+                        INSERT INTO users (student_number, username, email, password_hash, is_admin, is_active, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                    ''', (student_number, username, email, password_hash, is_admin, True))
+                    conn.commit()
+                    count += 1
+        return jsonify({'success': True, 'message': f'{count}件のユーザーを登録しました'})
+    except Exception as e:
+        app.logger.error(f"CSVユーザー登録エラー: {e}")
+        return jsonify({'error': f'CSVユーザー登録に失敗しました: {str(e)}'}), 500
+
 if __name__ == '__main__':
     # データベース接続プールを初期化
     try:

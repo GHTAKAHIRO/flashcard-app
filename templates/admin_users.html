@@ -58,6 +58,9 @@
     <button class="btn btn-outline-primary me-2" onclick="exportUsers()">
         <i class="fas fa-download me-1"></i>ユーザー一覧エクスポート
     </button>
+    <button class="btn btn-outline-info me-2" onclick="showCsvUserUploadModal()">
+        <i class="fas fa-upload me-1"></i>CSV一括登録
+    </button>
 </div>
 
 <!-- ユーザー一覧テーブル -->
@@ -68,6 +71,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>ID</th>
+                        <th>生徒番号</th>
                         <th>ユーザー名</th>
                         <th>メールアドレス</th>
                         <th>登録日</th>
@@ -80,6 +84,7 @@
                     {% for user in users %}
                     <tr>
                         <td>{{ user.id }}</td>
+                        <td>{{ user.student_number or '-' }}</td>
                         <td>
                             <div class="fw-bold">{{ user.username }}</div>
                             {% if user.is_admin %}
@@ -144,6 +149,10 @@
             <div class="modal-body">
                 <form id="addUserForm">
                     <div class="mb-3">
+                        <label for="student_number" class="form-label">生徒番号 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="student_number" name="student_number" required oninput="autoSetPassword()">
+                    </div>
+                    <div class="mb-3">
                         <label for="username" class="form-label">ユーザー名 <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="username" name="username" required>
                     </div>
@@ -153,11 +162,12 @@
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">パスワード <span class="text-danger">*</span></label>
-                        <input type="password" class="form-control" id="password" name="password" required>
+                        <input type="password" class="form-control" id="password" name="password" required readonly>
+                        <div class="form-text">パスワードは「So-生徒番号」となります</div>
                     </div>
                     <div class="mb-3">
                         <label for="confirm_password" class="form-label">パスワード確認 <span class="text-danger">*</span></label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required readonly>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">
@@ -172,6 +182,35 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
                 <button type="button" class="btn btn-primary" onclick="addUser()">登録</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CSV一括登録モーダル -->
+<div class="modal fade" id="csvUserUploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">CSV一括ユーザー登録</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="csvUserUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csv-user-file" class="form-label">CSVファイル</label>
+                        <input type="file" class="form-control" id="csv-user-file" name="csv_file" accept=".csv" required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            CSV形式: 生徒番号,ユーザー名,メールアドレス,管理者フラグ（1=管理者,0=一般）<br>
+                            <small class="text-muted">パスワードは自動的に「So-生徒番号」となります</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="uploadCsvUsers()">アップロード</button>
             </div>
         </div>
     </div>
@@ -224,12 +263,22 @@ let currentEditUserId = null;
 
 function showAddUserModal() {
     document.getElementById('addUserForm').reset();
+    document.getElementById('password').value = '';
+    document.getElementById('confirm_password').value = '';
     const modal = new bootstrap.Modal(document.getElementById('addUserModal'));
     modal.show();
 }
 
+function autoSetPassword() {
+    const studentNumber = document.getElementById('student_number').value.trim();
+    const pw = studentNumber ? `So-${studentNumber}` : '';
+    document.getElementById('password').value = pw;
+    document.getElementById('confirm_password').value = pw;
+}
+
 function addUser() {
     const formData = {
+        student_number: document.getElementById('student_number').value.trim(),
         username: document.getElementById('username').value.trim(),
         email: document.getElementById('email').value.trim(),
         password: document.getElementById('password').value,
@@ -237,8 +286,8 @@ function addUser() {
         is_admin: document.getElementById('is_admin').checked
     };
     
-    if (!formData.username || !formData.password) {
-        alert('ユーザー名とパスワードは必須です');
+    if (!formData.student_number || !formData.username || !formData.password) {
+        alert('生徒番号・ユーザー名・パスワードは必須です');
         return;
     }
     
@@ -266,6 +315,39 @@ function addUser() {
     .catch(error => {
         console.error('ユーザー登録エラー:', error);
         alert('ユーザーの登録に失敗しました');
+    });
+}
+
+function showCsvUserUploadModal() {
+    document.getElementById('csvUserUploadForm').reset();
+    const modal = new bootstrap.Modal(document.getElementById('csvUserUploadModal'));
+    modal.show();
+}
+
+function uploadCsvUsers() {
+    const formData = new FormData();
+    const fileInput = document.getElementById('csv-user-file');
+    if (!fileInput.files[0]) {
+        alert('CSVファイルを選択してください');
+        return;
+    }
+    formData.append('csv_file', fileInput.files[0]);
+    fetch('/admin/users/upload_csv', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラー: ' + data.error);
+        } else {
+            alert('CSVアップロードが完了しました。' + data.message);
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('CSVアップロードエラー:', error);
+        alert('CSVアップロードに失敗しました');
     });
 }
 
