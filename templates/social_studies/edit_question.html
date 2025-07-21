@@ -376,8 +376,11 @@ function showCurrentImage() {
                 containerDiv.innerHTML = '';
                 containerDiv.appendChild(img);
             } else {
-                // 画像が見つからない場合は何も表示しない（プレビューエリアは非表示のまま）
-                previewDiv.style.display = 'none';
+                // 画像が見つからない場合は「なし」と表示
+                previewDiv.style.display = 'block';
+                statusDiv.className = 'alert alert-warning';
+                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">なし</span>';
+                containerDiv.innerHTML = '';
             }
         })
         .catch(error => {
