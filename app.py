@@ -3892,24 +3892,29 @@ def social_studies_add_unit(textbook_id):
     if not current_user.is_admin:
         flash("管理者権限が必要です")
         return redirect(url_for('admin'))
+    
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 教材情報を取得
                 cur.execute('SELECT * FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
                 textbook = cur.fetchone()
+                
                 if not textbook:
                     flash('教材が見つかりません', 'error')
                     return redirect(url_for('social_studies_admin_unified'))
+                
                 if request.method == 'POST':
                     name = request.form['name']
                     chapter_number = request.form.get('chapter_number', '') or None
                     description = request.form.get('description', '')
+                    
                     # 章番号が指定されていない場合、自動的に次の番号を割り当て
                     if not chapter_number:
                         cur.execute('SELECT MAX(chapter_number) as max_num FROM social_studies_units WHERE textbook_id = %s', (textbook_id,))
                         result = cur.fetchone()
                         chapter_number = (result['max_num'] or 0) + 1
+                    
                     cur.execute('''
                         INSERT INTO social_studies_units (textbook_id, name, chapter_number, description)
                         VALUES (%s, %s, %s, %s)
@@ -3917,8 +3922,8 @@ def social_studies_add_unit(textbook_id):
                     conn.commit()
                     flash('単元が追加されました', 'success')
                     return redirect(url_for('social_studies_admin_textbook_unified', textbook_id=textbook_id))
-                else:
-                    return render_template('social_studies/add_unit.html', textbook=textbook)
+                
+                return render_template('social_studies/add_unit.html', textbook=textbook)
     except Exception as e:
         app.logger.error(f"単元追加エラー: {e}")
         flash('単元の追加に失敗しました', 'error')
@@ -4812,8 +4817,8 @@ def social_studies_upload_questions_csv():
                                 try:
                                     unit_id = int(csv_unit_id)
                                     # 単元IDが存在するかチェック
-                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
-                    if not cur.fetchone():
+                                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                                    if not cur.fetchone():
                                         unit_id = None
                                 except ValueError:
                                     unit_id = None
@@ -5817,7 +5822,7 @@ def admin_add_user():
                     INSERT INTO users (student_number, username, email, password_hash, is_admin, is_active, created_at)
                     VALUES (%s, %s, %s, %s, %s, %s, NOW())
                 ''', (student_number, username, email, password_hash, is_admin, True))
-                    conn.commit()
+                conn.commit()
         return jsonify({'success': True})
     except Exception as e:
         app.logger.error(f"ユーザー追加エラー: {e}")
