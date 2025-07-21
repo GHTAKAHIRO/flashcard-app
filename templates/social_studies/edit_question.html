@@ -158,7 +158,7 @@
                                 <span class="badge bg-primary">{{ question.image_title }}</span>
                             </div>
                             <!-- 現在の画像プレビュー -->
-                            <div id="current-image-preview" class="text-center mt-2">
+                            <div id="current-image-preview" class="text-center mt-2" style="display: none;">
                                 <div id="current-image-status" class="alert alert-success">
                                     <i class="fas fa-check-circle me-1"></i>
                                     <strong>現在の画像:</strong>
@@ -346,7 +346,8 @@ function showCurrentImage() {
         .then(response => response.json())
         .then(data => {
             if (data.exists) {
-                // 画像が見つかった場合
+                // 画像が見つかった場合のみプレビューエリアを表示
+                previewDiv.style.display = 'block';
                 statusDiv.className = 'alert alert-success';
                 statusDiv.innerHTML = '<i class="fas fa-check-circle me-1"></i><strong>現在の画像:</strong>';
                 
@@ -375,10 +376,8 @@ function showCurrentImage() {
                 containerDiv.innerHTML = '';
                 containerDiv.appendChild(img);
             } else {
-                // 画像が見つからない場合は「なし」と表示
-                statusDiv.className = 'alert alert-warning';
-                statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">なし</span>';
-                containerDiv.innerHTML = '';
+                // 画像が見つからない場合は何も表示しない（プレビューエリアは非表示のまま）
+                previewDiv.style.display = 'none';
             }
         })
         .catch(error => {
