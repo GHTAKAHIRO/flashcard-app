@@ -36,7 +36,7 @@
                                 <i class="fas fa-list-ol me-1"></i>単元・章
                             </label>
                             <input type="text" class="form-control" value="{{ unit_info.name if unit_info else '未設定' }}{% if unit_info and unit_info.chapter_number %} (第{{ unit_info.chapter_number }}章){% endif %}" readonly>
-                            <input type="hidden" name="unit_id" value="{{ question.unit_id or '' }}">
+                            <input type="hidden" id="unit_id" name="unit_id" value="{{ question.unit_id or '' }}">
                         </div>
                     {% else %}
                         <!-- 通常の選択形式 -->
