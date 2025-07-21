@@ -150,12 +150,11 @@
                         </div>
                         
                         <!-- 既存の画像表示 -->
-                        {% if question.image_title %}
                         <div class="mt-2">
-                            <div class="alert alert-info">
+                            <div id="current-image-header" class="alert alert-info">
                                 <i class="fas fa-image me-1"></i>
                                 <strong>現在の画像:</strong> 
-                                <span class="badge bg-primary">{{ question.image_title }}</span>
+                                <span id="current-image-title" class="badge bg-primary">{{ question.image_title or 'なし' }}</span>
                             </div>
                             <!-- 現在の画像プレビュー -->
                             <div id="current-image-preview" class="text-center mt-2" style="display: none;">
@@ -170,15 +169,6 @@
                                 </div>
                             </div>
                         </div>
-                        {% else %}
-                        <div class="mt-2">
-                            <div class="alert alert-warning">
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                <strong>現在の画像:</strong> 
-                                <span class="badge bg-secondary">なし</span>
-                            </div>
-                        </div>
-                        {% endif %}
                         
                         <!-- 画像プレビューセクション -->
                         <div id="image-preview" class="mt-2" style="display: none;">
@@ -219,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updatePreview();
     
     // 現在の画像がある場合は自動的に表示
-    {% if question.image_title %}
+    {% if question.image_title and question.image_title != 'なし' %}
     showCurrentImage();
     {% endif %}
     
@@ -378,6 +368,15 @@ function showCurrentImage() {
             } else {
                 // 画像が見つからない場合は「なし」と表示
                 previewDiv.style.display = 'block';
+                
+                // ヘッダー部分も「なし」に変更
+                const headerDiv = document.getElementById('current-image-header');
+                const titleSpan = document.getElementById('current-image-title');
+                if (headerDiv && titleSpan) {
+                    headerDiv.className = 'alert alert-warning';
+                    headerDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">なし</span>';
+                }
+                
                 statusDiv.className = 'alert alert-warning';
                 statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i><strong>現在の画像:</strong> <span class="badge bg-secondary">なし</span>';
                 containerDiv.innerHTML = '';
