@@ -340,6 +340,40 @@ def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
         print(f"❌ 例外タイプ: {type(e).__name__}")
         return None, f"画像アップロードエラー: {str(e)}"
 
+def set_image_public_access(image_url):
+    """既存の画像ファイルに公開アクセス権限を設定"""
+    try:
+        s3_client = init_wasabi_client()
+        if not s3_client:
+            print("❌ Wasabiクライアント初期化失敗")
+            return False, "Wasabi設定が不完全です"
+        
+        # URLからファイルパスを抽出
+        endpoint = os.getenv('WASABI_ENDPOINT')
+        bucket_name = os.getenv('WASABI_BUCKET')
+        
+        if endpoint.endswith('/'):
+            endpoint = endpoint[:-1]
+        
+        # URLからファイルパスを抽出
+        file_path = image_url.replace(f"{endpoint}/{bucket_name}/", "")
+        
+        print(f"🔍 画像公開アクセス設定: {file_path}")
+        
+        # 公開アクセス権限を設定
+        s3_client.put_object_acl(
+            Bucket=bucket_name,
+            Key=file_path,
+            ACL='public-read'
+        )
+        
+        print(f"✅ 画像公開アクセス設定完了: {file_path}")
+        return True, None
+        
+    except Exception as e:
+        print(f"❌ 画像公開アクセス設定エラー: {e}")
+        return False, f"画像公開アクセス設定エラー: {str(e)}"
+
 # DB接続情報
 DB_HOST = os.getenv('DB_HOST')
 DB_PORT = os.getenv('DB_PORT')
@@ -4136,6 +4170,17 @@ def social_studies_api_check_image():
         
         if found_image:
             app.logger.info(f"✅ 画像確認成功: {found_image}")
+            
+            # 画像の公開アクセス権限を確認・設定
+            try:
+                success, error = set_image_public_access(found_image)
+                if success:
+                    app.logger.info(f"✅ 画像公開アクセス設定完了: {found_image}")
+                else:
+                    app.logger.warning(f"⚠️ 画像公開アクセス設定失敗: {error}")
+            except Exception as e:
+                app.logger.warning(f"⚠️ 画像公開アクセス設定エラー: {e}")
+            
             return jsonify({
                 'exists': True,
                 'image_url': found_image,
@@ -4153,6 +4198,42 @@ def social_studies_api_check_image():
     except Exception as e:
         app.logger.error(f"❌ 画像確認エラー: {e}")
         return jsonify({'exists': False, 'error': f'画像確認に失敗しました: {str(e)}'}), 500
+
+@app.route('/social_studies/api/set_image_public/<int:question_id>', methods=['POST'])
+@login_required
+def social_studies_api_set_image_public(question_id):
+    """問題の画像に公開アクセス権限を設定（管理者のみ）"""
+    if not current_user.is_admin:
+        return jsonify({'error': '管理者権限が必要です'}), 403
+    
+    try:
+        # 問題の画像URLを取得
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+            cur.execute('SELECT image_url FROM social_studies_questions WHERE id = %s', (question_id,))
+            result = cur.fetchone()
+            if not result or not result[0]:
+                return jsonify({'error': 'この問題には画像が設定されていません'}), 404
+            
+            image_url = result[0]
+        
+        # 公開アクセス権限を設定
+        success, error = set_image_public_access(image_url)
+        
+        if success:
+            app.logger.info(f"✅ 問題ID {question_id} の画像公開アクセス設定完了: {image_url}")
+            return jsonify({
+                'success': True,
+                'message': '画像の公開アクセス権限を設定しました',
+                'image_url': image_url
+            })
+        else:
+            app.logger.error(f"❌ 問題ID {question_id} の画像公開アクセス設定失敗: {error}")
+            return jsonify({'error': f'画像の公開アクセス権限設定に失敗しました: {error}'}), 500
+            
+    except Exception as e:
+        app.logger.error(f"❌ 画像公開アクセス設定エラー: {e}")
+        return jsonify({'error': f'画像公開アクセス設定に失敗しました: {str(e)}'}), 500
 
 # ========== 教材管理 ==========
 
