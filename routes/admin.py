@@ -49,7 +49,7 @@ def admin_users():
             with get_db_cursor(conn) as cur:
                 # 実際のデータベースからユーザーを取得
                 cur.execute('''
-                    SELECT id, username, email, role, full_name, created_at, last_login
+                    SELECT id, username, email, is_admin, full_name, created_at, last_login
                     FROM users 
                     ORDER BY created_at DESC
                 ''')
@@ -61,7 +61,7 @@ def admin_users():
                         'id': user_data[0],
                         'username': user_data[1],
                         'email': user_data[2],
-                        'role': user_data[3],
+                        'role': 'admin' if user_data[3] else 'user',
                         'full_name': user_data[4],
                         'created_at': user_data[5],
                         'last_login': user_data[6]
@@ -99,11 +99,12 @@ def admin_add_user():
                 # 新しいユーザーを追加
                 from werkzeug.security import generate_password_hash
                 hashed_password = generate_password_hash(password)
+                is_admin = (role == 'admin')
                 
                 cur.execute('''
-                    INSERT INTO users (username, email, password_hash, role, full_name, created_at)
+                    INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
                     VALUES (?, ?, ?, ?, ?, datetime('now'))
-                ''', (username, email, hashed_password, role, username))
+                ''', (username, email, hashed_password, is_admin, username))
                 
                 conn.commit()
                 flash('ユーザーが正常に追加されました', 'success')
@@ -162,11 +163,12 @@ def admin_upload_users_csv():
                         # ユーザー追加
                         from werkzeug.security import generate_password_hash
                         hashed_password = generate_password_hash(password)
+                        is_admin = (role == 'admin')
                         
                         cur.execute('''
-                            INSERT INTO users (username, email, password_hash, role, full_name, created_at)
+                            INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
                             VALUES (?, ?, ?, ?, ?, datetime('now'))
-                        ''', (username, email, hashed_password, role, full_name))
+                        ''', (username, email, hashed_password, is_admin, full_name))
                         
                         success_count += 1
                         
