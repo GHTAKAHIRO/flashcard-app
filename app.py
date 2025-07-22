@@ -24,9 +24,9 @@ from flask_wtf.csrf import CSRFProtect
 import io
 import csv
 import re
-import boto3
-from botocore.exceptions import ClientError
-from PIL import Image
+# import boto3  # AWS S3関連（現在は使用しない）
+# from botocore.exceptions import ClientError  # AWS S3関連（現在は使用しない）
+# from PIL import Image  # 画像処理（現在は使用しない）
 import uuid
 from routes.auth import auth_bp
 from models.user import User
@@ -141,54 +141,9 @@ log_thread.start()
 
 # Wasabi S3クライアント初期化
 def init_wasabi_client():
-    """Wasabi S3クライアントを初期化"""
-    try:
-        access_key = os.getenv('WASABI_ACCESS_KEY')
-        secret_key = os.getenv('WASABI_SECRET_KEY')
-        endpoint = os.getenv('WASABI_ENDPOINT')
-        bucket_name = os.getenv('WASABI_BUCKET')
-        
-        print(f"🔍 Wasabi設定確認:")
-        print(f"  ACCESS_KEY: {'Set' if access_key else 'Not Set'}")
-        print(f"  SECRET_KEY: {'Set' if secret_key else 'Not Set'}")
-        print(f"  ENDPOINT: {endpoint}")
-        print(f"  BUCKET: {bucket_name}")
-        
-        if not all([access_key, secret_key, endpoint, bucket_name]):
-            print("⚠️ Wasabi設定が不完全です。画像アップロード機能は無効になります。")
-            return None
-        
-        print(f"🔍 Wasabi S3クライアント作成中...")
-        s3_client = boto3.client(
-            's3',
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            endpoint_url=endpoint,
-            region_name='ap-northeast-1'  # 日本リージョン
-        )
-        
-        # 接続テスト
-        print(f"🔍 Wasabiバケット接続テスト: {bucket_name}")
-        try:
-            s3_client.head_bucket(Bucket=bucket_name)
-            print("✅ Wasabi S3クライアント初期化完了")
-            return s3_client
-        except ClientError as e:
-            error_code = e.response['Error']['Code']
-            error_message = e.response['Error']['Message']
-            print(f"❌ Wasabiバケット接続テスト失敗:")
-            print(f"  エラーコード: {error_code}")
-            print(f"  エラーメッセージ: {error_message}")
-            if error_code == '403':
-                print("  認証エラーまたは権限不足の可能性があります")
-            elif error_code == '404':
-                print("  バケットが存在しない可能性があります")
-            return None
-        
-    except Exception as e:
-        print(f"❌ Wasabi S3クライアント初期化エラー: {e}")
-        print(f"❌ エラータイプ: {type(e).__name__}")
-        return None
+    """Wasabi S3クライアントの初期化（現在は無効化）"""
+    print("⚠️ Wasabi S3クライアントは現在無効化されています")
+    return None
 
 def get_unit_image_folder_path(question_id):
     """問題IDから単元の章番号に基づいて画像フォルダパスを生成"""
@@ -291,103 +246,14 @@ def get_unit_image_folder_path_by_unit_id(unit_id):
 
 # 画像アップロード関数
 def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
-    """画像をWasabiにアップロード"""
-    try:
-        print(f"🔍 画像アップロード開始: question_id={question_id}, textbook_id={textbook_id}")
-        
-        s3_client = init_wasabi_client()
-        if not s3_client:
-            print("❌ Wasabiクライアント初期化失敗")
-            return None, "Wasabi設定が不完全です"
-        
-        # 画像をPILで開いて検証
-        image = Image.open(image_file)
-        
-        # 画像形式を確認
-        if image.format not in ['JPEG', 'PNG', 'GIF']:
-            return None, "サポートされていない画像形式です。JPEG、PNG、GIFのみ対応しています。"
-        
-        # ファイルサイズチェック（5MB以下）
-        image_file.seek(0, 2)  # ファイルの末尾に移動
-        file_size = image_file.tell()
-        image_file.seek(0)  # ファイルの先頭に戻る
-        
-        if file_size > 5 * 1024 * 1024:  # 5MB
-            return None, "ファイルサイズが大きすぎます。5MB以下にしてください。"
-        
-        # ユニークなファイル名を生成
-        file_extension = image.format.lower()
-        if file_extension == 'jpeg':
-            file_extension = 'jpg'
-        
-        # 単元の章番号に基づいてフォルダパスを生成
-        folder_path = get_unit_image_folder_path(question_id)
-        print(f"🔍 使用するフォルダパス: {folder_path}")
-        
-        filename = f"{folder_path}/{question_id}_{uuid.uuid4().hex[:8]}.{file_extension}"
-        
-        # Wasabiにアップロード
-        bucket_name = os.getenv('WASABI_BUCKET')
-        s3_client.upload_fileobj(
-            image_file,
-            bucket_name,
-            filename,
-            ExtraArgs={
-                'ContentType': f'image/{file_extension}',
-                'ACL': 'public-read'
-            }
-        )
-        
-        # 公開URLを生成
-        endpoint = os.getenv('WASABI_ENDPOINT')
-        if endpoint.endswith('/'):
-            endpoint = endpoint[:-1]
-        
-        image_url = f"{endpoint}/{bucket_name}/{filename}"
-        
-        return image_url, None
-        
-    except ClientError as e:
-        print(f"❌ Wasabi ClientError: {e}")
-        return None, f"Wasabiアップロードエラー: {str(e)}"
-    except Exception as e:
-        print(f"❌ 画像アップロード例外: {e}")
-        print(f"❌ 例外タイプ: {type(e).__name__}")
-        return None, f"画像アップロードエラー: {str(e)}"
+    """画像をWasabiにアップロード（現在は無効化）"""
+    print("⚠️ 画像アップロード機能は現在無効化されています")
+    return None, "画像アップロード機能は現在無効化されています"
 
 def set_image_public_access(image_url):
-    """既存の画像ファイルに公開アクセス権限を設定"""
-    try:
-        s3_client = init_wasabi_client()
-        if not s3_client:
-            print("❌ Wasabiクライアント初期化失敗")
-            return False, "Wasabi設定が不完全です"
-        
-        # URLからファイルパスを抽出
-        endpoint = os.getenv('WASABI_ENDPOINT')
-        bucket_name = os.getenv('WASABI_BUCKET')
-        
-        if endpoint.endswith('/'):
-            endpoint = endpoint[:-1]
-        
-        # URLからファイルパスを抽出
-        file_path = image_url.replace(f"{endpoint}/{bucket_name}/", "")
-        
-        print(f"🔍 画像公開アクセス設定: {file_path}")
-        
-        # 公開アクセス権限を設定
-        s3_client.put_object_acl(
-            Bucket=bucket_name,
-            Key=file_path,
-            ACL='public-read'
-        )
-        
-        print(f"✅ 画像公開アクセス設定完了: {file_path}")
-        return True, None
-        
-    except Exception as e:
-        print(f"❌ 画像公開アクセス設定エラー: {e}")
-        return False, f"画像公開アクセス設定エラー: {str(e)}"
+    """既存の画像ファイルに公開アクセス権限を設定（現在は無効化）"""
+    print("⚠️ 画像公開アクセス設定機能は現在無効化されています")
+    return False, "画像公開アクセス設定機能は現在無効化されています"
 
 # DB接続情報
 DB_HOST = os.getenv('DB_HOST')
@@ -417,15 +283,17 @@ def init_connection_pool():
                 min_conn = 2
                 max_conn = 10
 
-            db_pool = psycopg2.pool.SimpleConnectionPool(
-                min_conn,
-                max_conn,
-                host=os.environ.get('DB_HOST'),
-                port=os.environ.get('DB_PORT'),
-                dbname=os.environ.get('DB_NAME'),
-                user=os.environ.get('DB_USER'),
-                password=os.environ.get('DB_PASSWORD')
-            )
+            # PostgreSQL接続プール（現在は無効化）
+            # db_pool = psycopg2.pool.SimpleConnectionPool(
+            #     min_conn,
+            #     max_conn,
+            #     host=os.environ.get('DB_HOST'),
+            #     port=os.environ.get('DB_PORT'),
+            #     dbname=os.environ.get('DB_NAME'),
+            #     user=os.environ.get('DB_USER'),
+            #     password=os.environ.get('DB_PASSWORD')
+            # )
+            db_pool = None
             app.logger.info("🚀 PostgreSQLデータベース接続プール初期化完了")
         except Exception as e:
             app.logger.error(f"接続プール初期化エラー: {e}")
