@@ -26,7 +26,7 @@
             <div class="card-body">
                 <i class="fas fa-users fa-2x text-primary mb-2"></i>
                 <h6 class="card-title">総ユーザー数</h6>
-                <p class="card-text h4">{{ total_users }}</p>
+                <p class="card-text h4">{{ users|length }}</p>
             </div>
         </div>
     </div>
@@ -34,8 +34,8 @@
         <div class="card text-center">
             <div class="card-body">
                 <i class="fas fa-user-check fa-2x text-success mb-2"></i>
-                <h6 class="card-title">アクティブユーザー</h6>
-                <p class="card-text h4">{{ active_users }}</p>
+                <h6 class="card-title">管理者数</h6>
+                <p class="card-text h4">{{ users|selectattr('role', 'equalto', 'admin')|list|length }}</p>
             </div>
         </div>
     </div>
@@ -43,8 +43,8 @@
         <div class="card text-center">
             <div class="card-body">
                 <i class="fas fa-user-plus fa-2x text-info mb-2"></i>
-                <h6 class="card-title">今月の新規登録</h6>
-                <p class="card-text h4">{{ new_users_this_month }}</p>
+                <h6 class="card-title">一般ユーザー数</h6>
+                <p class="card-text h4">{{ users|selectattr('role', 'equalto', 'user')|list|length }}</p>
             </div>
         </div>
     </div>
@@ -71,13 +71,11 @@
                 <thead class="table-light">
                     <tr>
                         <th>ID</th>
-                        <th>生徒番号</th>
                         <th>ユーザー名</th>
-                        <th>学年</th>
                         <th>メールアドレス</th>
+                        <th>役割</th>
                         <th>登録日</th>
                         <th>最終ログイン</th>
-                        <th>ステータス</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -85,38 +83,27 @@
                     {% for user in users %}
                     <tr>
                         <td>{{ user.id }}</td>
-                        <td>{{ user.student_number or '-' }}</td>
                         <td>
                             <div class="fw-bold">{{ user.username }}</div>
-                            {% if user.is_admin %}
+                            {% if user.role == 'admin' %}
                                 <span class="badge bg-danger">管理者</span>
                             {% endif %}
                         </td>
-                        <td>{{ user.grade or '-' }}</td>
                         <td>{{ user.email or '未設定' }}</td>
-                        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '不明' }}</td>
-                        <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
                         <td>
-                            {% if user.is_active %}
-                                <span class="badge bg-success">アクティブ</span>
+                            {% if user.role == 'admin' %}
+                                <span class="badge bg-danger">管理者</span>
                             {% else %}
-                                <span class="badge bg-secondary">非アクティブ</span>
+                                <span class="badge bg-primary">一般ユーザー</span>
                             {% endif %}
                         </td>
+                        <td>{{ user.created_at or '不明' }}</td>
+                        <td>{{ user.last_login or '未ログイン' }}</td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
                                 <button class="btn btn-outline-primary" onclick="editUser({{ user.id }})" title="編集">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                {% if user.is_active %}
-                                    <button class="btn btn-outline-warning" onclick="toggleUserStatus({{ user.id }}, false)" title="無効化">
-                                        <i class="fas fa-ban"></i>
-                                    </button>
-                                {% else %}
-                                    <button class="btn btn-outline-success" onclick="toggleUserStatus({{ user.id }}, true)" title="有効化">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                {% endif %}
                                 <button class="btn btn-outline-danger" onclick="deleteUser({{ user.id }})" title="削除">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -151,45 +138,27 @@
             <div class="modal-body">
                 <form id="addUserForm">
                     <div class="mb-3">
-                        <label for="student_number" class="form-label">生徒番号 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="student_number" name="student_number" required oninput="autoSetPassword()">
-                    </div>
-                    <div class="mb-3">
                         <label for="username" class="form-label">ユーザー名 <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="username" name="username" required>
                     </div>
                     <div class="mb-3">
-                        <label for="grade" class="form-label">学年 <span class="text-danger">*</span></label>
-                        <select class="form-select" id="grade" name="grade" required>
-                            <option value="">選択してください</option>
-                            <option value="小4">小4</option>
-                            <option value="小5">小5</option>
-                            <option value="小6">小6</option>
-                            <option value="中1">中1</option>
-                            <option value="中2">中2</option>
-                            <option value="中3">中3</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="email" class="form-label">メールアドレス</label>
-                        <input type="email" class="form-control" id="email" name="email">
+                        <label for="email" class="form-label">メールアドレス <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" id="email" name="email" required>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">パスワード <span class="text-danger">*</span></label>
-                        <input type="password" class="form-control" id="password" name="password" required readonly>
-                        <div class="form-text">パスワードは「So-生徒番号」となります</div>
+                        <input type="password" class="form-control" id="password" name="password" required>
                     </div>
                     <div class="mb-3">
                         <label for="confirm_password" class="form-label">パスワード確認 <span class="text-danger">*</span></label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required readonly>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
                     </div>
                     <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin">
-                            <label class="form-check-label" for="is_admin">
-                                管理者権限を付与する
-                            </label>
-                        </div>
+                        <label for="role" class="form-label">役割</label>
+                        <select class="form-select" id="role" name="role">
+                            <option value="user">一般ユーザー</option>
+                            <option value="admin">管理者</option>
+                        </select>
                     </div>
                 </form>
             </div>
@@ -288,26 +257,19 @@ function showAddUserModal() {
     modal.show();
 }
 
-function autoSetPassword() {
-    const studentNumber = document.getElementById('student_number').value.trim();
-    const pw = studentNumber ? `So-${studentNumber}` : '';
-    document.getElementById('password').value = pw;
-    document.getElementById('confirm_password').value = pw;
-}
+
 
 function addUser() {
     const formData = {
-        student_number: document.getElementById('student_number').value.trim(),
         username: document.getElementById('username').value.trim(),
-        grade: document.getElementById('grade').value,
         email: document.getElementById('email').value.trim(),
         password: document.getElementById('password').value,
         confirm_password: document.getElementById('confirm_password').value,
-        is_admin: document.getElementById('is_admin').checked
+        role: document.getElementById('role').value
     };
     
-    if (!formData.student_number || !formData.username || !formData.password || !formData.grade) {
-        alert('生徒番号・ユーザー名・学年・パスワードは必須です');
+    if (!formData.username || !formData.email || !formData.password) {
+        alert('ユーザー名・メールアドレス・パスワードは必須です');
         return;
     }
     
@@ -316,20 +278,23 @@ function addUser() {
         return;
     }
     
+    // フォームデータをFormDataに変換
+    const submitData = new FormData();
+    submitData.append('username', formData.username);
+    submitData.append('email', formData.email);
+    submitData.append('password', formData.password);
+    submitData.append('role', formData.role);
+    
     fetch('/admin/users/add', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData)
+        body: submitData
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            alert('エラー: ' + data.error);
-        } else {
+    .then(response => {
+        if (response.ok) {
             alert('ユーザーを登録しました');
             location.reload();
+        } else {
+            alert('ユーザーの登録に失敗しました');
         }
     })
     .catch(error => {

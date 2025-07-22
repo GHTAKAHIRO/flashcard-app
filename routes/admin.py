@@ -44,13 +44,35 @@ def admin():
 @login_required
 def admin_users():
     """ユーザー管理画面"""
-    # 仮のユーザーデータ（本番ではDBから取得）
-    users = [
-        {'id': 1, 'username': 'admin', 'email': 'admin@example.com', 'role': 'admin'},
-        {'id': 2, 'username': 'user1', 'email': 'user1@example.com', 'role': 'user'},
-        {'id': 3, 'username': 'user2', 'email': 'user2@example.com', 'role': 'user'}
-    ]
-    return render_template('admin_users.html', users=users)
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 実際のデータベースからユーザーを取得
+                cur.execute('''
+                    SELECT id, username, email, role, full_name, created_at, last_login
+                    FROM users 
+                    ORDER BY created_at DESC
+                ''')
+                users_data = cur.fetchall()
+                
+                users = []
+                for user_data in users_data:
+                    users.append({
+                        'id': user_data[0],
+                        'username': user_data[1],
+                        'email': user_data[2],
+                        'role': user_data[3],
+                        'full_name': user_data[4],
+                        'created_at': user_data[5],
+                        'last_login': user_data[6]
+                    })
+                
+                return render_template('admin_users.html', users=users)
+                
+    except Exception as e:
+        current_app.logger.error(f"ユーザー管理画面エラー: {e}")
+        flash('ユーザー管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.admin'))
 
 @admin_bp.route('/admin/users/add', methods=['POST'])
 @login_required
