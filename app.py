@@ -36,6 +36,8 @@ load_dotenv(dotenv_path='dbname.env')
 
 # 環境変数の確認とログ出力
 print("🔍 環境変数チェック:")
+print(f"DB_TYPE: {os.getenv('DB_TYPE', 'sqlite')}")
+print(f"DB_PATH: {os.getenv('DB_PATH', 'flashcards.db')}")
 print(f"DB_HOST: {os.getenv('DB_HOST', 'Not set')}")
 print(f"DB_PORT: {os.getenv('DB_PORT', 'Not set')}")
 print(f"DB_NAME: {os.getenv('DB_NAME', 'Not set')}")
@@ -66,7 +68,16 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=2),
     
     # 静的ファイルキャッシュ
-    SEND_FILE_MAX_AGE_DEFAULT=31536000  # 1年
+    SEND_FILE_MAX_AGE_DEFAULT=31536000,  # 1年
+    
+    # データベース設定
+    DB_TYPE=os.getenv('DB_TYPE', 'sqlite'),
+    DB_PATH=os.getenv('DB_PATH', 'flashcards.db'),
+    DB_HOST=os.getenv('DB_HOST'),
+    DB_PORT=os.getenv('DB_PORT'),
+    DB_NAME=os.getenv('DB_NAME'),
+    DB_USER=os.getenv('DB_USER'),
+    DB_PASSWORD=os.getenv('DB_PASSWORD')
 )
 
 print("🚀 バックエンド高速化システム初期化完了")
@@ -386,30 +397,38 @@ DB_PASSWORD = os.getenv('DB_PASSWORD')
 db_pool = None
 
 def init_connection_pool():
-    """データベース接続プールの初期化（最適化版）"""
+    """データベース接続プールの初期化（SQLite/PostgreSQL対応版）"""
     global db_pool
-    try:
-        # 本番環境では最小限の接続数に
-        if os.environ.get('RENDER'):
-            min_conn = 1
-            max_conn = 3
-        else:
-            min_conn = 2
-            max_conn = 10
+    db_type = os.environ.get('DB_TYPE', 'sqlite')
+    
+    if db_type == 'sqlite':
+        # SQLiteの場合はプールを使用しない
+        db_pool = None
+        app.logger.info("🚀 SQLiteデータベース接続初期化完了")
+    else:
+        # PostgreSQL接続プール
+        try:
+            # 本番環境では最小限の接続数に
+            if os.environ.get('RENDER'):
+                min_conn = 1
+                max_conn = 3
+            else:
+                min_conn = 2
+                max_conn = 10
 
-        db_pool = psycopg2.pool.SimpleConnectionPool(
-            min_conn,
-            max_conn,
-            host=os.environ.get('DB_HOST'),
-            port=os.environ.get('DB_PORT'),
-            dbname=os.environ.get('DB_NAME'),
-            user=os.environ.get('DB_USER'),
-            password=os.environ.get('DB_PASSWORD')
-        )
-        app.logger.info("🚀 データベース接続プール初期化完了")
-    except Exception as e:
-        app.logger.error(f"接続プール初期化エラー: {e}")
-        raise
+            db_pool = psycopg2.pool.SimpleConnectionPool(
+                min_conn,
+                max_conn,
+                host=os.environ.get('DB_HOST'),
+                port=os.environ.get('DB_PORT'),
+                dbname=os.environ.get('DB_NAME'),
+                user=os.environ.get('DB_USER'),
+                password=os.environ.get('DB_PASSWORD')
+            )
+            app.logger.info("🚀 PostgreSQLデータベース接続プール初期化完了")
+        except Exception as e:
+            app.logger.error(f"接続プール初期化エラー: {e}")
+            raise
 
 # 🔥 シンプルなインメモリキャッシュ（Redis代替）
 memory_cache = {}
@@ -421,21 +440,40 @@ print("📋 Redis除去版アプリ - 基本設定完了")
 # ========== Redis除去版 パート2: データベース接続とインデックス最適化 ==========
 
 def optimize_database_indexes():
-    """🔥 データベースインデックス最適化（修正版）"""
-    indexes = [
-        "CREATE INDEX IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
-        "CREATE INDEX IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
-        "CREATE INDEX IF NOT EXISTS idx_image_source_page ON image(source, page_number);",
-        "CREATE INDEX IF NOT EXISTS idx_image_source_level ON image(source, level);",
-        "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
-        "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
-        "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);"
-    ]
+    """🔥 データベースインデックス最適化（SQLite/PostgreSQL対応版）"""
+    db_type = os.environ.get('DB_TYPE', 'sqlite')
+    
+    if db_type == 'sqlite':
+        # SQLite用インデックス
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
+            "CREATE INDEX IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_image_source_page ON image(source, page_number);",
+            "CREATE INDEX IF NOT EXISTS idx_image_source_level ON image(source, level);",
+            "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
+            "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);"
+        ]
+    else:
+        # PostgreSQL用インデックス
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
+            "CREATE INDEX IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_image_source_page ON image(source, page_number);",
+            "CREATE INDEX IF NOT EXISTS idx_image_source_level ON image(source, level);",
+            "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
+            "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);"
+        ]
     
     success_count = 0
     try:
         with get_db_connection() as conn:
-            conn.autocommit = True
+            if db_type == 'sqlite':
+                # SQLiteの場合はautocommitを設定しない
+                pass
+            else:
+                conn.autocommit = True
             
             with conn.cursor() as cur:
                 for index_sql in indexes:
@@ -5839,6 +5877,11 @@ if __name__ == '__main__':
                     cur.execute('SELECT 1')
                     result = cur.fetchone()
                     print(f"✅ データベース接続テスト成功: {result}")
+                    
+                    # データベース最適化を実行
+                    optimize_database_indexes()
+                    print("✅ データベース最適化完了")
+                    
         except Exception as e:
             print(f"❌ データベース接続テスト失敗: {e}")
             

@@ -1,6 +1,0 @@
-{
-    "git.autoCommit": true,
-    "git.autoPush": true,
-    "git.autoCommitMessage": "Auto commit: ${file}",
-    "git.autoCommitInterval": 300
-} 
