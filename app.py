@@ -87,7 +87,7 @@ print("🚀 バックエンド高速化システム初期化完了")
 # Flask-Login 初期化
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'auth.login'
 
 # Blueprint登録
 app.register_blueprint(auth_bp)
@@ -1619,101 +1619,10 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
         return None
 
 # ========== 認証ルート ==========
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'GET':
-        session.pop('_flashes', None)
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-
-        try:
-            with get_db_connection() as conn:
-                with get_db_cursor(conn) as cur:
-                    cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = ?", (username,))
-                    user = cur.fetchone()
-
-            if user and check_password_hash(user[2], password):
-                login_user(User(user[0], user[1], user[2], user[3], user[4]))
-                # 最終ログイン時刻を更新
-                with get_db_connection() as conn:
-                    with get_db_cursor(conn) as cur:
-                        cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user[0],))
-                        conn.commit()
-                # 管理者の場合は管理者画面にリダイレクト
-                if user[4]:  # is_adminがTrueの場合
-                    return redirect(url_for('admin.admin'))
-                # 通常ユーザーの場合はnextパラメータまたはダッシュボードにリダイレクト
-                next_page = request.args.get('next')
-                if next_page:
-                    return redirect(next_page)
-                return redirect(url_for('dashboard'))
-            else:
-                flash("ログインに失敗しました。")
-        except Exception as e:
-            app.logger.error(f"ログインエラー: {e}")
-            flash("ログイン中にエラーが発生しました")
-
-    return render_template('login.html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = generate_password_hash(request.form['password'])
-
-        try:
-            with get_db_connection() as conn:
-                with get_db_cursor(conn) as cur:
-                    cur.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, password))
-                    conn.commit()
-            return redirect(url_for('login'))
-        except Exception as e:
-            flash(f"登録エラー: {e}")
-
-    return render_template('register.html')
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
+# 認証関連のルートは routes/auth.py に移動済み
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        if username and password:
-            try:
-                with get_db_connection() as conn:
-                    with get_db_cursor(conn) as cur:
-                        cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = ?", (username,))
-                        user = cur.fetchone()
-
-                if user and check_password_hash(user[2], password):
-                    login_user(User(user[0], user[1], user[2], user[3], user[4]))
-                    # 最終ログイン時刻を更新
-                    with get_db_connection() as conn:
-                        with get_db_cursor(conn) as cur:
-                            cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user[0],))
-                            conn.commit()
-                    # 管理者の場合は管理者画面にリダイレクト
-                    if user[4]:  # is_adminがTrueの場合
-                        return redirect(url_for('admin.admin'))
-                    # 通常ユーザーの場合はnextパラメータまたは管理画面にリダイレクト
-                    next_page = request.args.get('next')
-                    if next_page:
-                        return redirect(next_page)
-                    return redirect(url_for('admin.admin'))
-                else:
-                    flash("ログインに失敗しました。")
-            except Exception as e:
-                app.logger.error(f"ログインエラー: {e}")
-                flash("ログイン中にエラーが発生しました")
-    
     if current_user.is_authenticated:
         # 管理者の場合は管理者画面にリダイレクト
         if current_user.is_admin:
