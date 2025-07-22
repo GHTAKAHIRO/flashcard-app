@@ -22,20 +22,29 @@ def login():
 
             if user and check_password_hash(user[2], password):
                 login_user(User(user[0], user[1], user[2], user[3], user[4]))
+                current_app.logger.info(f"ログイン成功: user_id={user[0]}, username={user[1]}, is_admin={user[4]}")
+                
                 # 最終ログイン時刻を更新
                 with get_db_connection() as conn:
                     with get_db_cursor(conn) as cur:
                         cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user[0],))
                         conn.commit()
+                
                 # 管理者の場合は管理者画面にリダイレクト
                 if user[4]:  # is_adminがTrueの場合
+                    current_app.logger.info("管理者ユーザー: 管理画面にリダイレクト")
                     return redirect(url_for('admin.admin'))
+                
                 # 通常ユーザーの場合はnextパラメータまたはダッシュボードにリダイレクト
                 next_page = request.args.get('next')
                 if next_page:
+                    current_app.logger.info(f"nextパラメータ: {next_page}にリダイレクト")
                     return redirect(next_page)
+                
+                current_app.logger.info("通常ユーザー: ダッシュボードにリダイレクト")
                 return redirect(url_for('dashboard'))
             else:
+                current_app.logger.warning(f"ログイン失敗: username={username}")
                 flash("ログインに失敗しました。")
         except Exception as e:
             current_app.logger.error(f"ログインエラー: {e}")
