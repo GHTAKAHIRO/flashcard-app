@@ -262,15 +262,6 @@
                         <label for="edit-textbook-description" class="form-label">説明</label>
                         <textarea class="form-control" id="edit-textbook-description" name="description" rows="3" placeholder="教材の説明を入力してください"></textarea>
                     </div>
-                    <div class="mb-3">
-                        <label for="edit-textbook-wasabi-folder-path" class="form-label">画像保存フォルダ</label>
-                        <input type="text" class="form-control" id="edit-textbook-wasabi-folder-path" name="wasabi_folder_path" 
-                               placeholder="例: question_images/geography">
-                        <div class="form-text">
-                            <i class="fas fa-info-circle me-1"></i>
-                            この教材の問題画像を保存するフォルダパスを指定します。
-                        </div>
-                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -463,7 +454,6 @@ function editTextbook() {
             document.getElementById('edit-textbook-grade').value = data.grade || '';
             document.getElementById('edit-textbook-publisher').value = data.publisher || '';
             document.getElementById('edit-textbook-description').value = data.description || '';
-            document.getElementById('edit-textbook-wasabi-folder-path').value = data.wasabi_folder_path || 'question_images';
             
             // モーダルを表示
             const modal = new bootstrap.Modal(document.getElementById('editTextbookModal'));
@@ -482,8 +472,7 @@ function saveTextbookEdit() {
         subject: document.getElementById('edit-textbook-subject').value,
         grade: document.getElementById('edit-textbook-grade').value,
         publisher: document.getElementById('edit-textbook-publisher').value,
-        description: document.getElementById('edit-textbook-description').value,
-        wasabi_folder_path: document.getElementById('edit-textbook-wasabi-folder-path').value
+        description: document.getElementById('edit-textbook-description').value
     };
     
     // 必須項目のチェック
