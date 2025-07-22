@@ -20,7 +20,7 @@ def admin():
                 cur.execute('SELECT COUNT(*) FROM study_log')
                 study_log_count = cur.fetchone()[0]
                 
-                cur.execute('SELECT COUNT(*) FROM questions')
+                cur.execute('SELECT COUNT(*) FROM social_studies_questions')
                 question_count = cur.fetchone()[0]
                 
                 cur.execute('SELECT COUNT(*) FROM vocabulary_words')

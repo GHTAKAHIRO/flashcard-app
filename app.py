@@ -152,7 +152,7 @@ log_thread.start()
 def init_wasabi_client():
     """Wasabi S3クライアントの初期化（現在は無効化）"""
     print("⚠️ Wasabi S3クライアントは現在無効化されています")
-    return None
+        return None
 
 def get_unit_image_folder_path(question_id):
     """問題IDから単元の章番号に基づいて画像フォルダパスを生成"""
@@ -283,14 +283,14 @@ def init_connection_pool():
         app.logger.info("🚀 SQLiteデータベース接続初期化完了")
     else:
         # PostgreSQL接続プール
-        try:
-            # 本番環境では最小限の接続数に
-            if os.environ.get('RENDER'):
-                min_conn = 1
-                max_conn = 3
-            else:
-                min_conn = 2
-                max_conn = 10
+    try:
+        # 本番環境では最小限の接続数に
+        if os.environ.get('RENDER'):
+            min_conn = 1
+            max_conn = 3
+        else:
+            min_conn = 2
+            max_conn = 10
 
             # PostgreSQL接続プール（現在は無効化）
             # db_pool = psycopg2.pool.SimpleConnectionPool(
@@ -304,9 +304,9 @@ def init_connection_pool():
             # )
             db_pool = None
             app.logger.info("🚀 PostgreSQLデータベース接続プール初期化完了")
-        except Exception as e:
-            app.logger.error(f"接続プール初期化エラー: {e}")
-            raise
+    except Exception as e:
+        app.logger.error(f"接続プール初期化エラー: {e}")
+        raise
 
 # 🔥 シンプルなインメモリキャッシュ（Redis代替）
 memory_cache = {}
@@ -334,15 +334,15 @@ def optimize_database_indexes():
         ]
     else:
         # PostgreSQL用インデックス
-        indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
-            "CREATE INDEX IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
-            "CREATE INDEX IF NOT EXISTS idx_image_source_page ON image(source, page_number);",
-            "CREATE INDEX IF NOT EXISTS idx_image_source_level ON image(source, level);",
-            "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
-            "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
-            "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);"
-        ]
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
+        "CREATE INDEX IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_image_source_page ON image(source, page_number);",
+        "CREATE INDEX IF NOT EXISTS idx_image_source_level ON image(source, level);",
+        "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
+        "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);"
+    ]
     
     success_count = 0
     try:
@@ -351,7 +351,7 @@ def optimize_database_indexes():
                 # SQLiteの場合はautocommitを設定しない
                 pass
             else:
-                conn.autocommit = True
+            conn.autocommit = True
             
             with get_db_cursor(conn) as cur:
                 for index_sql in indexes:
