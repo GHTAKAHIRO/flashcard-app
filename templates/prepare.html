@@ -572,7 +572,7 @@
                         <div class="d-flex gap-2 justify-content-end">
                             <!-- テストボタン -->
                             {% if chunk.can_start_test and not chunk.test_completed %}
-                                <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='test') }}" 
+                                <a href="{{ url_for('study.start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='test') }}" 
                                    class="btn btn-primary-mini">
                                     <i class="fas fa-play"></i> テスト開始
                                 </a>
@@ -589,7 +589,7 @@
                             <!-- 練習ボタン（×問題がある場合のみ表示） -->
                             {% if chunk.practice_needed %}
                                 {% if chunk.can_start_practice %}
-                                    <a href="{{ url_for('start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
+                                    <a href="{{ url_for('study.start_chunk', source=source, stage=stage_info.stage, chunk_number=chunk.chunk_number, mode='practice') }}" 
                                        class="btn btn-success-mini">
                                         <i class="fas fa-dumbbell"></i> 
                                         練習開始
