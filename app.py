@@ -1628,7 +1628,7 @@ def home():
         if current_user.is_admin:
             return redirect(url_for('admin.admin'))
         return redirect(url_for('admin.admin'))
-    return render_template('login.html')
+    return redirect(url_for('auth.login'))
 
 # favicon.icoのルートを追加
 @app.route('/favicon.ico')
