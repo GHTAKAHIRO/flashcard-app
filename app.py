@@ -267,6 +267,13 @@ def set_image_public_access(image_url):
     print("⚠️ 画像公開アクセス設定は現在無効化されています")
     return None
 
+@app.route('/')
+def home():
+    if not current_user.is_authenticated:
+        return redirect(url_for('auth.login'))
+    else:
+        return redirect(url_for('admin.admin'))
+
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
