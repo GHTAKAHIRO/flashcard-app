@@ -646,7 +646,7 @@ def check_stage_completion(user_id, source, stage, page_range, difficulty):
     """指定ステージが完了しているかチェック（キャッシュ付き）"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # ステージ1の場合、特別な条件を適用
                 if stage == 1:
                     # まず、そのステージの全チャンク数を取得
@@ -1822,12 +1822,12 @@ def social_studies_submit_answer():
         user_answer = data.get('answer')
         
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 問題の正解を取得
                 cur.execute('''
                     SELECT correct_answer, acceptable_answers, subject, answer_suffix
                     FROM social_studies_questions 
-                    WHERE id = %s
+                    WHERE id = ?
                 ''', (question_id,))
                 question_data = cur.fetchone()
                 
@@ -1836,41 +1836,41 @@ def social_studies_submit_answer():
                 
                 # 許容回答をパース
                 acceptable_answers = []
-                if question_data['acceptable_answers']:
+                if question_data[1]:  # acceptable_answers
                     try:
                         # JSON形式の場合
-                        if question_data['acceptable_answers'].startswith('['):
-                            acceptable_answers = json.loads(question_data['acceptable_answers'])
+                        if question_data[1].startswith('['):
+                            acceptable_answers = json.loads(question_data[1])
                         else:
                             # 文字列形式の場合（カンマ区切り）
-                            acceptable_answers = [ans.strip() for ans in question_data['acceptable_answers'].split(',') if ans.strip()]
+                            acceptable_answers = [ans.strip() for ans in question_data[1].split(',') if ans.strip()]
                     except Exception as e:
-                        app.logger.error(f"許容回答パースエラー: {e}, データ: {question_data['acceptable_answers']}")
+                        app.logger.error(f"許容回答パースエラー: {e}, データ: {question_data[1]}")
                         # パースに失敗した場合は単一の文字列として扱う
-                        acceptable_answers = [question_data['acceptable_answers'].strip()]
+                        acceptable_answers = [question_data[1].strip()]
                 
-                app.logger.info(f"問題ID: {question_id}, 正解: {question_data['correct_answer']}, 許容回答: {acceptable_answers}")
+                app.logger.info(f"問題ID: {question_id}, 正解: {question_data[0]}, 許容回答: {acceptable_answers}")
                 
                 # 回答をチェック（answer_suffixは表示用の補足情報なので、比較には使用しない）
-                app.logger.info(f"回答チェック: ユーザー回答='{user_answer}', 正解='{question_data['correct_answer']}'")
+                app.logger.info(f"回答チェック: ユーザー回答='{user_answer}', 正解='{question_data[0]}'")
                 
                 is_correct, result_message = check_answer(
                     user_answer, 
-                    question_data['correct_answer'], 
+                    question_data[0],  # correct_answer
                     acceptable_answers
                 )
                 
                 # 学習ログを記録
                 cur.execute('''
                     INSERT INTO social_studies_study_log (user_id, question_id, user_answer, is_correct, subject)
-                    VALUES (%s, %s, %s, %s, %s)
-                ''', (current_user.id, question_id, user_answer, is_correct, question_data['subject']))
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (current_user.id, question_id, user_answer, is_correct, question_data[2]))  # subject
                 conn.commit()
                 
                 return jsonify({
                     'is_correct': is_correct,
                     'message': result_message,
-                    'correct_answer': question_data['correct_answer']
+                    'correct_answer': question_data[0]  # correct_answer
                 })
                 
     except Exception as e:
@@ -1904,7 +1904,7 @@ def social_studies_admin_textbook_unified(textbook_id):
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 教材情報を取得
-                cur.execute('SELECT * FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                cur.execute('SELECT * FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 textbook = cur.fetchone()
                 
                 if not textbook:
@@ -1912,17 +1912,17 @@ def social_studies_admin_textbook_unified(textbook_id):
                     return redirect(url_for('social_studies_admin_unified'))
                 
                 # 統計情報を取得
-                cur.execute('SELECT COUNT(*) as total_units FROM social_studies_units WHERE textbook_id = %s', (textbook_id,))
-                total_units = cur.fetchone()['total_units']
+                cur.execute('SELECT COUNT(*) as total_units FROM social_studies_units WHERE textbook_id = ?', (textbook_id,))
+                total_units = cur.fetchone()[0]
                 
-                cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions WHERE textbook_id = %s', (textbook_id,))
-                total_questions = cur.fetchone()['total_questions']
+                cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions WHERE textbook_id = ?', (textbook_id,))
+                total_questions = cur.fetchone()[0]
                 
                 cur.execute('''
                     SELECT COUNT(*) as total_study_logs 
                     FROM social_studies_study_log sl
                     JOIN social_studies_questions q ON sl.question_id = q.id
-                    WHERE q.textbook_id = %s
+                    WHERE q.textbook_id = ?
                 ''', (textbook_id,))
                 total_study_logs = cur.fetchone()['total_study_logs']
                 
@@ -1933,7 +1933,7 @@ def social_studies_admin_textbook_unified(textbook_id):
                         COUNT(q.id) as question_count
                     FROM social_studies_units u
                     LEFT JOIN social_studies_questions q ON u.id = q.unit_id
-                    WHERE u.textbook_id = %s
+                    WHERE u.textbook_id = ?
                     GROUP BY u.id, u.name, u.chapter_number, u.description
                     ORDER BY u.chapter_number, u.name
                 ''', (textbook_id,))
@@ -1947,7 +1947,7 @@ def social_studies_admin_textbook_unified(textbook_id):
                         u.name as unit_name
                     FROM social_studies_questions q
                     LEFT JOIN social_studies_units u ON q.unit_id = u.id
-                    WHERE q.textbook_id = %s
+                    WHERE q.textbook_id = ?
                 '''
                 
                 # WHERE句の条件を構築
@@ -1955,15 +1955,15 @@ def social_studies_admin_textbook_unified(textbook_id):
                 params = [textbook_id]
                 
                 if unit_id:
-                    conditions.append('q.unit_id = %s')
+                    conditions.append('q.unit_id = ?')
                     params.append(int(unit_id))
                 
                 if difficulty:
-                    conditions.append('q.difficulty_level = %s')
+                    conditions.append('q.difficulty_level = ?')
                     params.append(difficulty)
                 
                 if search:
-                    conditions.append('(q.question ILIKE %s OR q.correct_answer ILIKE %s)')
+                    conditions.append('(q.question ILIKE ? OR q.correct_answer ILIKE ?)')
                     search_param = f'%{search}%'
                     params.extend([search_param, search_param])
                 
@@ -2202,7 +2202,7 @@ def social_studies_add_question():
                     if image_name and textbook_id:
                         try:
                             # 教材のフォルダパスを取得
-                            cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                            cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                             result = cur.fetchone()
                             if result and result[0]:
                                 folder_path = result[0]
@@ -2230,8 +2230,8 @@ def social_studies_add_question():
                                         # 問題に画像URLを設定
                                         cur.execute('''
                                             UPDATE social_studies_questions 
-                                            SET image_url = %s 
-                                            WHERE id = %s
+                                            SET image_url = ? 
+                                            WHERE id = ?
                                         ''', (found_image_url, question_id))
                                         app.logger.info(f"問題ID {question_id} に画像URLを設定: {found_image_url}")
                                     else:
@@ -2266,11 +2266,11 @@ def social_studies_add_question():
         try:
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute('SELECT id, name, subject, wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                    cur.execute('SELECT id, name, subject, wasabi_folder_path FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                     textbook_info = cur.fetchone()
                     
                     if unit_id:
-                        cur.execute('SELECT id, name, chapter_number FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                        cur.execute('SELECT id, name, chapter_number FROM social_studies_units WHERE id = ? AND textbook_id = ?', (unit_id, textbook_id))
                         unit_info = cur.fetchone()
         except Exception as e:
             app.logger.error(f"教材・単元情報取得エラー: {e}")
@@ -2290,15 +2290,15 @@ def social_studies_delete_question(question_id):
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # 問題が存在するかチェック
-                cur.execute('SELECT id FROM social_studies_questions WHERE id = %s', (question_id,))
+                cur.execute('SELECT id FROM social_studies_questions WHERE id = ?', (question_id,))
                 if not cur.fetchone():
                     return jsonify({'error': '問題が見つかりません'}), 404
                 
                 # 関連する学習ログを削除
-                cur.execute('DELETE FROM social_studies_study_log WHERE question_id = %s', (question_id,))
+                cur.execute('DELETE FROM social_studies_study_log WHERE question_id = ?', (question_id,))
                 
                 # 問題を削除
-                cur.execute('DELETE FROM social_studies_questions WHERE id = %s', (question_id,))
+                cur.execute('DELETE FROM social_studies_questions WHERE id = ?', (question_id,))
                 conn.commit()
                 
                 return jsonify({'success': True, 'message': '問題が削除されました'})
@@ -2330,7 +2330,7 @@ def social_studies_bulk_delete_questions():
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # 問題が存在するかチェック
-                placeholders = ','.join(['%s'] * len(question_ids))
+                placeholders = ','.join(['?'] * len(question_ids))
                 cur.execute(f'SELECT id FROM social_studies_questions WHERE id IN ({placeholders})', question_ids)
                 existing_questions = cur.fetchall()
                 
@@ -2375,7 +2375,7 @@ def social_studies_edit_question_page(question_id):
                     FROM social_studies_questions q
                     LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
                     LEFT JOIN social_studies_units u ON q.unit_id = u.id
-                    WHERE q.id = %s
+                    WHERE q.id = ?
                 ''', (question_id,))
                 question = cur.fetchone()
                 
@@ -2389,11 +2389,11 @@ def social_studies_edit_question_page(question_id):
                 image_path_info = None
                 
                 if question['textbook_id']:
-                    cur.execute('SELECT * FROM social_studies_textbooks WHERE id = %s', (question['textbook_id'],))
+                    cur.execute('SELECT * FROM social_studies_textbooks WHERE id = ?', (question['textbook_id'],))
                     textbook_info = cur.fetchone()
                 
                 if question['unit_id']:
-                    cur.execute('SELECT * FROM social_studies_units WHERE id = %s', (question['unit_id'],))
+                    cur.execute('SELECT * FROM social_studies_units WHERE id = ?', (question['unit_id'],))
                     unit_info = cur.fetchone()
                 
                 # 画像パス情報を生成
@@ -2405,7 +2405,7 @@ def social_studies_edit_question_page(question_id):
                     cur.execute('''
                         SELECT COUNT(*) as count
                         FROM social_studies_questions
-                        WHERE textbook_id = %s AND unit_id = %s AND image_url IS NOT NULL AND image_url != ''
+                        WHERE textbook_id = ? AND unit_id = ? AND image_url IS NOT NULL AND image_url != ''
                     ''', (question['textbook_id'], question['unit_id']))
                     image_questions_count = cur.fetchone()['count']
                     
@@ -2445,7 +2445,7 @@ def social_studies_edit_question(question_id):
                         FROM social_studies_questions q
                         LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
                         LEFT JOIN social_studies_units u ON q.unit_id = u.id
-                        WHERE q.id = %s
+                        WHERE q.id = ?
                     ''', (question_id,))
                     question = cur.fetchone()
                     
@@ -2480,18 +2480,18 @@ def social_studies_edit_question(question_id):
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     # 問題が存在するかチェック
-                    cur.execute('SELECT id FROM social_studies_questions WHERE id = %s', (question_id,))
+                    cur.execute('SELECT id FROM social_studies_questions WHERE id = ?', (question_id,))
                     if not cur.fetchone():
                         return jsonify({'error': '問題が見つかりません'}), 404
                     
                     # 問題を更新
                     cur.execute('''
                         UPDATE social_studies_questions 
-                        SET subject = %s, textbook_id = %s, unit_id = %s, question = %s, 
-                            correct_answer = %s, acceptable_answers = %s, answer_suffix = %s,
-                            explanation = %s, difficulty_level = %s, image_name = %s, image_title = %s,
+                        SET subject = ?, textbook_id = ?, unit_id = ?, question = ?, 
+                            correct_answer = ?, acceptable_answers = ?, answer_suffix = ?,
+                            explanation = ?, difficulty_level = ?, image_name = ?, image_title = ?,
                             updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
+                        WHERE id = ?
                     ''', (subject, textbook_id, unit_id, question_text, correct_answer, 
                           acceptable_answers, answer_suffix, explanation, difficulty_level, 
                           image_name, image_title, question_id))
@@ -2500,7 +2500,7 @@ def social_studies_edit_question(question_id):
                     if image_name and textbook_id:
                         try:
                             # 教材のフォルダパスを取得
-                            cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                            cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                             result = cur.fetchone()
                             if result and result[0]:
                                 folder_path = result[0]
@@ -2528,8 +2528,8 @@ def social_studies_edit_question(question_id):
                                         # 問題に画像URLを設定
                                         cur.execute('''
                                             UPDATE social_studies_questions 
-                                            SET image_url = %s 
-                                            WHERE id = %s
+                                            SET image_url = ? 
+                                            WHERE id = ?
                                         ''', (found_image_url, question_id))
                                         app.logger.info(f"問題ID {question_id} に画像URLを設定: {found_image_url}")
                                     else:
@@ -2561,7 +2561,7 @@ def social_studies_add_unit(textbook_id):
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 教材情報を取得
-                cur.execute('SELECT * FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                cur.execute('SELECT * FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 textbook = cur.fetchone()
                 
                 if not textbook:
@@ -2575,13 +2575,13 @@ def social_studies_add_unit(textbook_id):
                     
                     # 章番号が指定されていない場合、自動的に次の番号を割り当て
                     if not chapter_number:
-                        cur.execute('SELECT MAX(chapter_number) as max_num FROM social_studies_units WHERE textbook_id = %s', (textbook_id,))
+                        cur.execute('SELECT MAX(chapter_number) as max_num FROM social_studies_units WHERE textbook_id = ?', (textbook_id,))
                         result = cur.fetchone()
                         chapter_number = (result['max_num'] or 0) + 1
                     
                     cur.execute('''
                         INSERT INTO social_studies_units (textbook_id, name, chapter_number, description)
-                        VALUES (%s, %s, %s, %s)
+                        VALUES (?, ?, ?, ?)
                     ''', (textbook_id, name, chapter_number, description))
                     conn.commit()
                     flash('単元が追加されました', 'success')
@@ -2604,7 +2604,7 @@ def social_studies_delete_unit(unit_id):
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # 単元が存在するかチェック
-                cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                cur.execute('SELECT id FROM social_studies_units WHERE id = ?', (unit_id,))
                 if not cur.fetchone():
                     return jsonify({'error': '単元が見つかりません'}), 404
                 
@@ -2612,15 +2612,15 @@ def social_studies_delete_unit(unit_id):
                 cur.execute('''
                     DELETE FROM social_studies_study_log 
                     WHERE question_id IN (
-                        SELECT id FROM social_studies_questions WHERE unit_id = %s
+                        SELECT id FROM social_studies_questions WHERE unit_id = ?
                     )
                 ''', (unit_id,))
                 
                 # 関連する問題を削除
-                cur.execute('DELETE FROM social_studies_questions WHERE unit_id = %s', (unit_id,))
+                cur.execute('DELETE FROM social_studies_questions WHERE unit_id = ?', (unit_id,))
                 
                 # 単元を削除
-                cur.execute('DELETE FROM social_studies_units WHERE id = %s', (unit_id,))
+                cur.execute('DELETE FROM social_studies_units WHERE id = ?', (unit_id,))
                 conn.commit()
                 
                 return jsonify({'success': True, 'message': '単元が削除されました'})
@@ -2644,7 +2644,7 @@ def social_studies_edit_unit(unit_id):
                     cur.execute('''
                         SELECT id, name, chapter_number, description
                         FROM social_studies_units 
-                        WHERE id = %s
+                        WHERE id = ?
                     ''', (unit_id,))
                     unit = cur.fetchone()
                     
@@ -2679,15 +2679,15 @@ def social_studies_edit_unit(unit_id):
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     # 単元が存在するかチェック
-                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                    cur.execute('SELECT id FROM social_studies_units WHERE id = ?', (unit_id,))
                     if not cur.fetchone():
                         return jsonify({'error': '単元が見つかりません'}), 404
                     
                     # 単元を更新
                     cur.execute('''
                         UPDATE social_studies_units 
-                        SET name = %s, chapter_number = %s, description = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
+                        SET name = ?, chapter_number = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
                     ''', (name, chapter_number_int, description, unit_id))
                     conn.commit()
                     
@@ -2712,7 +2712,7 @@ def social_studies_api_textbooks():
                     cur.execute('''
                         SELECT id, name, subject, grade, publisher
                         FROM social_studies_textbooks 
-                        WHERE subject = %s
+                        WHERE subject = ?
                         ORDER BY name
                     ''', (subject,))
                 else:
@@ -2737,7 +2737,7 @@ def social_studies_api_textbook_detail(textbook_id):
                 cur.execute('''
                     SELECT id, name, subject, grade, publisher, wasabi_folder_path
                     FROM social_studies_textbooks 
-                    WHERE id = %s
+                    WHERE id = ?
                 ''', (textbook_id,))
                 textbook = cur.fetchone()
                 
@@ -2764,7 +2764,7 @@ def social_studies_api_units():
                 cur.execute('''
                     SELECT id, name, chapter_number, description
                     FROM social_studies_units 
-                    WHERE textbook_id = %s
+                    WHERE textbook_id = ?
                     ORDER BY chapter_number, name
                 ''', (textbook_id,))
                 units = cur.fetchall()
@@ -2863,7 +2863,7 @@ def social_studies_api_set_image_public(question_id):
     try:
         # 問題の画像URLを取得
         with get_db_connection() as conn:
-                cur.execute('SELECT image_url FROM social_studies_questions WHERE id = %s', (question_id,))
+                cur.execute('SELECT image_url FROM social_studies_questions WHERE id = ?', (question_id,))
                 result = cur.fetchone()
                 if not result or not result[0]:
                     return jsonify({'error': 'この問題には画像が設定されていません'}), 404
@@ -2912,7 +2912,7 @@ def social_studies_add_textbook():
                     cur.execute('''
                         INSERT INTO social_studies_textbooks 
                         (name, subject, grade, publisher, description, wasabi_folder_path)
-                        VALUES (%s, %s, %s, %s, %s, %s)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     ''', (name, subject, grade, publisher, description, wasabi_folder_path))
                     conn.commit()
                     flash('教材が追加されました', 'success')
@@ -2938,7 +2938,7 @@ def social_studies_edit_textbook(textbook_id):
                     cur.execute('''
                         SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
                         FROM social_studies_textbooks 
-                        WHERE id = %s
+                        WHERE id = ?
                     ''', (textbook_id,))
                     textbook = cur.fetchone()
                     
@@ -2974,15 +2974,15 @@ def social_studies_edit_textbook(textbook_id):
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     # 教材が存在するかチェック
-                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                     if not cur.fetchone():
                         return jsonify({'error': '教材が見つかりません'}), 404
                     
                     # 教材を更新
                     cur.execute('''
                         UPDATE social_studies_textbooks 
-                        SET name = %s, subject = %s, grade = %s, publisher = %s, description = %s, wasabi_folder_path = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
+                        SET name = ?, subject = ?, grade = ?, publisher = ?, description = ?, wasabi_folder_path = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
                     ''', (name, subject, grade, publisher, description, wasabi_folder_path, textbook_id))
                     conn.commit()
                     
@@ -3003,7 +3003,7 @@ def social_studies_delete_textbook(textbook_id):
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # 教材が存在するかチェック
-                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 if not cur.fetchone():
                     return jsonify({'error': '教材が見つかりません'}), 404
                 
@@ -3011,18 +3011,18 @@ def social_studies_delete_textbook(textbook_id):
                 cur.execute('''
                     DELETE FROM social_studies_study_log 
                     WHERE question_id IN (
-                        SELECT id FROM social_studies_questions WHERE textbook_id = %s
+                        SELECT id FROM social_studies_questions WHERE textbook_id = ?
                     )
                 ''', (textbook_id,))
                 
                 # 関連する問題を削除
-                cur.execute('DELETE FROM social_studies_questions WHERE textbook_id = %s', (textbook_id,))
+                cur.execute('DELETE FROM social_studies_questions WHERE textbook_id = ?', (textbook_id,))
                 
                 # 関連する単元を削除
-                cur.execute('DELETE FROM social_studies_units WHERE textbook_id = %s', (textbook_id,))
+                cur.execute('DELETE FROM social_studies_units WHERE textbook_id = ?', (textbook_id,))
                 
                 # 教材を削除
-                cur.execute('DELETE FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                cur.execute('DELETE FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 conn.commit()
                 
                 return jsonify({'success': True, 'message': '教材が削除されました'})
@@ -3112,7 +3112,7 @@ def social_studies_upload_csv():
                         
                         # 教材別アップロードの場合は教材の科目を取得
                         if textbook_id:
-                            cur.execute('SELECT subject FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                            cur.execute('SELECT subject FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                             result = cur.fetchone()
                             if not result:
                                 app.logger.warning(f"行 {i}: 無効な教材IDです: {textbook_id}")
@@ -3136,9 +3136,9 @@ def social_studies_upload_csv():
                                 unit_id = int(unit_id)
                                 if textbook_id:
                                     # 教材別アップロードの場合は教材に属する単元かチェック
-                                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                                    cur.execute('SELECT id FROM social_studies_units WHERE id = ? AND textbook_id = ?', (unit_id, textbook_id))
                                 else:
-                                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                                    cur.execute('SELECT id FROM social_studies_units WHERE id = ?', (unit_id,))
                                 if not cur.fetchone():
                                     app.logger.warning(f"行 {i}: 無効な単元IDです: {unit_id}")
                                     unit_id = None
@@ -3150,7 +3150,7 @@ def social_studies_upload_csv():
                         cur.execute('''
                                 INSERT INTO social_studies_questions 
                                 (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
                             ''', (subject, textbook_id, unit_id, question, correct_answer, explanation, difficulty_level))
                         
                         imported_count += 1
@@ -3217,7 +3217,7 @@ def social_studies_upload_units_csv():
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # 教材が存在するかチェック
-                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 if not cur.fetchone():
                     return jsonify({'error': '指定された教材が見つかりません'}), 400
                 
@@ -3263,7 +3263,7 @@ def social_studies_upload_units_csv():
                         cur.execute('''
                             INSERT INTO social_studies_units 
                             (textbook_id, name, chapter_number, description)
-                            VALUES (%s, %s, %s, %s)
+                            VALUES (?, ?, ?, ?)
                         ''', (textbook_id, name, chapter_number_int, description))
                         
                         imported_count += 1
@@ -3371,7 +3371,7 @@ def social_studies_upload_questions_csv():
                         
                         if textbook_name:
                             # 教材が存在するかチェック
-                            cur.execute('SELECT id FROM social_studies_textbooks WHERE name = %s', (textbook_name,))
+                            cur.execute('SELECT id FROM social_studies_textbooks WHERE name = ?', (textbook_name,))
                             existing_textbook = cur.fetchone()
                             
                             if existing_textbook:
@@ -3387,7 +3387,7 @@ def social_studies_upload_questions_csv():
                                 cur.execute('''
                                     INSERT INTO social_studies_textbooks 
                                     (name, subject, grade, publisher, wasabi_folder_path)
-                                    VALUES (%s, %s, %s, %s, %s)
+                                    VALUES (?, ?, ?, ?, ?)
                                     RETURNING id
                                 ''', (textbook_name, subject, textbook_grade, textbook_publisher, 
                                      textbook_wasabi_folder or 'question_images'))
@@ -3400,7 +3400,7 @@ def social_studies_upload_questions_csv():
                                 try:
                                     textbook_id = int(csv_textbook_id)
                                     # 教材IDが存在するかチェック
-                                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                                     if not cur.fetchone():
                                         textbook_id = None
                                 except ValueError:
@@ -3409,7 +3409,7 @@ def social_studies_upload_questions_csv():
                                 try:
                                     textbook_id = int(default_textbook_id)
                                     # 教材IDが存在するかチェック
-                                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                                     if not cur.fetchone():
                                         textbook_id = None
                                 except ValueError:
@@ -3422,7 +3422,7 @@ def social_studies_upload_questions_csv():
                         
                         if unit_name and textbook_id:
                     # 単元が存在するかチェック
-                            cur.execute('SELECT id FROM social_studies_units WHERE name = %s AND textbook_id = %s', 
+                            cur.execute('SELECT id FROM social_studies_units WHERE name = ? AND textbook_id = ?', 
                                        (unit_name, textbook_id))
                             existing_unit = cur.fetchone()
                             
@@ -3440,7 +3440,7 @@ def social_studies_upload_questions_csv():
                                 cur.execute('''
                                     INSERT INTO social_studies_units 
                                     (textbook_id, name, chapter_number)
-                                    VALUES (%s, %s, %s)
+                                    VALUES (?, ?, ?)
                                     RETURNING id
                                 ''', (textbook_id, unit_name, chapter_number))
                                 unit_id = cur.fetchone()[0]
@@ -3452,7 +3452,7 @@ def social_studies_upload_questions_csv():
                                 try:
                                     unit_id = int(csv_unit_id)
                                     # 単元IDが存在するかチェック
-                                    cur.execute('SELECT id FROM social_studies_units WHERE id = %s', (unit_id,))
+                                    cur.execute('SELECT id FROM social_studies_units WHERE id = ?', (unit_id,))
                                     if not cur.fetchone():
                                         unit_id = None
                                 except ValueError:
@@ -3468,7 +3468,7 @@ def social_studies_upload_questions_csv():
                             # 画像存在確認とURL取得
                             try:
                                 # 教材のフォルダパスを取得
-                                cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                                cur.execute('SELECT wasabi_folder_path FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                                 result = cur.fetchone()
                                 if result and result[0]:
                                     folder_path = result[0]
@@ -3496,7 +3496,7 @@ def social_studies_upload_questions_csv():
                         try:
                             cur.execute('''
                                 SELECT id FROM social_studies_questions 
-                                WHERE question = %s AND correct_answer = %s
+                                WHERE question = ? AND correct_answer = ?
                             ''', (question, correct_answer))
                             if cur.fetchone():
                                 app.logger.warning(f"行{row_num}: 重複データ - question: '{question}', correct_answer: '{correct_answer}'")
@@ -3506,7 +3506,7 @@ def social_studies_upload_questions_csv():
                             cur.execute('''
                                 INSERT INTO social_studies_questions 
                                 (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url, image_title)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ''', (subject, textbook_id, unit_id, question, correct_answer, acceptable_answers, explanation, answer_suffix, image_url, image_title))
                             app.logger.info(f"行{row_num}: 問題を登録しました - subject: '{subject}', question: '{question}'")
                             registered_count += 1
@@ -3558,7 +3558,7 @@ def social_studies_upload_image(question_id):
         # 問題と教材IDを取得
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT id, textbook_id FROM social_studies_questions WHERE id = %s', (question_id,))
+                cur.execute('SELECT id, textbook_id FROM social_studies_questions WHERE id = ?', (question_id,))
                 result = cur.fetchone()
                 if not result:
                     return jsonify({'error': '指定された問題が見つかりません'}), 404
@@ -3578,8 +3578,8 @@ def social_studies_upload_image(question_id):
             with conn.cursor() as cur:
                 cur.execute('''
                     UPDATE social_studies_questions 
-                    SET image_url = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
+                    SET image_url = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
                 ''', (image_url, question_id))
                 conn.commit()
                 
@@ -3604,7 +3604,7 @@ def social_studies_delete_image(question_id):
         # 現在の画像URLを取得
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT image_url FROM social_studies_questions WHERE id = %s', (question_id,))
+                cur.execute('SELECT image_url FROM social_studies_questions WHERE id = ?', (question_id,))
                 result = cur.fetchone()
                 if not result:
                     return jsonify({'error': '指定された問題が見つかりません'}), 404
@@ -3635,7 +3635,7 @@ def social_studies_delete_image(question_id):
                 cur.execute('''
                     UPDATE social_studies_questions 
                     SET image_url = NULL, image_title = NULL, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
+                    WHERE id = ?
                 ''', (question_id,))
                 conn.commit()
                 
@@ -3662,7 +3662,7 @@ def social_studies_get_question(question_id):
                     SELECT id, subject, question, correct_answer, acceptable_answers, 
                            explanation, image_url, image_title, difficulty_level, textbook_id, unit_id
                     FROM social_studies_questions 
-                    WHERE id = %s
+                    WHERE id = ?
                 ''', (question_id,))
                 
                 question = cur.fetchone()
@@ -3806,7 +3806,7 @@ def download_units_csv(textbook_id):
                 cur.execute('''
                     SELECT name, chapter_number, description
                     FROM social_studies_units
-                    WHERE textbook_id = %s
+                    WHERE textbook_id = ?
                     ORDER BY chapter_number, id
                 ''', (textbook_id,))
                 existing_units = cur.fetchall()
@@ -3879,7 +3879,7 @@ def download_questions_csv(textbook_id):
                 cur.execute('''
                     SELECT wasabi_folder_path
                     FROM social_studies_textbooks 
-                    WHERE id = %s
+                    WHERE id = ?
                 ''', (textbook_id,))
                 textbook = cur.fetchone()
                 base_image_url = f"https://s3.ap-northeast-1.wasabisys.com/{os.getenv('WASABI_BUCKET')}/{textbook['wasabi_folder_path'] or 'question_images'}" if textbook else "https://s3.ap-northeast-1.wasabisys.com/bucket/question_images"
@@ -3891,7 +3891,7 @@ def download_questions_csv(textbook_id):
                    q.image_url, q.image_title, q.created_at
                     FROM social_studies_questions q
             JOIN social_studies_units u ON q.unit_id = u.id
-            WHERE q.textbook_id = %s
+            WHERE q.textbook_id = ?
             ORDER BY u.chapter_number, q.question_number, q.id
         ''', (textbook_id,))
         existing_questions = cur.fetchall()
@@ -3968,7 +3968,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
                     SELECT t.name as textbook_name, t.wasabi_folder_path, u.name as unit_name, u.chapter_number
                     FROM social_studies_textbooks t
                     JOIN social_studies_units u ON t.id = u.textbook_id
-                    WHERE t.id = %s AND u.id = %s
+                    WHERE t.id = ? AND u.id = ?
                 ''', (textbook_id, unit_id))
                 result = cur.fetchone()
                 
@@ -3987,7 +3987,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
                     SELECT id, question_number, question, correct_answer, acceptable_answers, answer_suffix, 
                            explanation, difficulty_level, image_url, image_title
                     FROM social_studies_questions
-                    WHERE textbook_id = %s AND unit_id = %s
+                    WHERE textbook_id = ? AND unit_id = ?
                     ORDER BY question_number, id
                 ''', (textbook_id, unit_id))
                 existing_questions = cur.fetchall()
@@ -4114,11 +4114,11 @@ def social_studies_upload_unit_questions_csv():
         # 教材と単元が存在するかチェック
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 if not cur.fetchone():
                     return jsonify({'error': '指定された教材が見つかりません'}), 404
                 
-                cur.execute('SELECT id FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                cur.execute('SELECT id FROM social_studies_units WHERE id = ? AND textbook_id = ?', (unit_id, textbook_id))
                 if not cur.fetchone():
                     return jsonify({'error': '指定された単元が見つかりません'}), 404
         
@@ -4178,7 +4178,7 @@ def social_studies_upload_unit_questions_csv():
                             q_number = int(question_number)
                             cur.execute('''
                                 SELECT id FROM social_studies_questions 
-                                WHERE question_number = %s AND textbook_id = %s AND unit_id = %s
+                                WHERE question_number = ? AND textbook_id = ? AND unit_id = ?
                             ''', (q_number, textbook_id, unit_id))
                             existing_question = cur.fetchone()
                             
@@ -4188,10 +4188,10 @@ def social_studies_upload_unit_questions_csv():
                                 app.logger.info(f"行{row_num}: 保存する値 - image_url='{image_url}', image_title='{image_title}'")
                                 cur.execute('''
                                     UPDATE social_studies_questions 
-                                    SET question = %s, correct_answer = %s, acceptable_answers = %s, 
-                                        answer_suffix = %s, explanation = %s, difficulty_level = %s, 
-                                        image_url = %s, image_title = %s
-                                    WHERE id = %s
+                                    SET question = ?, correct_answer = ?, acceptable_answers = ?, 
+                                        answer_suffix = ?, explanation = ?, difficulty_level = ?, 
+                                        image_url = ?, image_title = ?
+                                    WHERE id = ?
                                 ''', (question, correct_answer, acceptable_answers, answer_suffix, 
                                       explanation, difficulty_level, image_url, image_title, existing_question[0]))
                                 registered_count += 1
@@ -4203,7 +4203,7 @@ def social_studies_upload_unit_questions_csv():
                                     INSERT INTO social_studies_questions 
                                     (textbook_id, unit_id, question_number, question, correct_answer, acceptable_answers, 
                                      answer_suffix, explanation, difficulty_level, image_url, image_title)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 ''', (textbook_id, unit_id, q_number, question, correct_answer, acceptable_answers,
                                       answer_suffix, explanation, difficulty_level, image_url, image_title))
                                 registered_count += 1
@@ -4211,7 +4211,7 @@ def social_studies_upload_unit_questions_csv():
                             # 問題番号が指定されていない場合は、問題文と正解で既存の問題を検索
                             cur.execute('''
                                 SELECT id FROM social_studies_questions 
-                                WHERE question = %s AND correct_answer = %s AND textbook_id = %s AND unit_id = %s
+                                WHERE question = ? AND correct_answer = ? AND textbook_id = ? AND unit_id = ?
                             ''', (question, correct_answer, textbook_id, unit_id))
                             existing_question = cur.fetchone()
                             
@@ -4221,9 +4221,9 @@ def social_studies_upload_unit_questions_csv():
                                 app.logger.info(f"行{row_num}: 保存する値 - image_url='{image_url}', image_title='{image_title}'")
                                 cur.execute('''
                                     UPDATE social_studies_questions 
-                                    SET acceptable_answers = %s, answer_suffix = %s, explanation = %s, 
-                                        difficulty_level = %s, image_url = %s, image_title = %s
-                                    WHERE id = %s
+                                    SET acceptable_answers = ?, answer_suffix = ?, explanation = ?, 
+                                        difficulty_level = ?, image_url = ?, image_title = ?
+                                    WHERE id = ?
                                 ''', (acceptable_answers, answer_suffix, explanation, difficulty_level, 
                                       image_url, image_title, existing_question[0]))
                                 registered_count += 1
@@ -4232,7 +4232,7 @@ def social_studies_upload_unit_questions_csv():
                                 cur.execute('''
                                     SELECT COALESCE(MAX(question_number), 0) + 1
                                     FROM social_studies_questions
-                                    WHERE textbook_id = %s AND unit_id = %s
+                                    WHERE textbook_id = ? AND unit_id = ?
                                 ''', (textbook_id, unit_id))
                                 next_number = cur.fetchone()[0]
                                 
@@ -4242,7 +4242,7 @@ def social_studies_upload_unit_questions_csv():
                                     INSERT INTO social_studies_questions 
                                     (textbook_id, unit_id, question_number, question, correct_answer, acceptable_answers, 
                                      answer_suffix, explanation, difficulty_level, image_url, image_title)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 ''', (textbook_id, unit_id, next_number, question, correct_answer, acceptable_answers,
                                       answer_suffix, explanation, difficulty_level, image_url, image_title))
                                 registered_count += 1
@@ -4284,15 +4284,15 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 教材情報取得
-                cur.execute('SELECT id, name, wasabi_folder_path FROM social_studies_textbooks WHERE id = %s', (textbook_id,))
+                cur.execute('SELECT id, name, wasabi_folder_path FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 textbook_info = cur.fetchone()
                 # 単元情報取得
-                cur.execute('SELECT id, name, chapter_number FROM social_studies_units WHERE id = %s AND textbook_id = %s', (unit_id, textbook_id))
+                cur.execute('SELECT id, name, chapter_number FROM social_studies_units WHERE id = ? AND textbook_id = ?', (unit_id, textbook_id))
                 unit_info = cur.fetchone()
                 # 問題リスト取得
                 cur.execute('''
                     SELECT * FROM social_studies_questions
-                    WHERE textbook_id = %s AND unit_id = %s
+                    WHERE textbook_id = ? AND unit_id = ?
                     ORDER BY question_number, id
                 ''', (textbook_id, unit_id))
                 questions = cur.fetchall()
@@ -4306,7 +4306,7 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
                     cur.execute('''
                         SELECT COUNT(*) as count
                         FROM social_studies_questions
-                        WHERE textbook_id = %s AND unit_id = %s AND image_url IS NOT NULL AND image_url != ''
+                        WHERE textbook_id = ? AND unit_id = ? AND image_url IS NOT NULL AND image_url != ''
                     ''', (textbook_id, unit_id))
                     image_questions_count = cur.fetchone()['count']
                     
@@ -4371,8 +4371,8 @@ def update_unit_image_path(textbook_id, unit_id):
                 # 教材のWasabiフォルダパスを更新
                 cur.execute('''
                     UPDATE social_studies_textbooks 
-                    SET wasabi_folder_path = %s 
-                    WHERE id = %s
+                    SET wasabi_folder_path = ? 
+                    WHERE id = ?
                 ''', (wasabi_folder_path, textbook_id))
                 
                 # 問題の画像パスも更新する場合
@@ -4381,7 +4381,7 @@ def update_unit_image_path(textbook_id, unit_id):
                     # 単元に登録されている問題の画像URLを更新
                     cur.execute('''
                         SELECT id, image_url FROM social_studies_questions
-                        WHERE textbook_id = %s AND unit_id = %s AND image_url IS NOT NULL AND image_url != ''
+                        WHERE textbook_id = ? AND unit_id = ? AND image_url IS NOT NULL AND image_url != ''
                     ''', (textbook_id, unit_id))
                     
                     questions = cur.fetchall()
@@ -4397,8 +4397,8 @@ def update_unit_image_path(textbook_id, unit_id):
                                 # 問題の画像URLを更新
                                 cur.execute('''
                                     UPDATE social_studies_questions 
-                                    SET image_url = %s 
-                                    WHERE id = %s
+                                    SET image_url = ? 
+                                    WHERE id = ?
                                 ''', (new_question_image_url, question_id))
                                 updated_questions_count += 1
                 
