@@ -264,4 +264,5 @@ def upload_image_to_wasabi(image_file, question_id, textbook_id=None):
 
 def set_image_public_access(image_url):
     """既存の画像ファイルに公開アクセス権限を設定（現在は無効化）"""
-    print("⚠️ 画像公開アクセス設
+    print("⚠️ 画像公開アクセス設定は現在無効化されています")
+    return None
