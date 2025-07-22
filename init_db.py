@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 
 def init_database():
+    print("init_database called")
     """データベースとテーブルを初期化"""
     db_path = 'flashcards.db'
     
@@ -244,4 +245,5 @@ def init_database():
         conn.close()
 
 if __name__ == '__main__':
+    print("__main__ section called")
     init_database() 

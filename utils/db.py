@@ -13,7 +13,7 @@ def get_db_connection():
     
     if db_type == 'sqlite':
         # SQLite接続
-        db_path = os.getenv('DB_PATH', 'flashcards.db')
+        db_path = os.path.abspath(os.getenv('DB_PATH', 'flashcards.db'))
         conn = None
         try:
             conn = sqlite3.connect(db_path)
