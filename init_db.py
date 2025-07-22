@@ -88,36 +88,46 @@ def init_database():
         )""",
         
         # 社会科テーブル
-        """CREATE TABLE IF NOT EXISTS textbooks (
+        """CREATE TABLE IF NOT EXISTS social_studies_textbooks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             subject TEXT NOT NULL,
             grade TEXT,
+            publisher TEXT,
+            description TEXT,
+            wasabi_folder_path TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         
-        """CREATE TABLE IF NOT EXISTS units (
+        """CREATE TABLE IF NOT EXISTS social_studies_units (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             textbook_id INTEGER NOT NULL,
             name TEXT NOT NULL,
-            unit_number INTEGER,
-            image_path TEXT,
+            chapter_number INTEGER,
+            description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (textbook_id) REFERENCES textbooks (id)
+            FOREIGN KEY (textbook_id) REFERENCES social_studies_textbooks (id)
         )""",
         
-        """CREATE TABLE IF NOT EXISTS questions (
+        """CREATE TABLE IF NOT EXISTS social_studies_questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
             textbook_id INTEGER NOT NULL,
             unit_id INTEGER,
-            question_text TEXT NOT NULL,
+            question TEXT NOT NULL,
             correct_answer TEXT NOT NULL,
             acceptable_answers TEXT,
+            answer_suffix TEXT,
             explanation TEXT,
-            image_path TEXT,
+            difficulty_level TEXT,
+            image_name TEXT,
+            image_url TEXT,
+            image_title TEXT,
+            question_number INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (textbook_id) REFERENCES textbooks (id),
-            FOREIGN KEY (unit_id) REFERENCES units (id)
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (textbook_id) REFERENCES social_studies_textbooks (id),
+            FOREIGN KEY (unit_id) REFERENCES social_studies_units (id)
         )""",
         
         # 語彙テーブル
@@ -188,7 +198,7 @@ def init_database():
             "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
             "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
             "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);",
-            "CREATE INDEX IF NOT EXISTS idx_questions_textbook_unit ON questions(textbook_id, unit_id);",
+            "CREATE INDEX IF NOT EXISTS idx_questions_textbook_unit ON social_studies_questions(textbook_id, unit_id);",
             "CREATE INDEX IF NOT EXISTS idx_vocabulary_words_chapter ON vocabulary_words(chapter_id, chunk_number);",
             "CREATE INDEX IF NOT EXISTS idx_vocabulary_progress_user_chapter ON vocabulary_progress(user_id, chapter_id, chunk_number);",
             "CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_user_word ON vocabulary_study_log(user_id, word_id);",
