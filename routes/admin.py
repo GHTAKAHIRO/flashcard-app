@@ -209,4 +209,113 @@ def admin_users_csv_template():
         mimetype='text/csv',
         as_attachment=True,
         download_name='users_template.csv'
-    ) 
+    )
+
+@admin_bp.route('/admin/users/<int:user_id>')
+@login_required
+def admin_get_user(user_id):
+    """ユーザー情報の取得（編集用）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    SELECT id, username, email, is_admin, full_name
+                    FROM users 
+                    WHERE id = ?
+                ''', (user_id,))
+                user_data = cur.fetchone()
+                
+                if not user_data:
+                    return jsonify({'error': 'ユーザーが見つかりません'}), 404
+                
+                user = {
+                    'id': user_data[0],
+                    'username': user_data[1],
+                    'email': user_data[2],
+                    'is_admin': bool(user_data[3]),
+                    'full_name': user_data[4]
+                }
+                
+                return jsonify(user)
+                
+    except Exception as e:
+        current_app.logger.error(f"ユーザー取得エラー: {e}")
+        return jsonify({'error': 'ユーザー情報の取得に失敗しました'}), 500
+
+@admin_bp.route('/admin/users/<int:user_id>', methods=['POST'])
+@login_required
+def admin_update_user(user_id):
+    """ユーザー情報の更新"""
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '').strip()
+        is_admin = data.get('is_admin', False)
+        
+        if not username:
+            return jsonify({'error': 'ユーザー名は必須です'}), 400
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # ユーザーが存在するかチェック
+                cur.execute('SELECT id FROM users WHERE id = ?', (user_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': 'ユーザーが見つかりません'}), 404
+                
+                # ユーザー名とメールの重複チェック（自分以外）
+                cur.execute('SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?', 
+                           (username, email, user_id))
+                if cur.fetchone():
+                    return jsonify({'error': 'ユーザー名またはメールアドレスが既に使用されています'}), 400
+                
+                # 更新処理
+                if password:
+                    # パスワードも更新
+                    from werkzeug.security import generate_password_hash
+                    hashed_password = generate_password_hash(password)
+                    cur.execute('''
+                        UPDATE users 
+                        SET username = ?, email = ?, password_hash = ?, is_admin = ?
+                        WHERE id = ?
+                    ''', (username, email, hashed_password, is_admin, user_id))
+                else:
+                    # パスワードは更新しない
+                    cur.execute('''
+                        UPDATE users 
+                        SET username = ?, email = ?, is_admin = ?
+                        WHERE id = ?
+                    ''', (username, email, is_admin, user_id))
+                
+                conn.commit()
+                return jsonify({'message': 'ユーザーを更新しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"ユーザー更新エラー: {e}")
+        return jsonify({'error': 'ユーザーの更新に失敗しました'}), 500
+
+@admin_bp.route('/admin/users/<int:user_id>', methods=['DELETE'])
+@login_required
+def admin_delete_user(user_id):
+    """ユーザーの削除"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # ユーザーが存在するかチェック
+                cur.execute('SELECT id FROM users WHERE id = ?', (user_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': 'ユーザーが見つかりません'}), 404
+                
+                # 自分自身は削除できない
+                if user_id == current_user.id:
+                    return jsonify({'error': '自分自身を削除することはできません'}), 400
+                
+                # ユーザーを削除
+                cur.execute('DELETE FROM users WHERE id = ?', (user_id,))
+                conn.commit()
+                
+                return jsonify({'message': 'ユーザーを削除しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"ユーザー削除エラー: {e}")
+        return jsonify({'error': 'ユーザーの削除に失敗しました'}), 500 
