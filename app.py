@@ -130,7 +130,7 @@ def log_worker():
                     with get_db_cursor(conn) as cur:
                         cur.execute('''
                             INSERT INTO study_log (user_id, card_id, result, stage, mode)
-                            VALUES (%s, %s, %s, %s, %s)
+                            VALUES (?, ?, ?, ?, ?)
                         ''', (user_id, card_id, result, stage, mode))
                         conn.commit()
                 app.logger.info(f"非同期ログ記録完了: user={user_id}, card={card_id}")
@@ -168,7 +168,7 @@ def get_unit_image_folder_path(question_id):
                     FROM social_studies_questions q
                     JOIN social_studies_units u ON q.unit_id = u.id
                     JOIN social_studies_textbooks t ON u.textbook_id = t.id
-                    WHERE q.id = %s
+                    WHERE q.id = ?
                 ''', (question_id,))
                 result = cur.fetchone()
                 
@@ -217,7 +217,7 @@ def get_unit_image_folder_path_by_unit_id(unit_id):
                         u.chapter_number
                     FROM social_studies_units u
                     JOIN social_studies_textbooks t ON u.textbook_id = t.id
-                    WHERE u.id = %s
+                    WHERE u.id = ?
                 ''', (unit_id,))
                 result = cur.fetchone()
                 
