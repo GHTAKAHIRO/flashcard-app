@@ -25,10 +25,12 @@ def init_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_number TEXT UNIQUE NOT NULL,
             username TEXT NOT NULL,
+            full_name TEXT,
             email TEXT,
             password_hash TEXT NOT NULL,
             is_admin BOOLEAN DEFAULT FALSE,
             is_active BOOLEAN DEFAULT TRUE,
+            last_login TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         
