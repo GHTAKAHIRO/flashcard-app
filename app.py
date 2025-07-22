@@ -127,7 +127,7 @@ def log_worker():
             
             try:
                 with get_db_connection() as conn:
-                    with conn.cursor() as cur:
+                    with get_db_cursor(conn) as cur:
                         cur.execute('''
                             INSERT INTO study_log (user_id, card_id, result, stage, mode)
                             VALUES (%s, %s, %s, %s, %s)
@@ -158,7 +158,7 @@ def get_unit_image_folder_path(question_id):
     """問題IDから単元の章番号に基づいて画像フォルダパスを生成"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 問題の単元情報を取得
                 cur.execute('''
                     SELECT 
@@ -205,7 +205,7 @@ def get_unit_image_folder_path_by_unit_id(unit_id):
     """単元IDから教材のWasabiフォルダパスと章番号に基づいて画像フォルダパスを生成"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 単元情報と教材のWasabiフォルダパスを取得
                 cur.execute('''
                     SELECT 
@@ -353,7 +353,7 @@ def optimize_database_indexes():
             else:
                 conn.autocommit = True
             
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 for index_sql in indexes:
                     try:
                         cur.execute(index_sql)
@@ -574,7 +574,7 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
         app.logger.info(f"進捗更新開始: user={user_id}, source={source}, chapter={chapter_id}, chunk={chunk_number}, completed={is_completed}, passed={is_passed}")
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 既存のレコードがあるかチェック
                 cur.execute('''
                     SELECT id FROM vocabulary_chunk_progress
@@ -776,7 +776,7 @@ def get_study_cards_fast(source, stage, mode, page_range, user_id, difficulty=''
     """超高速化されたカード取得"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 最適化されたクエリ
                 base_query = '''
                     SELECT id, subject, page_number, problem_number, level, image_problem, image_answer
@@ -874,7 +874,7 @@ def get_stage2_cards(source, page_range, user_id, difficulty):
     """Stage 2: Stage 1の×問題を全て取得（キャッシュ付き）"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 query = '''
                     SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
                     FROM image
@@ -949,7 +949,7 @@ def get_stage3_cards(source, page_range, user_id, difficulty):
             return []
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 query = '''
                     SELECT id, subject, grade, source, page_number, problem_number, topic, level, format, image_problem, image_answer
                     FROM image
@@ -1020,7 +1020,7 @@ def get_or_create_chunk_progress(user_id, source, stage, page_range, difficulty)
     """Stage 1用のチャンク進捗を取得または作成（最適化版）"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT chunk_number, total_chunks, completed 
                     FROM chunk_progress 
@@ -1155,7 +1155,7 @@ def get_or_create_chunk_progress_universal(user_id, source, stage, page_range, d
         chunk_number = 1
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 既存の進捗をチェック
                 cur.execute('''
                     SELECT chunk_number, total_chunks, completed 
@@ -1253,7 +1253,7 @@ def get_chunk_practice_cards(user_id, source, stage, chunk_number, page_range, d
         chunk_card_ids = [card['id'] for card in image]
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # テスト時に×だった問題を取得
                 cur.execute('''
                     SELECT card_id FROM (
@@ -1325,7 +1325,7 @@ def get_chunk_practice_cards_universal(user_id, source, stage, chunk_number, pag
         target_card_ids = [card['id'] for card in target_cards]
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 practice_mode = 'practice'
                 
                 query = '''
@@ -1386,7 +1386,7 @@ def is_stage_perfect(user_id, source, stage, page_range, difficulty):
         return False
     card_ids = [card['id'] for card in cards]
     with get_db_connection() as conn:
-        with conn.cursor() as cur:
+        with get_db_cursor(conn) as cur:
             cur.execute('''
                 SELECT card_id, result
                 FROM (
@@ -1519,7 +1519,7 @@ def get_stage_detailed_progress(user_id, source, stage, page_range, difficulty):
         chunks_progress = []
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 for chunk_num in range(1, total_chunks + 1):
                     if stage == 1:
                         image = chunks[chunk_num - 1]
@@ -1902,7 +1902,7 @@ def social_studies_admin_textbook_unified(textbook_id):
         search = request.args.get('search', '').strip()
         
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 教材情報を取得
                 cur.execute('SELECT * FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 textbook = cur.fetchone()
@@ -2007,7 +2007,7 @@ def social_studies_admin_unified():
         search = request.args.get('search', '').strip()
         
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 統計情報を取得
                 cur.execute('SELECT COUNT(*) as total_textbooks FROM social_studies_textbooks')
                 total_textbooks = cur.fetchone()[0]
@@ -2111,7 +2111,7 @@ def social_studies_admin_questions():
         search = request.args.get('search', '').strip()
         
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 基本クエリ
                 query = '''
                     SELECT 
@@ -2187,7 +2187,7 @@ def social_studies_add_question():
         
         try:
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with get_db_cursor(conn) as cur:
                     # 問題を追加
                     cur.execute('''
                         INSERT INTO social_studies_questions 
@@ -2265,7 +2265,7 @@ def social_studies_add_question():
     if textbook_id:
         try:
             with get_db_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                with get_db_cursor(conn) as cur:
                     cur.execute('SELECT id, name, subject, wasabi_folder_path FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                     textbook_info = cur.fetchone()
                     
@@ -2288,7 +2288,7 @@ def social_studies_delete_question(question_id):
     
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 問題が存在するかチェック
                 cur.execute('SELECT id FROM social_studies_questions WHERE id = ?', (question_id,))
                 if not cur.fetchone():
@@ -2328,7 +2328,7 @@ def social_studies_bulk_delete_questions():
             return jsonify({'error': '無効な問題IDが含まれています'}), 400
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 問題が存在するかチェック
                 placeholders = ','.join(['?'] * len(question_ids))
                 cur.execute(f'SELECT id FROM social_studies_questions WHERE id IN ({placeholders})', question_ids)
@@ -2365,7 +2365,7 @@ def social_studies_edit_question_page(question_id):
     
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 問題データを取得
                 cur.execute('''
                     SELECT q.id, q.subject, q.textbook_id, q.unit_id, q.question, q.correct_answer, 
@@ -2437,7 +2437,7 @@ def social_studies_edit_question(question_id):
         # 問題データを取得
         try:
             with get_db_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                with get_db_cursor(conn) as cur:
                     cur.execute('''
                         SELECT q.id, q.subject, q.textbook_id, q.unit_id, q.question, q.correct_answer, 
                                q.acceptable_answers, q.answer_suffix, q.explanation, q.difficulty_level,
@@ -2478,7 +2478,7 @@ def social_studies_edit_question(question_id):
                 return jsonify({'error': '問題文と正解は必須です'}), 400
             
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with get_db_cursor(conn) as cur:
                     # 問題が存在するかチェック
                     cur.execute('SELECT id FROM social_studies_questions WHERE id = ?', (question_id,))
                     if not cur.fetchone():
@@ -2559,7 +2559,7 @@ def social_studies_add_unit(textbook_id):
     
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 教材情報を取得
                 cur.execute('SELECT * FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 textbook = cur.fetchone()
@@ -2602,7 +2602,7 @@ def social_studies_delete_unit(unit_id):
     
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 単元が存在するかチェック
                 cur.execute('SELECT id FROM social_studies_units WHERE id = ?', (unit_id,))
                 if not cur.fetchone():
@@ -2640,7 +2640,7 @@ def social_studies_edit_unit(unit_id):
         # 単元データを取得
         try:
             with get_db_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                with get_db_cursor(conn) as cur:
                     cur.execute('''
                         SELECT id, name, chapter_number, description
                         FROM social_studies_units 
@@ -2677,7 +2677,7 @@ def social_studies_edit_unit(unit_id):
                     return jsonify({'error': '章番号は数値で入力してください'}), 400
             
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with get_db_cursor(conn) as cur:
                     # 単元が存在するかチェック
                     cur.execute('SELECT id FROM social_studies_units WHERE id = ?', (unit_id,))
                     if not cur.fetchone():
@@ -2707,7 +2707,7 @@ def social_studies_api_textbooks():
     
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 if subject:
                     cur.execute('''
                         SELECT id, name, subject, grade, publisher
@@ -2733,7 +2733,7 @@ def social_studies_api_textbook_detail(textbook_id):
     """教材詳細API（wasabi_folder_pathを含む）"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT id, name, subject, grade, publisher, wasabi_folder_path
                     FROM social_studies_textbooks 
@@ -2760,7 +2760,7 @@ def social_studies_api_units():
     
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT id, name, chapter_number, description
                     FROM social_studies_units 
@@ -2908,7 +2908,7 @@ def social_studies_add_textbook():
         
         try:
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with get_db_cursor(conn) as cur:
                     cur.execute('''
                         INSERT INTO social_studies_textbooks 
                         (name, subject, grade, publisher, description, wasabi_folder_path)
@@ -2934,7 +2934,7 @@ def social_studies_edit_textbook(textbook_id):
         # 教材データを取得
         try:
             with get_db_connection() as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                with get_db_cursor(conn) as cur:
                     cur.execute('''
                         SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
                         FROM social_studies_textbooks 
@@ -2972,7 +2972,7 @@ def social_studies_edit_textbook(textbook_id):
                 return jsonify({'error': '無効な科目です'}), 400
             
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with get_db_cursor(conn) as cur:
                     # 教材が存在するかチェック
                     cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                     if not cur.fetchone():
@@ -3001,7 +3001,7 @@ def social_studies_delete_textbook(textbook_id):
     
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 教材が存在するかチェック
                 cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 if not cur.fetchone():
@@ -3068,7 +3068,7 @@ def social_studies_upload_csv():
         error_count = 0
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 for i, line in enumerate(data_lines, 2):
                     try:
                         # カンマで分割（ただし、ダブルクォート内のカンマは無視）
@@ -3215,7 +3215,7 @@ def social_studies_upload_units_csv():
         error_count = 0
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 教材が存在するかチェック
                 cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 if not cur.fetchone():
@@ -3341,7 +3341,7 @@ def social_studies_upload_questions_csv():
         app.logger.info(f"CSVアップロード開始: {len(csv_data)}行のデータ")
             
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 for row_num, row in enumerate(reader, 1):
                     app.logger.info(f"行{row_num}を処理中: {row}")
                     try:
@@ -3557,7 +3557,7 @@ def social_studies_upload_image(question_id):
         
         # 問題と教材IDを取得
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('SELECT id, textbook_id FROM social_studies_questions WHERE id = ?', (question_id,))
                 result = cur.fetchone()
                 if not result:
@@ -3575,7 +3575,7 @@ def social_studies_upload_image(question_id):
         
         # データベースに画像URLを保存
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     UPDATE social_studies_questions 
                     SET image_url = ?, updated_at = CURRENT_TIMESTAMP
@@ -3603,7 +3603,7 @@ def social_studies_delete_image(question_id):
     try:
         # 現在の画像URLを取得
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('SELECT image_url FROM social_studies_questions WHERE id = ?', (question_id,))
                 result = cur.fetchone()
                 if not result:
@@ -3631,7 +3631,7 @@ def social_studies_delete_image(question_id):
         
         # データベースから画像URLと画像タイトルを削除
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     UPDATE social_studies_questions 
                     SET image_url = NULL, image_title = NULL, updated_at = CURRENT_TIMESTAMP
@@ -3657,7 +3657,7 @@ def social_studies_get_question(question_id):
     
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT id, subject, question, correct_answer, acceptable_answers, 
                            explanation, image_url, image_title, difficulty_level, textbook_id, unit_id
@@ -3802,7 +3802,7 @@ def download_units_csv(textbook_id):
         
         # 既存の単元データを取得
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT name, chapter_number, description
                     FROM social_studies_units
@@ -3875,7 +3875,7 @@ def download_questions_csv(textbook_id):
         
         # 教材の画像URLを取得
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT wasabi_folder_path
                     FROM social_studies_textbooks 
@@ -3962,7 +3962,7 @@ def download_unit_questions_csv(textbook_id, unit_id):
         
         # 教材と単元の情報を取得
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 教材と単元の情報を取得
                 cur.execute('''
                     SELECT t.name as textbook_name, t.wasabi_folder_path, u.name as unit_name, u.chapter_number
@@ -4113,7 +4113,7 @@ def social_studies_upload_unit_questions_csv():
         
         # 教材と単元が存在するかチェック
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 if not cur.fetchone():
                     return jsonify({'error': '指定された教材が見つかりません'}), 404
@@ -4131,7 +4131,7 @@ def social_studies_upload_unit_questions_csv():
         app.logger.info(f"CSVヘッダー: {reader.fieldnames}")
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 for row_num, row in enumerate(reader, 1):
                     app.logger.info(f"行{row_num}を処理中: {row}")
                     try:
@@ -4282,7 +4282,7 @@ def social_studies_admin_unit_questions(textbook_id, unit_id):
     image_path_info = None
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 教材情報取得
                 cur.execute('SELECT id, name, wasabi_folder_path FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
                 textbook_info = cur.fetchone()
@@ -4347,7 +4347,7 @@ def update_unit_image_path(textbook_id, unit_id):
             return jsonify({'error': '有効なURLを入力してください（https://で始まる必要があります）'}), 400
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 教材のWasabiフォルダパスを更新（URLからパスを抽出）
                 # URLの形式: https://s3.ap-northeast-1-ntt.wasabisys.com/so-image/path/to/folder
                 url_parts = new_image_url.split('/')
@@ -4431,7 +4431,7 @@ if __name__ == '__main__':
         # データベース接続テスト
         try:
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with get_db_cursor(conn) as cur:
                     cur.execute('SELECT 1')
                     result = cur.fetchone()
                     print(f"✅ データベース接続テスト成功: {result}")
