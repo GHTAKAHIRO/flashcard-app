@@ -2328,29 +2328,30 @@ def vocabulary_home():
     try:
         # ユーザーの学習履歴を取得（vocabulary_study_logテーブルから）
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT DISTINCT source, COUNT(*) as total_words,
                            COUNT(CASE WHEN result = 'known' THEN 1 END) as known_words
                     FROM vocabulary_study_log 
-                    WHERE user_id = %s
+                    WHERE user_id = ?
                     GROUP BY source
                 ''', (str(current_user.id),))
                 vocabulary_sources = cur.fetchall()
         
         # 各セットの総単語数も取得
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT source, COUNT(*) as total_available
                     FROM vocabulary_words 
                     GROUP BY source
                 ''')
-                total_available = {row['source']: row['total_available'] for row in cur.fetchall()}
+                total_available = {row[0]: row[1] for row in cur.fetchall()}
         
         # 結果をマージ
         for source in vocabulary_sources:
-            source['total_available'] = total_available.get(source['source'], 0)
+            source = list(source)  # タプルをリストに変換
+            source.append(total_available.get(source[0], 0))  # total_availableを追加
         
         return render_template('vocabulary/home.html', vocabulary_sources=vocabulary_sources)
     except Exception as e:
@@ -4359,16 +4360,16 @@ def admin():
         return redirect(url_for('login')) 
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 統計情報を取得
                 cur.execute('SELECT COUNT(*) as total_users FROM users')
-                total_users = cur.fetchone()['total_users']
+                total_users = cur.fetchone()[0]
                 
-                cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions')
-                total_questions = cur.fetchone()['total_questions']
+                cur.execute('SELECT COUNT(*) as total_questions FROM questions')
+                total_questions = cur.fetchone()[0]
                 
-                cur.execute('SELECT COUNT(*) as total_study_logs FROM social_studies_study_log')
-                total_study_logs = cur.fetchone()['total_study_logs']
+                cur.execute('SELECT COUNT(*) as total_study_logs FROM study_log')
+                total_study_logs = cur.fetchone()[0]
                 
                 return render_template('admin.html',
                                      total_users=total_users,

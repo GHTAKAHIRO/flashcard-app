@@ -77,7 +77,7 @@ def get_db_connection():
                 conn.close()
 
 @contextmanager
-def get_db_cursor(conn):
+def get_db_cursor(conn, cursor_factory=None):
     """
     データベースカーソルを取得（SQLite/PostgreSQL対応版）
     """
@@ -92,5 +92,9 @@ def get_db_cursor(conn):
             cursor.close()
     else:
         # PostgreSQLの場合はコンテキストマネージャーを使用
-        with conn.cursor() as cursor:
-            yield cursor 
+        if cursor_factory:
+            with conn.cursor(cursor_factory=cursor_factory) as cursor:
+                yield cursor
+        else:
+            with conn.cursor() as cursor:
+                yield cursor 
