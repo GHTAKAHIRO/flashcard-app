@@ -388,7 +388,7 @@
                         <i class="fas fa-home me-2"></i>管理画面
                     </a>
                     {% if current_user.is_admin %}
-                    <a class="nav-link" href="{{ url_for('vocabulary_admin') }}">
+                    <a class="nav-link" href="{{ url_for('vocabulary.vocabulary_admin') }}">
                         <i class="fas fa-cog me-2"></i>管理画面
                     </a>
                     {% endif %}
@@ -416,7 +416,7 @@
                                     </div>
                                     <div class="stats-label">総単語数</div>
                                 </div>
-                                <a href="{{ url_for('vocabulary_chapters', source='basic') }}" class="btn start-btn">
+                                <a href="{{ url_for('vocabulary.vocabulary_chapters', source='basic') }}" class="btn start-btn">
                                     <i class="fas fa-arrow-right me-2"></i>章を選択
                                 </a>
                             </div>
@@ -439,7 +439,7 @@
                                     </div>
                                     <div class="stats-label">総単語数</div>
                                 </div>
-                                <a href="{{ url_for('vocabulary_chapters', source='toeic') }}" class="btn start-btn">
+                                <a href="{{ url_for('vocabulary.vocabulary_chapters', source='toeic') }}" class="btn start-btn">
                                     <i class="fas fa-arrow-right me-2"></i>章を選択
                                 </a>
                             </div>
@@ -462,7 +462,7 @@
                                     </div>
                                     <div class="stats-label">総単語数</div>
                                 </div>
-                                <a href="{{ url_for('vocabulary_chapters', source='university') }}" class="btn start-btn">
+                                <a href="{{ url_for('vocabulary.vocabulary_chapters', source='university') }}" class="btn start-btn">
                                     <i class="fas fa-arrow-right me-2"></i>章を選択
                                 </a>
                             </div>

@@ -605,16 +605,16 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item">
-                            <a href="{{ url_for('vocabulary_home') }}">
+                            <a href="{{ url_for('vocabulary.vocabulary_home') }}">
                                 <i class="fas fa-home me-1"></i>英単語帳
                             </a>
                         </li>
                         <li class="breadcrumb-item">
-                            <a href="{{ url_for('vocabulary_chapters', source=source) }}">{{ source_title }}</a>
+                            <a href="{{ url_for('vocabulary.vocabulary_chapters', source=source) }}">{{ source_title }}</a>
                         </li>
                         {% if chapter_id %}
                         <li class="breadcrumb-item">
-                            <a href="{{ url_for('vocabulary_chunks', source=source, chapter_id=chapter_id) }}">{{ chapter_title }}</a>
+                            <a href="{{ url_for('vocabulary.vocabulary_chunks', source=source, chapter_id=chapter_id) }}">{{ chapter_title }}</a>
                         </li>
                         <li class="breadcrumb-item active" aria-current="page">チャンク{{ chunk_number }} 結果</li>
                         {% else %}
@@ -737,11 +737,11 @@
                 <!-- アクションボタン -->
                 <div class="action-buttons">
                     {% if chapter_id %}
-                    <a href="{{ url_for('vocabulary_chunks', source=source, chapter_id=chapter_id) }}" class="btn-custom">
+                    <a href="{{ url_for('vocabulary.vocabulary_chunks', source=source, chapter_id=chapter_id) }}" class="btn-custom">
                         <i class="fas fa-list me-2"></i>チャンク一覧に戻る
                     </a>
                     {% endif %}
-                    <a href="{{ url_for('vocabulary_home') }}" class="btn-custom btn-home">
+                    <a href="{{ url_for('vocabulary.vocabulary_home') }}" class="btn-custom btn-home">
                         <i class="fas fa-home me-2"></i>ホームに戻る
                     </a>
                 </div>
