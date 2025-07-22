@@ -1789,12 +1789,12 @@ def social_studies_quiz(subject):
     """社会科クイズ画面"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 指定された科目の問題を取得
                 cur.execute('''
                     SELECT id, question, correct_answer, acceptable_answers, answer_suffix, explanation, image_url
                     FROM social_studies_questions 
-                    WHERE subject = %s 
+                    WHERE subject = ? 
                     ORDER BY RANDOM() 
                     LIMIT 10
                 ''', (subject,))
@@ -1802,7 +1802,7 @@ def social_studies_quiz(subject):
                 
                 if not questions:
                     flash('この科目の問題が見つかりません', 'error')
-                    return redirect(url_for('admin'))
+                    return redirect(url_for('admin.admin'))
                 
                 return render_template('social_studies/quiz.html', 
                                      questions=questions, 
@@ -1810,7 +1810,7 @@ def social_studies_quiz(subject):
     except Exception as e:
         app.logger.error(f"社会科クイズ画面エラー: {e}")
         flash('問題の取得に失敗しました', 'error')
-        return redirect(url_for('admin'))
+        return redirect(url_for('admin.admin'))
 
 @app.route('/social_studies/submit_answer', methods=['POST'])
 @login_required
@@ -2010,16 +2010,16 @@ def social_studies_admin_unified():
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # 統計情報を取得
                 cur.execute('SELECT COUNT(*) as total_textbooks FROM social_studies_textbooks')
-                total_textbooks = cur.fetchone()['total_textbooks']
+                total_textbooks = cur.fetchone()[0]
                 
                 cur.execute('SELECT COUNT(*) as total_units FROM social_studies_units')
-                total_units = cur.fetchone()['total_units']
+                total_units = cur.fetchone()[0]
                 
                 cur.execute('SELECT COUNT(*) as total_questions FROM social_studies_questions')
-                total_questions = cur.fetchone()['total_questions']
+                total_questions = cur.fetchone()[0]
                 
                 cur.execute('SELECT COUNT(*) as total_study_logs FROM social_studies_study_log')
-                total_study_logs = cur.fetchone()['total_study_logs']
+                total_study_logs = cur.fetchone()[0]
                 
                 # 教材一覧を取得
                 cur.execute('''
@@ -2051,23 +2051,23 @@ def social_studies_admin_unified():
                 params = []
                 
                 if subject:
-                    conditions.append('q.subject = %s')
+                    conditions.append('q.subject = ?')
                     params.append(subject)
                 
                 if textbook_id:
-                    conditions.append('q.textbook_id = %s')
+                    conditions.append('q.textbook_id = ?')
                     params.append(int(textbook_id))
                 
                 if unit_id:
-                    conditions.append('q.unit_id = %s')
+                    conditions.append('q.unit_id = ?')
                     params.append(int(unit_id))
                 
                 if difficulty:
-                    conditions.append('q.difficulty_level = %s')
+                    conditions.append('q.difficulty_level = ?')
                     params.append(difficulty)
                 
                 if search:
-                    conditions.append('(q.question ILIKE %s OR q.correct_answer ILIKE %s)')
+                    conditions.append('(q.question LIKE ? OR q.correct_answer LIKE ?)')
                     search_param = f'%{search}%'
                     params.extend([search_param, search_param])
                 
@@ -2092,7 +2092,7 @@ def social_studies_admin_unified():
     except Exception as e:
         app.logger.error(f"社会科統合管理画面エラー: {e}")
         flash('統合管理画面の読み込みに失敗しました', 'error')
-        return redirect(url_for('admin'))
+        return redirect(url_for('admin.admin'))
 
 @app.route('/social_studies/admin/questions')
 @login_required

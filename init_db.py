@@ -148,6 +148,20 @@ def init_database():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (chapter_id) REFERENCES vocabulary_chapters (id)
+        )""",
+        
+        """CREATE TABLE IF NOT EXISTS vocabulary_study_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            word_id INTEGER NOT NULL,
+            chapter_id INTEGER NOT NULL,
+            chunk_number INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            result TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (word_id) REFERENCES vocabulary_words (id),
+            FOREIGN KEY (chapter_id) REFERENCES vocabulary_chapters (id)
         )"""
     ]
     
@@ -170,7 +184,9 @@ def init_database():
             "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);",
             "CREATE INDEX IF NOT EXISTS idx_questions_textbook_unit ON questions(textbook_id, unit_id);",
             "CREATE INDEX IF NOT EXISTS idx_vocabulary_words_chapter ON vocabulary_words(chapter_id, chunk_number);",
-            "CREATE INDEX IF NOT EXISTS idx_vocabulary_progress_user_chapter ON vocabulary_progress(user_id, chapter_id, chunk_number);"
+            "CREATE INDEX IF NOT EXISTS idx_vocabulary_progress_user_chapter ON vocabulary_progress(user_id, chapter_id, chunk_number);",
+            "CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_user_word ON vocabulary_study_log(user_id, word_id);",
+            "CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_user_chapter ON vocabulary_study_log(user_id, chapter_id, chunk_number);"
         ]
         
         for index_sql in indexes:
