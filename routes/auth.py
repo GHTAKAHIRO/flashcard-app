@@ -42,7 +42,7 @@ def login():
                     return redirect(next_page)
                 
                 current_app.logger.info("通常ユーザー: ダッシュボードにリダイレクト")
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('admin.admin'))
             else:
                 current_app.logger.warning(f"ログイン失敗: username={username}")
                 flash("ログインに失敗しました。")
