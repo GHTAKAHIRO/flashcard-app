@@ -1,5 +1,5 @@
 import sqlite3
-import psycopg2
+# import psycopg2  # SQLite使用時はコメントアウト
 from contextlib import contextmanager
 from flask import current_app
 import os

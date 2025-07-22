@@ -7,8 +7,9 @@ from datetime import datetime, timedelta
 import os
 import logging
 import math
-import psycopg2
-from psycopg2.extras import RealDictCursor
+# PostgreSQL関連のインポートをコメントアウト（SQLite使用時）
+# import psycopg2
+# from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 from functools import wraps
 import json
@@ -16,7 +17,7 @@ import hashlib
 import threading
 import time
 import queue
-import psycopg2.pool
+# import psycopg2.pool
 from contextlib import contextmanager
 import atexit
 from flask_wtf.csrf import CSRFProtect
