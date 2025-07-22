@@ -224,12 +224,12 @@ def get_unit_image_folder_path_by_unit_id(unit_id):
                 if result:
                     subject, wasabi_folder_path, chapter_number = result
                     
-                    # 教材のWasabiフォルダパスが設定されている場合はそれを使用
-                    if wasabi_folder_path:
-                        if chapter_number:
-                            folder_path = f"{wasabi_folder_path}/{chapter_number}"
-                        else:
-                            folder_path = f"{wasabi_folder_path}/default"
+                    # Noneや空の場合はデフォルト値を使用
+                    base_folder = wasabi_folder_path or 'so-image'
+                    
+                    # 章番号が設定されている場合は章番号を使用、そうでなければデフォルト
+                    if chapter_number:
+                        folder_path = f"{base_folder}/{chapter_number}"
                     else:
                         # フォールバック: 科目を英語に変換
                         subject_map = {
@@ -239,11 +239,11 @@ def get_unit_image_folder_path_by_unit_id(unit_id):
                             '理科': 'science'
                         }
                         subject_en = subject_map.get(subject, 'other')
-                        
+                        base_folder = 'so-image'
                         if chapter_number:
-                            folder_path = f"social_studies/{subject_en}/{chapter_number}"
+                            folder_path = f"{base_folder}/{subject_en}/{chapter_number}"
                         else:
-                            folder_path = f"social_studies/{subject_en}/default"
+                            folder_path = f"{base_folder}/{subject_en}/default"
                     
                     print(f"🔍 単元ID {unit_id} から生成されたフォルダパス: {folder_path}")
                     return folder_path
