@@ -29,6 +29,7 @@ import re
 # from PIL import Image  # 画像処理（現在は使用しない）
 import uuid
 from routes.auth import auth_bp
+from routes.admin import admin_bp
 from models.user import User
 from utils.db import get_db_connection, get_db_cursor
 
@@ -87,6 +88,10 @@ print("🚀 バックエンド高速化システム初期化完了")
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Blueprint登録
+app.register_blueprint(auth_bp)
+app.register_blueprint(admin_bp)
 
 # --- ここからカスタムフィルタ追加 ---
 def to_kanji_circle(value):
@@ -4218,36 +4223,7 @@ def social_studies_delete_textbook(textbook_id):
         app.logger.error(f"教材削除エラー: {e}")
         return jsonify({'error': '教材の削除に失敗しました'}), 500
 
-# ========== メイン管理画面 ==========
-
-@app.route('/admin')
-@login_required
-def admin():
-    """メイン管理画面（管理者のみ）"""
-    if not current_user.is_admin:
-        flash("管理者権限が必要です")
-        return redirect(url_for('login')) 
-    try:
-        with get_db_connection() as conn:
-            with get_db_cursor(conn) as cur:
-                # 統計情報を取得
-                cur.execute('SELECT COUNT(*) as total_users FROM users')
-                total_users = cur.fetchone()[0]
-                
-                cur.execute('SELECT COUNT(*) as total_questions FROM questions')
-                total_questions = cur.fetchone()[0]
-                
-                cur.execute('SELECT COUNT(*) as total_study_logs FROM study_log')
-                total_study_logs = cur.fetchone()[0]
-                
-                return render_template('admin.html',
-                                     total_users=total_users,
-                                     total_questions=total_questions,
-                                     total_study_logs=total_study_logs)
-    except Exception as e:
-        app.logger.error(f"管理画面エラー: {e}")
-        flash('管理画面の読み込みに失敗しました', 'error')
-        return redirect(url_for('login'))
+# 管理機能は routes/admin.py に移動済み
 
 @app.route('/social_studies/admin/upload_csv', methods=['POST'])
 @login_required
@@ -5636,103 +5612,7 @@ def update_unit_image_path(textbook_id, unit_id):
         app.logger.error(f"画像URL更新エラー: {e}")
         return jsonify({'error': f'画像URLの更新に失敗しました: {str(e)}'}), 500
 
-@app.route('/admin/users')
-@login_required
-def admin_users():
-    # 仮のユーザーデータ（本番ではDBから取得）
-    users = []
-    total_users = 0
-    active_users = 0
-    new_users_this_month = 0
-    # TODO: DBからユーザー情報を取得し、上記変数にセット
-    return render_template(
-        'admin_users.html',
-        users=users,
-        total_users=total_users,
-        active_users=active_users,
-        new_users_this_month=new_users_this_month
-    )
-
-@app.route('/admin/users/add', methods=['POST'])
-@login_required
-def admin_add_user():
-    data = request.get_json()
-    student_number = data.get('student_number')
-    username = data.get('username')
-    email = data.get('email')
-    is_admin = data.get('is_admin', False)
-    password = data.get('password')
-    # パスワードは「So-生徒番号」
-    if not student_number or not username or not password:
-        return jsonify({'error': '生徒番号・ユーザー名・パスワードは必須です'}), 400
-    if password != f'So-{student_number}':
-        return jsonify({'error': 'パスワードは「So-生徒番号」にしてください'}), 400
-    password_hash = generate_password_hash(password)
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute('''
-                    INSERT INTO users (student_number, username, email, password_hash, is_admin, is_active, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                ''', (student_number, username, email, password_hash, is_admin, True))
-                conn.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        app.logger.error(f"ユーザー追加エラー: {e}")
-        return jsonify({'error': f'ユーザー追加に失敗しました: {str(e)}'}), 500
-
-@app.route('/admin/users/upload_csv', methods=['POST'])
-@login_required
-def admin_upload_users_csv():
-    if 'csv_file' not in request.files:
-        return jsonify({'error': 'CSVファイルがありません'}), 400
-    file = request.files['csv_file']
-    if not file.filename.endswith('.csv'):
-        return jsonify({'error': 'CSVファイルをアップロードしてください'}), 400
-    try:
-        file.stream.seek(0)
-        csv_reader = csv.reader((line.decode('utf-8') for line in file), delimiter=',')
-        count = 0
-        for row in csv_reader:
-            if not row or row[0].startswith('#'):
-                continue
-            # CSV: 生徒番号,ユーザー名,メールアドレス,管理者フラグ
-            student_number = row[0].strip()
-            username = row[1].strip() if len(row) > 1 else ''
-            email = row[2].strip() if len(row) > 2 else ''
-            is_admin = row[3].strip() == '1' if len(row) > 3 else False
-            password = f'So-{student_number}'
-            password_hash = generate_password_hash(password)
-            if not student_number or not username:
-                continue
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute('''
-                        INSERT INTO users (student_number, username, email, password_hash, is_admin, is_active, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                    ''', (student_number, username, email, password_hash, is_admin, True))
-                    conn.commit()
-                    count += 1
-        return jsonify({'success': True, 'message': f'{count}件のユーザーを登録しました'})
-    except Exception as e:
-        app.logger.error(f"CSVユーザー登録エラー: {e}")
-        return jsonify({'error': f'CSVユーザー登録に失敗しました: {str(e)}'}), 500
-
-@app.route('/admin/users/csv_template')
-@login_required
-def admin_users_csv_template():
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['生徒番号', 'ユーザー名', '学年', 'メールアドレス', '管理者フラグ'])
-    writer.writerow(['10001', '山田太郎', '小4', 'taro@example.com', '0'])
-    writer.writerow(['10002', '佐藤花子', '中1', 'hanako@example.com', '1'])
-    output.seek(0)
-    return send_file(
-        io.BytesIO(output.getvalue().encode('utf-8-sig')),
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name='user_template.csv'
-    )
+# ユーザー管理機能は routes/admin.py に移動済み
 
 if __name__ == '__main__':
     # データベース接続プールを初期化
