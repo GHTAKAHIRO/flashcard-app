@@ -129,6 +129,18 @@ def init_database():
             FOREIGN KEY (textbook_id) REFERENCES social_studies_textbooks (id),
             FOREIGN KEY (unit_id) REFERENCES social_studies_units (id)
         )""",
+        # 社会科学習ログテーブル
+        """CREATE TABLE IF NOT EXISTS social_studies_study_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            question_id INTEGER NOT NULL,
+            user_answer TEXT,
+            is_correct BOOLEAN,
+            subject TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (question_id) REFERENCES social_studies_questions (id)
+        )""",
         
         # 語彙テーブル
         """CREATE TABLE IF NOT EXISTS vocabulary_chapters (
