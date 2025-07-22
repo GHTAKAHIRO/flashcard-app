@@ -74,4 +74,23 @@ def get_db_connection():
                     if conn:
                         conn.close()
             elif conn:
-                conn.close() 
+                conn.close()
+
+@contextmanager
+def get_db_cursor(conn):
+    """
+    データベースカーソルを取得（SQLite/PostgreSQL対応版）
+    """
+    db_type = os.getenv('DB_TYPE', 'sqlite')
+    
+    if db_type == 'sqlite':
+        # SQLiteの場合は手動でカーソルを管理
+        cursor = conn.cursor()
+        try:
+            yield cursor
+        finally:
+            cursor.close()
+    else:
+        # PostgreSQLの場合はコンテキストマネージャーを使用
+        with conn.cursor() as cursor:
+            yield cursor 

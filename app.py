@@ -29,7 +29,7 @@ from PIL import Image
 import uuid
 from routes.auth import auth_bp
 from models.user import User
-from utils.db import get_db_connection
+from utils.db import get_db_connection, get_db_cursor
 
 # ========== 設定エリア ==========
 load_dotenv(dotenv_path='dbname.env')
@@ -597,8 +597,8 @@ def parse_page_range(page_range_str):
 def load_user(user_id):
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE id = %s", (user_id,))
+            with get_db_cursor(conn) as cur:
+                cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE id = ?", (user_id,))
                 user = cur.fetchone()
                 if user:
                     return User(*user)
@@ -619,11 +619,11 @@ def has_study_history(user_id, source):
     """指定教材に学習履歴があるかチェック（キャッシュ付き）"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT COUNT(*) FROM study_log sl
                     JOIN image i ON sl.card_id = i.id
-                    WHERE sl.user_id = %s AND i.source = %s
+                    WHERE sl.user_id = ? AND i.source = ?
                 ''', (user_id, source))
                 count = cur.fetchone()[0]
                 return count > 0
@@ -636,14 +636,14 @@ def check_chunk_completion(user_id, source, chapter_id, chunk_number):
     """指定チャンクが合格済みかチェック"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with get_db_cursor(conn) as cur:
                 # 最新のセッションで全問正解したかチェック
                 cur.execute('''
                     SELECT vsl.session_id, COUNT(*) as total_words,
                            SUM(CASE WHEN vsl.result = 'known' THEN 1 ELSE 0 END) as correct_words
                     FROM vocabulary_study_log vsl
-                    WHERE vsl.user_id = %s AND vsl.source = %s 
-                    AND vsl.chapter_id = %s AND vsl.chunk_number = %s
+                    WHERE vsl.user_id = ? AND vsl.source = ? 
+                    AND vsl.chapter_id = ? AND vsl.chunk_number = ?
                     GROUP BY vsl.session_id
                     ORDER BY vsl.study_date DESC
                     LIMIT 1
@@ -663,12 +663,12 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
     """英単語チャンクの進捗状況を取得"""
     try:
         with get_db_connection() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with get_db_cursor(conn) as cur:
                 # 基本の進捗情報を取得
                 cur.execute('''
                     SELECT is_completed, is_passed, completed_at, passed_at
                     FROM vocabulary_chunk_progress
-                    WHERE user_id = %s AND source = %s AND chapter_id = %s AND chunk_number = %s
+                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
                 ''', (user_id, source, chapter_id, chunk_number))
                 result = cur.fetchone()
                 
@@ -676,10 +676,10 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
                 cur.execute('''
                     SELECT COUNT(*) as correct_count
                     FROM vocabulary_study_log
-                    WHERE user_id = %s AND source = %s AND chapter_id = %s AND chunk_number = %s AND result = 'known'
+                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ? AND result = 'known'
                 ''', (user_id, source, chapter_id, chunk_number))
                 correct_result = cur.fetchone()
-                correct_count = correct_result['correct_count'] if correct_result else 0
+                correct_count = correct_result[0] if correct_result else 0
                 
                 if result:
                     result = dict(result)
@@ -1756,16 +1756,16 @@ def login():
 
         try:
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = %s", (username,))
+                with get_db_cursor(conn) as cur:
+                    cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = ?", (username,))
                     user = cur.fetchone()
 
             if user and check_password_hash(user[2], password):
                 login_user(User(user[0], user[1], user[2], user[3], user[4]))
                 # 最終ログイン時刻を更新
                 with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s", (user[0],))
+                    with get_db_cursor(conn) as cur:
+                        cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user[0],))
                         conn.commit()
                 # 管理者の場合は管理者画面にリダイレクト
                 if user[4]:  # is_adminがTrueの場合
@@ -1791,8 +1791,8 @@ def register():
 
         try:
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, password))
+                with get_db_cursor(conn) as cur:
+                    cur.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, password))
                     conn.commit()
             return redirect(url_for('login'))
         except Exception as e:
@@ -1815,16 +1815,16 @@ def home():
         if username and password:
             try:
                 with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = %s", (username,))
+                    with get_db_cursor(conn) as cur:
+                        cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = ?", (username,))
                         user = cur.fetchone()
 
                 if user and check_password_hash(user[2], password):
                     login_user(User(user[0], user[1], user[2], user[3], user[4]))
                     # 最終ログイン時刻を更新
                     with get_db_connection() as conn:
-                        with conn.cursor() as cur:
-                            cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s", (user[0],))
+                        with get_db_cursor(conn) as cur:
+                            cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user[0],))
                             conn.commit()
                     # 管理者の場合は管理者画面にリダイレクト
                     if user[4]:  # is_adminがTrueの場合
