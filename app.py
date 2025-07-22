@@ -1643,7 +1643,7 @@ def login():
                         conn.commit()
                 # 管理者の場合は管理者画面にリダイレクト
                 if user[4]:  # is_adminがTrueの場合
-                    return redirect(url_for('admin'))
+                    return redirect(url_for('admin.admin'))
                 # 通常ユーザーの場合はnextパラメータまたはダッシュボードにリダイレクト
                 next_page = request.args.get('next')
                 if next_page:
@@ -1702,12 +1702,12 @@ def home():
                             conn.commit()
                     # 管理者の場合は管理者画面にリダイレクト
                     if user[4]:  # is_adminがTrueの場合
-                        return redirect(url_for('admin'))
+                        return redirect(url_for('admin.admin'))
                     # 通常ユーザーの場合はnextパラメータまたは管理画面にリダイレクト
                     next_page = request.args.get('next')
                     if next_page:
                         return redirect(next_page)
-                    return redirect(url_for('admin'))
+                    return redirect(url_for('admin.admin'))
                 else:
                     flash("ログインに失敗しました。")
             except Exception as e:
@@ -1717,8 +1717,8 @@ def home():
     if current_user.is_authenticated:
         # 管理者の場合は管理者画面にリダイレクト
         if current_user.is_admin:
-            return redirect(url_for('admin'))
-        return redirect(url_for('admin'))
+            return redirect(url_for('admin.admin'))
+        return redirect(url_for('admin.admin'))
     return render_template('login.html')
 
 # favicon.icoのルートを追加
@@ -1731,7 +1731,7 @@ def favicon():
 @login_required
 def dashboard():
     """ダッシュボード画面 - 管理画面にリダイレクト"""
-    return redirect(url_for('admin'))
+    return redirect(url_for('admin.admin'))
 
 @app.route('/set_page_range_and_prepare/<source>', methods=['POST'])
 @login_required
@@ -1852,7 +1852,7 @@ def reset_history(source):
         import traceback
         app.logger.error(f"詳細エラー: {traceback.format_exc()}")
     
-    return redirect(url_for('admin'))
+    return redirect(url_for('admin.admin'))
 
 @app.route('/prepare/<source>')
 @login_required
@@ -1927,7 +1927,7 @@ def prepare(source):
     except Exception as e:
         app.logger.error(f"準備画面エラー: {e}")
         flash("準備画面でエラーが発生しました")
-        return redirect(url_for('admin'))
+        return redirect(url_for('admin.admin'))
 
 def is_all_stages_perfect(user_id, source, page_range, difficulty):
     return (
@@ -2231,7 +2231,7 @@ def vocabulary_home():
     except Exception as e:
         app.logger.error(f"英単語ホーム画面エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('admin'))
+        return redirect(url_for('admin.admin'))
 
 @app.route('/vocabulary/chapters/<source>')
 @login_required

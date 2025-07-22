@@ -29,7 +29,7 @@ def login():
                         conn.commit()
                 # 管理者の場合は管理者画面にリダイレクト
                 if user[4]:  # is_adminがTrueの場合
-                    return redirect(url_for('admin'))
+                    return redirect(url_for('admin.admin'))
                 # 通常ユーザーの場合はnextパラメータまたはダッシュボードにリダイレクト
                 next_page = request.args.get('next')
                 if next_page:
