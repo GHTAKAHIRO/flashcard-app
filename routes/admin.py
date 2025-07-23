@@ -362,18 +362,49 @@ def social_studies_admin_questions():
 def social_studies_add_question():
     """社会科問題追加画面"""
     try:
+        textbook_id = request.args.get('textbook_id', type=int)
+        unit_id = request.args.get('unit_id', type=int)
+        
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
-                # 教材一覧を取得
-                cur.execute('SELECT id, name, subject FROM social_studies_textbooks ORDER BY subject, name')
-                textbooks = cur.fetchall()
-                
-                # 単元一覧を取得
-                cur.execute('SELECT id, name, textbook_id FROM social_studies_units ORDER BY textbook_id, name')
-                units = cur.fetchall()
-                
-                return render_template('social_studies/add_question.html', 
-                                     textbooks=textbooks, units=units)
+                if textbook_id and unit_id:
+                    # 特定の教材・単元の問題を追加する場合
+                    cur.execute('''
+                        SELECT t.id, t.name, t.subject, u.id, u.name
+                        FROM social_studies_textbooks t
+                        JOIN social_studies_units u ON t.id = u.textbook_id
+                        WHERE t.id = ? AND u.id = ?
+                    ''', (textbook_id, unit_id))
+                    data = cur.fetchone()
+                    
+                    if not data:
+                        flash('教材または単元が見つかりません', 'error')
+                        return redirect(url_for('admin.social_studies_admin_unified'))
+                    
+                    textbook_info = {
+                        'id': data[0],
+                        'name': data[1],
+                        'subject': data[2]
+                    }
+                    
+                    unit_info = {
+                        'id': data[3],
+                        'name': data[4]
+                    }
+                    
+                    return render_template('social_studies/add_question.html', 
+                                         textbook_info=textbook_info, unit_info=unit_info)
+                else:
+                    # 教材一覧を取得
+                    cur.execute('SELECT id, name, subject FROM social_studies_textbooks ORDER BY subject, name')
+                    textbooks = cur.fetchall()
+                    
+                    # 単元一覧を取得
+                    cur.execute('SELECT id, name, textbook_id FROM social_studies_units ORDER BY textbook_id, name')
+                    units = cur.fetchall()
+                    
+                    return render_template('social_studies/add_question.html', 
+                                         textbooks=textbooks, units=units)
                 
     except Exception as e:
         current_app.logger.error(f"社会科問題追加画面エラー: {e}")
@@ -509,13 +540,32 @@ def social_studies_admin_textbook_unified(textbook_id):
 def social_studies_add_unit():
     """社会科単元追加画面"""
     try:
+        textbook_id = request.args.get('textbook_id', type=int)
+        
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
-                # 教材一覧を取得
-                cur.execute('SELECT id, name, subject FROM social_studies_textbooks ORDER BY subject, name')
-                textbooks = cur.fetchall()
-                
-                return render_template('social_studies/add_unit.html', textbooks=textbooks)
+                if textbook_id:
+                    # 特定の教材の単元を追加する場合
+                    cur.execute('SELECT id, name, subject FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                    textbook_data = cur.fetchone()
+                    
+                    if not textbook_data:
+                        flash('教材が見つかりません', 'error')
+                        return redirect(url_for('admin.social_studies_admin_unified'))
+                    
+                    textbook = {
+                        'id': textbook_data[0],
+                        'name': textbook_data[1],
+                        'subject': textbook_data[2]
+                    }
+                    
+                    return render_template('social_studies/add_unit.html', textbook=textbook)
+                else:
+                    # 教材一覧を取得
+                    cur.execute('SELECT id, name, subject FROM social_studies_textbooks ORDER BY subject, name')
+                    textbooks = cur.fetchall()
+                    
+                    return render_template('social_studies/add_unit.html', textbooks=textbooks)
                 
     except Exception as e:
         current_app.logger.error(f"社会科単元追加画面エラー: {e}")
