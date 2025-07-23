@@ -26,14 +26,11 @@ def admin():
                 cur.execute('SELECT COUNT(*) FROM vocabulary_words')
                 vocabulary_count = cur.fetchone()[0]
                 
-                stats = {
-                    'users': user_count,
-                    'study_logs': study_log_count,
-                    'questions': question_count,
-                    'vocabulary_words': vocabulary_count
-                }
-                
-                return render_template('admin.html', stats=stats)
+                return render_template('admin.html', 
+                                     total_users=user_count,
+                                     total_study_logs=study_log_count,
+                                     total_questions=question_count,
+                                     total_vocabulary_words=vocabulary_count)
                 
     except Exception as e:
         current_app.logger.error(f"管理画面エラー: {e}")
@@ -319,3 +316,96 @@ def admin_delete_user(user_id):
     except Exception as e:
         current_app.logger.error(f"ユーザー削除エラー: {e}")
         return jsonify({'error': 'ユーザーの削除に失敗しました'}), 500 
+
+@admin_bp.route('/admin/social_studies/questions')
+@login_required
+def social_studies_admin_questions():
+    """社会科問題一覧管理画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 問題一覧を取得
+                cur.execute('''
+                    SELECT q.id, q.question_text, q.answer_text, q.explanation, 
+                           q.subject, q.difficulty, q.created_at,
+                           t.name as textbook_name, u.name as unit_name
+                    FROM social_studies_questions q
+                    LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
+                    LEFT JOIN social_studies_units u ON q.unit_id = u.id
+                    ORDER BY q.created_at DESC
+                ''')
+                questions_data = cur.fetchall()
+                
+                questions = []
+                for q_data in questions_data:
+                    questions.append({
+                        'id': q_data[0],
+                        'question_text': q_data[1],
+                        'answer_text': q_data[2],
+                        'explanation': q_data[3],
+                        'subject': q_data[4],
+                        'difficulty': q_data[5],
+                        'created_at': q_data[6],
+                        'textbook_name': q_data[7] or '未設定',
+                        'unit_name': q_data[8] or '未設定'
+                    })
+                
+                return render_template('social_studies/admin_questions.html', questions=questions)
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科問題管理画面エラー: {e}")
+        flash('社会科問題管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.admin'))
+
+@admin_bp.route('/admin/social_studies/questions/add')
+@login_required
+def social_studies_add_question():
+    """社会科問題追加画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材一覧を取得
+                cur.execute('SELECT id, name, subject FROM social_studies_textbooks ORDER BY subject, name')
+                textbooks = cur.fetchall()
+                
+                # 単元一覧を取得
+                cur.execute('SELECT id, name, textbook_id FROM social_studies_units ORDER BY textbook_id, name')
+                units = cur.fetchall()
+                
+                return render_template('social_studies/add_question.html', 
+                                     textbooks=textbooks, units=units)
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科問題追加画面エラー: {e}")
+        flash('社会科問題追加画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_admin_questions'))
+
+@admin_bp.route('/admin/social_studies/unified')
+@login_required
+def social_studies_admin_unified():
+    """社会科統合管理画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 統計情報を取得
+                cur.execute('SELECT COUNT(*) FROM social_studies_questions')
+                question_count = cur.fetchone()[0]
+                
+                cur.execute('SELECT COUNT(*) FROM social_studies_textbooks')
+                textbook_count = cur.fetchone()[0]
+                
+                cur.execute('SELECT COUNT(*) FROM social_studies_units')
+                unit_count = cur.fetchone()[0]
+                
+                stats = {
+                    'questions': question_count,
+                    'textbooks': textbook_count,
+                    'units': unit_count
+                }
+                
+                return render_template('social_studies/admin_unified.html', stats=stats)
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科統合管理画面エラー: {e}")
+        flash('社会科統合管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.admin')) 
