@@ -505,6 +505,8 @@ def social_studies_admin_unified():
                 ''')
                 textbooks_data = cur.fetchall()
                 
+                current_app.logger.info(f"教材一覧取得: {len(textbooks_data)} 件")
+                
                 textbooks = []
                 for t_data in textbooks_data:
                     textbooks.append({
@@ -517,6 +519,7 @@ def social_studies_admin_unified():
                         'unit_count': t_data[6],
                         'question_count': t_data[7]
                     })
+                    current_app.logger.info(f"教材: ID={t_data[0]}, name={t_data[1]}, subject={t_data[2]}")
                 
                 return render_template('social_studies/admin_unified.html', 
                                      stats={'questions': question_count, 'textbooks': textbook_count, 'units': unit_count},
@@ -549,6 +552,8 @@ def social_studies_add_textbook_post():
         publisher = request.form.get('publisher', '').strip()
         description = request.form.get('description', '').strip()
         
+        current_app.logger.info(f"教材追加開始: name={name}, subject={subject}")
+        
         # バリデーション
         if not name:
             flash('教材名は必須です', 'error')
@@ -572,7 +577,21 @@ def social_studies_add_textbook_post():
                     VALUES (?, ?, ?, ?, ?, datetime('now'))
                 ''', (name, subject, grade, publisher, description))
                 
+                # 追加された教材のIDを取得
+                textbook_id = cur.lastrowid
+                current_app.logger.info(f"教材追加完了: ID={textbook_id}")
+                
                 conn.commit()
+                current_app.logger.info(f"データベースコミット完了: ID={textbook_id}")
+                
+                # 追加された教材を確認
+                cur.execute('SELECT id, name, subject FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                added_textbook = cur.fetchone()
+                if added_textbook:
+                    current_app.logger.info(f"追加確認: ID={added_textbook[0]}, name={added_textbook[1]}")
+                else:
+                    current_app.logger.error(f"追加確認失敗: ID={textbook_id} が見つかりません")
+                
                 flash('教材を追加しました', 'success')
                 return redirect(url_for('admin.social_studies_admin_unified'))
                 
