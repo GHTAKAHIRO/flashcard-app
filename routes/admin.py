@@ -397,15 +397,188 @@ def social_studies_admin_unified():
                 cur.execute('SELECT COUNT(*) FROM social_studies_units')
                 unit_count = cur.fetchone()[0]
                 
-                stats = {
-                    'questions': question_count,
-                    'textbooks': textbook_count,
-                    'units': unit_count
-                }
+                # 教材一覧を取得
+                cur.execute('''
+                    SELECT t.id, t.name, t.subject, t.grade, t.publisher, t.description,
+                           COUNT(DISTINCT u.id) as unit_count,
+                           COUNT(DISTINCT q.id) as question_count
+                    FROM social_studies_textbooks t
+                    LEFT JOIN social_studies_units u ON t.id = u.textbook_id
+                    LEFT JOIN social_studies_questions q ON t.id = q.textbook_id
+                    GROUP BY t.id
+                    ORDER BY t.subject, t.name
+                ''')
+                textbooks_data = cur.fetchall()
                 
-                return render_template('social_studies/admin_unified.html', stats=stats)
+                textbooks = []
+                for t_data in textbooks_data:
+                    textbooks.append({
+                        'id': t_data[0],
+                        'name': t_data[1],
+                        'subject': t_data[2],
+                        'grade': t_data[3],
+                        'publisher': t_data[4],
+                        'description': t_data[5],
+                        'unit_count': t_data[6],
+                        'question_count': t_data[7]
+                    })
+                
+                return render_template('social_studies/admin_unified.html', 
+                                     stats={'questions': question_count, 'textbooks': textbook_count, 'units': unit_count},
+                                     textbooks=textbooks)
                 
     except Exception as e:
         current_app.logger.error(f"社会科統合管理画面エラー: {e}")
         flash('社会科統合管理画面の読み込みに失敗しました', 'error')
         return redirect(url_for('admin.admin')) 
+
+@admin_bp.route('/admin/social_studies/textbooks/add')
+@login_required
+def social_studies_add_textbook():
+    """社会科教材追加画面"""
+    try:
+        return render_template('social_studies/add_textbook.html')
+    except Exception as e:
+        current_app.logger.error(f"社会科教材追加画面エラー: {e}")
+        flash('社会科教材追加画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_admin_unified'))
+
+@admin_bp.route('/admin/social_studies/textbooks/<int:textbook_id>')
+@login_required
+def social_studies_admin_textbook_unified(textbook_id):
+    """社会科教材詳細管理画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材情報を取得
+                cur.execute('''
+                    SELECT id, name, subject, grade, publisher, description, created_at
+                    FROM social_studies_textbooks 
+                    WHERE id = ?
+                ''', (textbook_id,))
+                textbook_data = cur.fetchone()
+                
+                if not textbook_data:
+                    flash('教材が見つかりません', 'error')
+                    return redirect(url_for('admin.social_studies_admin_unified'))
+                
+                textbook_info = {
+                    'id': textbook_data[0],
+                    'name': textbook_data[1],
+                    'subject': textbook_data[2],
+                    'grade': textbook_data[3],
+                    'publisher': textbook_data[4],
+                    'description': textbook_data[5],
+                    'created_at': textbook_data[6]
+                }
+                
+                # 単元一覧を取得
+                cur.execute('''
+                    SELECT id, name, description, created_at
+                    FROM social_studies_units 
+                    WHERE textbook_id = ?
+                    ORDER BY name
+                ''', (textbook_id,))
+                units_data = cur.fetchall()
+                
+                units = []
+                for unit_data in units_data:
+                    units.append({
+                        'id': unit_data[0],
+                        'name': unit_data[1],
+                        'description': unit_data[2],
+                        'created_at': unit_data[3]
+                    })
+                
+                # 問題数を取得
+                cur.execute('SELECT COUNT(*) FROM social_studies_questions WHERE textbook_id = ?', (textbook_id,))
+                question_count = cur.fetchone()[0]
+                
+                return render_template('social_studies/admin_textbook_unified.html', 
+                                     textbook_info=textbook_info, 
+                                     units=units,
+                                     question_count=question_count)
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科教材詳細管理画面エラー: {e}")
+        flash('社会科教材詳細管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_admin_unified'))
+
+@admin_bp.route('/admin/social_studies/units/add')
+@login_required
+def social_studies_add_unit():
+    """社会科単元追加画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材一覧を取得
+                cur.execute('SELECT id, name, subject FROM social_studies_textbooks ORDER BY subject, name')
+                textbooks = cur.fetchall()
+                
+                return render_template('social_studies/add_unit.html', textbooks=textbooks)
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科単元追加画面エラー: {e}")
+        flash('社会科単元追加画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_admin_unified'))
+
+@admin_bp.route('/admin/social_studies/units/<int:unit_id>/questions')
+@login_required
+def social_studies_admin_unit_questions(unit_id):
+    """社会科単元問題管理画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 単元情報を取得
+                cur.execute('''
+                    SELECT u.id, u.name, u.description, t.id as textbook_id, t.name as textbook_name
+                    FROM social_studies_units u
+                    JOIN social_studies_textbooks t ON u.textbook_id = t.id
+                    WHERE u.id = ?
+                ''', (unit_id,))
+                unit_data = cur.fetchone()
+                
+                if not unit_data:
+                    flash('単元が見つかりません', 'error')
+                    return redirect(url_for('admin.social_studies_admin_unified'))
+                
+                textbook_info = {
+                    'id': unit_data[3],
+                    'name': unit_data[4]
+                }
+                
+                unit_info = {
+                    'id': unit_data[0],
+                    'name': unit_data[1],
+                    'description': unit_data[2]
+                }
+                
+                # 問題一覧を取得
+                cur.execute('''
+                    SELECT id, question_text, answer_text, explanation, difficulty, created_at
+                    FROM social_studies_questions 
+                    WHERE unit_id = ?
+                    ORDER BY created_at DESC
+                ''', (unit_id,))
+                questions_data = cur.fetchall()
+                
+                questions = []
+                for q_data in questions_data:
+                    questions.append({
+                        'id': q_data[0],
+                        'question_text': q_data[1],
+                        'answer_text': q_data[2],
+                        'explanation': q_data[3],
+                        'difficulty': q_data[4],
+                        'created_at': q_data[5]
+                    })
+                
+                return render_template('social_studies/admin_unit_questions.html', 
+                                     textbook_info=textbook_info,
+                                     unit_info=unit_info,
+                                     questions=questions)
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科単元問題管理画面エラー: {e}")
+        flash('社会科単元問題管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_admin_unified')) 
