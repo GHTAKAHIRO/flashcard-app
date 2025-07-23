@@ -411,6 +411,70 @@ def social_studies_add_question():
         flash('社会科問題追加画面の読み込みに失敗しました', 'error')
         return redirect(url_for('admin.social_studies_admin_questions'))
 
+@admin_bp.route('/admin/social_studies/questions/add', methods=['POST'])
+@login_required
+def social_studies_add_question_post():
+    """社会科問題追加処理"""
+    try:
+        question_text = request.form.get('question_text', '').strip()
+        answer_text = request.form.get('answer_text', '').strip()
+        explanation = request.form.get('explanation', '').strip()
+        subject = request.form.get('subject', '').strip()
+        difficulty = request.form.get('difficulty', 'normal')
+        textbook_id = request.form.get('textbook_id', type=int)
+        unit_id = request.form.get('unit_id', type=int)
+        
+        # バリデーション
+        if not question_text:
+            flash('問題文は必須です', 'error')
+            return redirect(url_for('admin.social_studies_add_question'))
+        
+        if not answer_text:
+            flash('正解は必須です', 'error')
+            return redirect(url_for('admin.social_studies_add_question'))
+        
+        if not subject:
+            flash('科目は必須です', 'error')
+            return redirect(url_for('admin.social_studies_add_question'))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材と単元の存在チェック
+                if textbook_id:
+                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                    if not cur.fetchone():
+                        flash('指定された教材が見つかりません', 'error')
+                        return redirect(url_for('admin.social_studies_add_question'))
+                
+                if unit_id:
+                    cur.execute('SELECT id FROM social_studies_units WHERE id = ?', (unit_id,))
+                    if not cur.fetchone():
+                        flash('指定された単元が見つかりません', 'error')
+                        return redirect(url_for('admin.social_studies_add_question'))
+                
+                # 問題を追加
+                cur.execute('''
+                    INSERT INTO social_studies_questions 
+                    (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ''', (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id))
+                
+                conn.commit()
+                flash('問題を追加しました', 'success')
+                
+                # リダイレクト先を決定
+                if unit_id:
+                    return redirect(url_for('admin.social_studies_admin_unit_questions', unit_id=unit_id))
+                elif textbook_id:
+                    return redirect(url_for('admin.social_studies_admin_textbook_unified', textbook_id=textbook_id))
+                else:
+                    return redirect(url_for('admin.social_studies_admin_questions'))
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科問題追加エラー: {e}")
+        flash('問題の追加に失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_add_question'))
+
 @admin_bp.route('/admin/social_studies/unified')
 @login_required
 def social_studies_admin_unified():
@@ -473,6 +537,49 @@ def social_studies_add_textbook():
         current_app.logger.error(f"社会科教材追加画面エラー: {e}")
         flash('社会科教材追加画面の読み込みに失敗しました', 'error')
         return redirect(url_for('admin.social_studies_admin_unified'))
+
+@admin_bp.route('/admin/social_studies/textbooks/add', methods=['POST'])
+@login_required
+def social_studies_add_textbook_post():
+    """社会科教材追加処理"""
+    try:
+        name = request.form.get('name', '').strip()
+        subject = request.form.get('subject', '').strip()
+        grade = request.form.get('grade', '').strip()
+        publisher = request.form.get('publisher', '').strip()
+        description = request.form.get('description', '').strip()
+        
+        # バリデーション
+        if not name:
+            flash('教材名は必須です', 'error')
+            return redirect(url_for('admin.social_studies_add_textbook'))
+        
+        if not subject:
+            flash('科目は必須です', 'error')
+            return redirect(url_for('admin.social_studies_add_textbook'))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材名の重複チェック
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE name = ?', (name,))
+                if cur.fetchone():
+                    flash('この教材名は既に使用されています', 'error')
+                    return redirect(url_for('admin.social_studies_add_textbook'))
+                
+                # 教材を追加
+                cur.execute('''
+                    INSERT INTO social_studies_textbooks (name, subject, grade, publisher, description, created_at)
+                    VALUES (?, ?, ?, ?, ?, datetime('now'))
+                ''', (name, subject, grade, publisher, description))
+                
+                conn.commit()
+                flash('教材を追加しました', 'success')
+                return redirect(url_for('admin.social_studies_admin_unified'))
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科教材追加エラー: {e}")
+        flash('教材の追加に失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_add_textbook'))
 
 @admin_bp.route('/admin/social_studies/textbooks/<int:textbook_id>')
 @login_required
@@ -571,6 +678,63 @@ def social_studies_add_unit():
         current_app.logger.error(f"社会科単元追加画面エラー: {e}")
         flash('社会科単元追加画面の読み込みに失敗しました', 'error')
         return redirect(url_for('admin.social_studies_admin_unified'))
+
+@admin_bp.route('/admin/social_studies/units/add', methods=['POST'])
+@login_required
+def social_studies_add_unit_post():
+    """社会科単元追加処理"""
+    try:
+        name = request.form.get('name', '').strip()
+        chapter_number = request.form.get('chapter_number', '').strip()
+        description = request.form.get('description', '').strip()
+        textbook_id = request.args.get('textbook_id', type=int)
+        
+        # バリデーション
+        if not name:
+            flash('単元名は必須です', 'error')
+            return redirect(url_for('admin.social_studies_add_unit', textbook_id=textbook_id))
+        
+        if not textbook_id:
+            flash('教材IDが指定されていません', 'error')
+            return redirect(url_for('admin.social_studies_admin_unified'))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材が存在するかチェック
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                if not cur.fetchone():
+                    flash('指定された教材が見つかりません', 'error')
+                    return redirect(url_for('admin.social_studies_admin_unified'))
+                
+                # 単元名の重複チェック（同じ教材内で）
+                cur.execute('SELECT id FROM social_studies_units WHERE name = ? AND textbook_id = ?', (name, textbook_id))
+                if cur.fetchone():
+                    flash('この単元名は既に使用されています', 'error')
+                    return redirect(url_for('admin.social_studies_add_unit', textbook_id=textbook_id))
+                
+                # 章番号の処理
+                chapter_num = None
+                if chapter_number:
+                    try:
+                        chapter_num = int(chapter_number)
+                    except ValueError:
+                        flash('章番号は数値で入力してください', 'error')
+                        return redirect(url_for('admin.social_studies_add_unit', textbook_id=textbook_id))
+                
+                # 単元を追加
+                cur.execute('''
+                    INSERT INTO social_studies_units (name, chapter_number, description, textbook_id, created_at)
+                    VALUES (?, ?, ?, ?, datetime('now'))
+                ''', (name, chapter_num, description, textbook_id))
+                
+                conn.commit()
+                flash('単元を追加しました', 'success')
+                return redirect(url_for('admin.social_studies_admin_textbook_unified', textbook_id=textbook_id))
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科単元追加エラー: {e}")
+        flash('単元の追加に失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_add_unit', textbook_id=textbook_id))
 
 @admin_bp.route('/admin/social_studies/units/<int:unit_id>/questions')
 @login_required
