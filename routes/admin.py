@@ -796,3 +796,186 @@ def social_studies_admin_unit_questions(unit_id):
         current_app.logger.error(f"社会科単元問題管理画面エラー: {e}")
         flash('社会科単元問題管理画面の読み込みに失敗しました', 'error')
         return redirect(url_for('admin.social_studies_admin_unified')) 
+
+@admin_bp.route('/admin/social_studies/textbooks/<int:textbook_id>/units/csv')
+@login_required
+def download_units_csv(textbook_id):
+    """単元CSVダウンロード"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材情報を取得
+                cur.execute('SELECT name FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                textbook_data = cur.fetchone()
+                
+                if not textbook_data:
+                    flash('教材が見つかりません', 'error')
+                    return redirect(url_for('admin.social_studies_admin_unified'))
+                
+                # 単元一覧を取得
+                cur.execute('''
+                    SELECT name, chapter_number, description
+                    FROM social_studies_units 
+                    WHERE textbook_id = ?
+                    ORDER BY chapter_number, name
+                ''', (textbook_id,))
+                units_data = cur.fetchall()
+                
+                # CSVデータを作成
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerow(['単元名', '章番号', '説明'])
+                
+                for unit_data in units_data:
+                    writer.writerow([
+                        unit_data[0] or '',
+                        unit_data[1] or '',
+                        unit_data[2] or ''
+                    ])
+                
+                output.seek(0)
+                
+                from flask import Response
+                return Response(
+                    output.getvalue(),
+                    mimetype='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename=units_{textbook_id}.csv'}
+                )
+                
+    except Exception as e:
+        current_app.logger.error(f"単元CSVダウンロードエラー: {e}")
+        flash('CSVダウンロードに失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_admin_textbook_unified', textbook_id=textbook_id))
+
+@admin_bp.route('/admin/social_studies/units/<int:unit_id>/questions/csv')
+@login_required
+def download_unit_questions_csv(unit_id):
+    """単元問題CSVダウンロード"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 単元情報を取得
+                cur.execute('''
+                    SELECT u.name, t.id as textbook_id, t.name as textbook_name
+                    FROM social_studies_units u
+                    JOIN social_studies_textbooks t ON u.textbook_id = t.id
+                    WHERE u.id = ?
+                ''', (unit_id,))
+                unit_data = cur.fetchone()
+                
+                if not unit_data:
+                    flash('単元が見つかりません', 'error')
+                    return redirect(url_for('admin.social_studies_admin_unified'))
+                
+                # 問題一覧を取得
+                cur.execute('''
+                    SELECT question_text, answer_text, explanation, difficulty
+                    FROM social_studies_questions 
+                    WHERE unit_id = ?
+                    ORDER BY created_at
+                ''', (unit_id,))
+                questions_data = cur.fetchall()
+                
+                # CSVデータを作成
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerow(['問題文', '正解', '説明', '難易度'])
+                
+                for question_data in questions_data:
+                    writer.writerow([
+                        question_data[0] or '',
+                        question_data[1] or '',
+                        question_data[2] or '',
+                        question_data[3] or 'normal'
+                    ])
+                
+                output.seek(0)
+                
+                from flask import Response
+                return Response(
+                    output.getvalue(),
+                    mimetype='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename=questions_unit_{unit_id}.csv'}
+                )
+                
+    except Exception as e:
+        current_app.logger.error(f"単元問題CSVダウンロードエラー: {e}")
+        flash('CSVダウンロードに失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_admin_unit_questions', unit_id=unit_id))
+
+@admin_bp.route('/social_studies/admin/edit_textbook/<int:textbook_id>')
+@login_required
+def social_studies_edit_textbook_get(textbook_id):
+    """教材編集データ取得（API）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    SELECT id, name, subject, grade, publisher, description
+                    FROM social_studies_textbooks 
+                    WHERE id = ?
+                ''', (textbook_id,))
+                textbook_data = cur.fetchone()
+                
+                if not textbook_data:
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                textbook = {
+                    'id': textbook_data[0],
+                    'name': textbook_data[1],
+                    'subject': textbook_data[2],
+                    'grade': textbook_data[3],
+                    'publisher': textbook_data[4],
+                    'description': textbook_data[5]
+                }
+                
+                return jsonify(textbook)
+                
+    except Exception as e:
+        current_app.logger.error(f"教材編集データ取得エラー: {e}")
+        return jsonify({'error': '教材データの取得に失敗しました'}), 500
+
+@admin_bp.route('/social_studies/admin/edit_textbook/<int:textbook_id>', methods=['POST'])
+@login_required
+def social_studies_edit_textbook_post(textbook_id):
+    """教材編集処理（API）"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        subject = data.get('subject', '').strip()
+        grade = data.get('grade', '').strip()
+        publisher = data.get('publisher', '').strip()
+        description = data.get('description', '').strip()
+        
+        # バリデーション
+        if not name:
+            return jsonify({'error': '教材名は必須です'}), 400
+        
+        if not subject:
+            return jsonify({'error': '科目は必須です'}), 400
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材が存在するかチェック
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                # 教材名の重複チェック（自分以外）
+                cur.execute('SELECT id FROM social_studies_textbooks WHERE name = ? AND id != ?', (name, textbook_id))
+                if cur.fetchone():
+                    return jsonify({'error': 'この教材名は既に使用されています'}), 400
+                
+                # 教材を更新
+                cur.execute('''
+                    UPDATE social_studies_textbooks 
+                    SET name = ?, subject = ?, grade = ?, publisher = ?, description = ?
+                    WHERE id = ?
+                ''', (name, subject, grade, publisher, description, textbook_id))
+                
+                conn.commit()
+                return jsonify({'message': '教材を更新しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"教材編集エラー: {e}")
+        return jsonify({'error': '教材の更新に失敗しました'}), 500 
