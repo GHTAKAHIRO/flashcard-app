@@ -633,7 +633,7 @@ def social_studies_admin_textbook_unified(textbook_id):
                 question_count = cur.fetchone()[0]
                 
                 return render_template('social_studies/admin_textbook_unified.html', 
-                                     textbook_info=textbook_info, 
+                                     textbook=textbook_info, 
                                      units=units,
                                      question_count=question_count)
                 
