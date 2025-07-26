@@ -449,7 +449,7 @@ function editQuestion(questionId) {
     currentEditId = questionId;
     
     // 問題データを取得
-    fetch(`/social_studies/admin/edit_question/${questionId}`)
+    fetch(`/input_studies/admin/edit_question/${questionId}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -515,7 +515,7 @@ function saveEdit() {
     saveButton.textContent = '保存中...';
     
     // APIに送信
-    fetch(`/social_studies/admin/edit_question/${currentEditId}`, {
+    fetch(`/input_studies/admin/edit_question/${currentEditId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -548,7 +548,7 @@ function saveEdit() {
 function deleteQuestion(questionId) {
     if (confirm('この問題を削除しますか？\nこの操作は取り消せません。')) {
         // 削除APIを呼び出し
-        fetch(`/social_studies/admin/delete_question/${questionId}`, {
+        fetch(`/input_studies/admin/delete_question/${questionId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -648,7 +648,7 @@ function uploadCsv() {
 
     
     // APIに送信
-    fetch('/social_studies/admin/upload_questions_csv', {
+    fetch('/input_studies/admin/upload_questions_csv', {
         method: 'POST',
         body: formData
     })
@@ -713,7 +713,7 @@ function downloadSampleCsv() {
 // 構造付きテンプレートCSVダウンロード
 function downloadTemplateCsv() {
     // サーバーから構造付きテンプレートをダウンロード
-    window.location.href = '/social_studies/admin/download_csv_template';
+    window.location.href = '/input_studies/admin/download_csv_template';
 }
 
 // 画像アップロード機能
@@ -723,7 +723,7 @@ function showImageUpload(questionId) {
     currentQuestionId = questionId;
     
     // 現在の画像を取得
-    fetch(`/social_studies/admin/question/${questionId}`)
+    fetch(`/input_studies/admin/question/${questionId}`)
         .then(response => response.json())
         .then(data => {
             if (data.success && data.question.image_url) {
@@ -800,9 +800,9 @@ function uploadImage() {
     uploadButton.disabled = true;
     uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>アップロード中...';
     
-    console.log('アップロード開始:', `/social_studies/admin/upload_image/${currentQuestionId}`);
+    console.log('アップロード開始:', `/input_studies/admin/upload_image/${currentQuestionId}`);
     
-    fetch(`/social_studies/admin/upload_image/${currentQuestionId}`, {
+    fetch(`/input_studies/admin/upload_image/${currentQuestionId}`, {
         method: 'POST',
         body: formData
     })
@@ -849,7 +849,7 @@ function deleteCurrentImage() {
     }
     
     if (confirm('現在の画像を削除しますか？')) {
-        fetch(`/social_studies/admin/delete_image/${currentQuestionId}`, {
+        fetch(`/input_studies/admin/delete_image/${currentQuestionId}`, {
             method: 'POST'
         })
         .then(response => response.json())
@@ -912,7 +912,7 @@ function bulkDeleteQuestions() {
     const questionIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
     
     if (confirm(`選択された${questionIds.length}件の問題を削除しますか？\nこの操作は取り消せません。`)) {
-        fetch('/social_studies/admin/bulk_delete_questions', {
+        fetch('/input_studies/admin/bulk_delete_questions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

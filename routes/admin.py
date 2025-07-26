@@ -970,7 +970,7 @@ def download_unit_questions_csv(unit_id):
         flash('CSVダウンロードに失敗しました', 'error')
         return redirect(url_for('admin.input_studies_admin_unit_questions', unit_id=unit_id))
 
-@admin_bp.route('/social_studies/admin/edit_textbook/<int:textbook_id>')
+@admin_bp.route('/input_studies/admin/edit_textbook/<int:textbook_id>')
 @login_required
 def input_studies_edit_textbook_get(textbook_id):
     """教材編集データ取得（API）"""
@@ -1002,7 +1002,7 @@ def input_studies_edit_textbook_get(textbook_id):
         current_app.logger.error(f"教材編集データ取得エラー: {e}")
         return jsonify({'error': '教材データの取得に失敗しました'}), 500
 
-@admin_bp.route('/social_studies/admin/edit_textbook/<int:textbook_id>', methods=['POST'])
+@admin_bp.route('/input_studies/admin/edit_textbook/<int:textbook_id>', methods=['POST'])
 @login_required
 def input_studies_edit_textbook_post(textbook_id):
     """教材編集処理（API）"""
@@ -1215,7 +1215,7 @@ def input_studies_edit_question_post(question_id):
             flash('問題の更新に失敗しました', 'error')
             return redirect(url_for('admin.input_studies_edit_question_page', question_id=question_id)) 
 
-@admin_bp.route('/social_studies/admin/update_image_path/<int:textbook_id>/<int:unit_id>', methods=['POST'])
+@admin_bp.route('/input_studies/admin/update_image_path/<int:textbook_id>/<int:unit_id>', methods=['POST'])
 @login_required
 def input_studies_update_image_path(textbook_id, unit_id):
     """画像URL更新処理"""
@@ -1289,7 +1289,7 @@ def input_studies_update_image_path(textbook_id, unit_id):
         current_app.logger.error(f"画像URL更新エラー: {e}")
         return jsonify({'error': '画像URLの更新に失敗しました'}), 500 
 
-@admin_bp.route('/social_studies/admin/upload_unit_questions_csv', methods=['POST'])
+@admin_bp.route('/input_studies/admin/upload_unit_questions_csv', methods=['POST'])
 @login_required
 def input_studies_upload_unit_questions_csv():
     """単元問題CSVアップロード処理"""
@@ -1378,7 +1378,7 @@ def input_studies_upload_unit_questions_csv():
         current_app.logger.error(f"CSVアップロードエラー: {e}")
         return jsonify({'error': 'CSVアップロードに失敗しました'}), 500 
 
-@admin_bp.route('/social_studies/admin/edit_question/<int:question_id>')
+@admin_bp.route('/input_studies/admin/edit_question/<int:question_id>')
 @login_required
 def input_studies_admin_edit_question_get(question_id):
     """問題編集データ取得（API）"""
@@ -1410,7 +1410,7 @@ def input_studies_admin_edit_question_get(question_id):
         current_app.logger.error(f"問題編集データ取得エラー: {e}")
         return jsonify({'error': '問題データの取得に失敗しました'}), 500
 
-@admin_bp.route('/social_studies/admin/edit_question/<int:question_id>', methods=['POST'])
+@admin_bp.route('/input_studies/admin/edit_question/<int:question_id>', methods=['POST'])
 @login_required
 def input_studies_admin_edit_question_post(question_id):
     """問題編集処理（API）"""
@@ -1451,7 +1451,7 @@ def input_studies_admin_edit_question_post(question_id):
         current_app.logger.error(f"問題編集エラー: {e}")
         return jsonify({'error': '問題の更新に失敗しました'}), 500
 
-@admin_bp.route('/social_studies/admin/delete_question/<int:question_id>', methods=['DELETE'])
+@admin_bp.route('/input_studies/admin/delete_question/<int:question_id>', methods=['DELETE'])
 @login_required
 def input_studies_admin_delete_question(question_id):
     """問題削除処理（API）"""

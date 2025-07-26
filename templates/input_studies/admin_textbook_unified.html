@@ -440,7 +440,7 @@ let currentEditTextbookId = {{ textbook.id }};
 
 function editTextbook() {
     // 教材データを取得
-    fetch(`/social_studies/admin/edit_textbook/{{ textbook.id }}`)
+    fetch(`/input_studies/admin/edit_textbook/{{ textbook.id }}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -482,7 +482,7 @@ function saveTextbookEdit() {
     }
     
     // データを送信
-    fetch(`/social_studies/admin/edit_textbook/{{ textbook.id }}`, {
+    fetch(`/input_studies/admin/edit_textbook/{{ textbook.id }}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -509,7 +509,7 @@ function deleteTextbook() {
         return;
     }
     
-    fetch(`/social_studies/admin/delete_textbook/{{ textbook.id }}`, {
+    fetch(`/input_studies/admin/delete_textbook/{{ textbook.id }}`, {
         method: 'DELETE'
     })
     .then(response => response.json())
@@ -518,7 +518,7 @@ function deleteTextbook() {
             alert(data.error);
         } else {
             alert('教材を削除しました');
-            window.location.href = '/social_studies/admin/textbooks';
+            window.location.href = '/input_studies/admin/textbooks';
         }
     })
     .catch(error => {
@@ -534,7 +534,7 @@ function editUnit(unitId) {
     currentEditUnitId = unitId;
     
     // 単元データを取得
-    fetch(`/social_studies/admin/edit_unit/${unitId}`)
+    fetch(`/input_studies/admin/edit_unit/${unitId}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -577,7 +577,7 @@ function saveUnitEdit() {
     }
     
     // データを送信
-    fetch(`/social_studies/admin/edit_unit/${currentEditUnitId}`, {
+    fetch(`/input_studies/admin/edit_unit/${currentEditUnitId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -604,7 +604,7 @@ function deleteUnit(unitId) {
         return;
     }
     
-    fetch(`/social_studies/admin/delete_unit/${unitId}`, {
+    fetch(`/input_studies/admin/delete_unit/${unitId}`, {
         method: 'DELETE'
     })
     .then(response => response.json())
@@ -629,7 +629,7 @@ function editQuestion(questionId) {
     currentEditQuestionId = questionId;
     
     // 問題データを取得
-    fetch(`/social_studies/admin/edit_question/${questionId}`)
+    fetch(`/input_studies/admin/edit_question/${questionId}`)
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -676,7 +676,7 @@ function saveQuestionEdit() {
     }
     
     // データを送信
-    fetch(`/social_studies/admin/edit_question/${currentEditQuestionId}`, {
+    fetch(`/input_studies/admin/edit_question/${currentEditQuestionId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -703,7 +703,7 @@ function deleteQuestion(questionId) {
         return;
     }
     
-    fetch(`/social_studies/admin/delete_question/${questionId}`, {
+    fetch(`/input_studies/admin/delete_question/${questionId}`, {
         method: 'DELETE'
     })
     .then(response => response.json())
@@ -766,7 +766,7 @@ function bulkDeleteQuestions() {
         return;
     }
     
-    fetch('/social_studies/admin/bulk_delete_questions', {
+    fetch('/input_studies/admin/bulk_delete_questions', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -811,7 +811,7 @@ function uploadCsv() {
     formData.append('csv_file', fileInput.files[0]);
     formData.append('textbook_id', '{{ textbook.id }}');
     
-    fetch('/social_studies/admin/upload_csv', {
+    fetch('/input_studies/admin/upload_csv', {
         method: 'POST',
         body: formData
     })
@@ -842,7 +842,7 @@ function uploadUnitsCsv() {
     formData.append('csv_file', fileInput.files[0]);
     formData.append('textbook_id', '{{ textbook.id }}');
     
-    fetch('/social_studies/admin/upload_units_csv', {
+    fetch('/input_studies/admin/upload_units_csv', {
         method: 'POST',
         body: formData
     })
