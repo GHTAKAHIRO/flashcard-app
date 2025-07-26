@@ -1047,6 +1047,409 @@ def input_studies_edit_textbook_post(textbook_id):
         current_app.logger.error(f"教材編集エラー: {e}")
         return jsonify({'error': '教材の更新に失敗しました'}), 500 
 
+@admin_bp.route('/input_studies/admin/edit_unit/<int:unit_id>')
+@login_required
+def input_studies_edit_unit_get(unit_id):
+    """単元編集データ取得（API）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    SELECT id, name, unit_number, description, textbook_id
+                    FROM input_units 
+                    WHERE id = ?
+                ''', (unit_id,))
+                unit_data = cur.fetchone()
+                
+                if not unit_data:
+                    return jsonify({'error': '単元が見つかりません'}), 404
+                
+                unit = {
+                    'id': unit_data[0],
+                    'name': unit_data[1],
+                    'unit_number': unit_data[2],
+                    'description': unit_data[3],
+                    'textbook_id': unit_data[4]
+                }
+                
+                return jsonify(unit)
+                
+    except Exception as e:
+        current_app.logger.error(f"単元編集データ取得エラー: {e}")
+        return jsonify({'error': '単元データの取得に失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/edit_unit/<int:unit_id>', methods=['POST'])
+@login_required
+def input_studies_edit_unit_post(unit_id):
+    """単元編集処理（API）"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        unit_number = data.get('unit_number', '').strip()
+        description = data.get('description', '').strip()
+        
+        # バリデーション
+        if not name:
+            return jsonify({'error': '単元名は必須です'}), 400
+        
+        if not unit_number:
+            return jsonify({'error': '単元番号は必須です'}), 400
+        
+        try:
+            unit_number = int(unit_number)
+        except ValueError:
+            return jsonify({'error': '単元番号は数値で入力してください'}), 400
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 単元が存在するかチェック
+                cur.execute('SELECT id, textbook_id FROM input_units WHERE id = ?', (unit_id,))
+                unit_info = cur.fetchone()
+                if not unit_info:
+                    return jsonify({'error': '単元が見つかりません'}), 404
+                
+                textbook_id = unit_info[1]
+                
+                # 単元番号の重複チェック（同じ教材内で、自分以外）
+                cur.execute('SELECT id FROM input_units WHERE textbook_id = ? AND unit_number = ? AND id != ?', 
+                          (textbook_id, unit_number, unit_id))
+                if cur.fetchone():
+                    return jsonify({'error': 'この単元番号は既に使用されています'}), 400
+                
+                # 単元を更新
+                cur.execute('''
+                    UPDATE input_units 
+                    SET name = ?, unit_number = ?, description = ?
+                    WHERE id = ?
+                ''', (name, unit_number, description, unit_id))
+                
+                conn.commit()
+                return jsonify({'message': '単元を更新しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"単元編集エラー: {e}")
+        return jsonify({'error': '単元の更新に失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/delete_unit/<int:unit_id>', methods=['DELETE'])
+@login_required
+def input_studies_delete_unit(unit_id):
+    """単元削除処理（API）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 単元が存在するかチェック
+                cur.execute('SELECT id, name FROM input_units WHERE id = ?', (unit_id,))
+                unit_info = cur.fetchone()
+                if not unit_info:
+                    return jsonify({'error': '単元が見つかりません'}), 404
+                
+                # 単元に関連する問題があるかチェック
+                cur.execute('SELECT COUNT(*) FROM input_questions WHERE unit_id = ?', (unit_id,))
+                question_count = cur.fetchone()[0]
+                
+                if question_count > 0:
+                    return jsonify({'error': f'この単元には{question_count}件の問題が含まれているため削除できません'}), 400
+                
+                # 単元を削除
+                cur.execute('DELETE FROM input_units WHERE id = ?', (unit_id,))
+                conn.commit()
+                
+                return jsonify({'message': '単元を削除しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"単元削除エラー: {e}")
+        return jsonify({'error': '単元の削除に失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/bulk_delete_questions', methods=['POST'])
+@login_required
+def input_studies_bulk_delete_questions():
+    """問題一括削除処理（API）"""
+    try:
+        data = request.get_json()
+        question_ids = data.get('question_ids', [])
+        
+        if not question_ids:
+            return jsonify({'error': '削除する問題が選択されていません'}), 400
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 問題を一括削除
+                placeholders = ','.join(['?' for _ in question_ids])
+                cur.execute(f'DELETE FROM input_questions WHERE id IN ({placeholders})', question_ids)
+                deleted_count = cur.rowcount
+                
+                conn.commit()
+                return jsonify({'message': f'{deleted_count}件の問題を削除しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"問題一括削除エラー: {e}")
+        return jsonify({'error': '問題の削除に失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/upload_csv', methods=['POST'])
+@login_required
+def input_studies_upload_csv():
+    """CSVアップロード処理（API）"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        textbook_id = request.form.get('textbook_id')
+        if not textbook_id:
+            return jsonify({'error': '教材IDが指定されていません'}), 400
+        
+        # CSVファイルを処理
+        import csv
+        import io
+        
+        content = file.read().decode('utf-8')
+        csv_reader = csv.reader(io.StringIO(content))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                for row in csv_reader:
+                    if len(row) >= 2:
+                        name = row[0].strip()
+                        unit_number = row[1].strip()
+                        description = row[2].strip() if len(row) > 2 else ''
+                        
+                        if name and unit_number:
+                            try:
+                                unit_number = int(unit_number)
+                                cur.execute('''
+                                    INSERT INTO input_units (textbook_id, name, unit_number, description)
+                                    VALUES (?, ?, ?, ?)
+                                ''', (textbook_id, name, unit_number, description))
+                            except ValueError:
+                                continue
+                
+                conn.commit()
+                return jsonify({'message': 'CSVファイルをアップロードしました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"CSVアップロードエラー: {e}")
+        return jsonify({'error': 'CSVアップロードに失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/upload_units_csv', methods=['POST'])
+@login_required
+def input_studies_upload_units_csv():
+    """単元CSVアップロード処理（API）"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        textbook_id = request.form.get('textbook_id')
+        if not textbook_id:
+            return jsonify({'error': '教材IDが指定されていません'}), 400
+        
+        # CSVファイルを処理
+        import csv
+        import io
+        
+        content = file.read().decode('utf-8')
+        csv_reader = csv.reader(io.StringIO(content))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                for row in csv_reader:
+                    if len(row) >= 2:
+                        name = row[0].strip()
+                        unit_number = row[1].strip()
+                        description = row[2].strip() if len(row) > 2 else ''
+                        
+                        if name and unit_number:
+                            try:
+                                unit_number = int(unit_number)
+                                cur.execute('''
+                                    INSERT INTO input_units (textbook_id, name, unit_number, description)
+                                    VALUES (?, ?, ?, ?)
+                                ''', (textbook_id, name, unit_number, description))
+                            except ValueError:
+                                continue
+                
+                conn.commit()
+                return jsonify({'message': '単元CSVファイルをアップロードしました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"単元CSVアップロードエラー: {e}")
+        return jsonify({'error': '単元CSVアップロードに失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/upload_questions_csv', methods=['POST'])
+@login_required
+def input_studies_upload_questions_csv():
+    """問題CSVアップロード処理（API）"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        unit_id = request.form.get('unit_id')
+        if not unit_id:
+            return jsonify({'error': '単元IDが指定されていません'}), 400
+        
+        # CSVファイルを処理
+        import csv
+        import io
+        
+        content = file.read().decode('utf-8')
+        csv_reader = csv.reader(io.StringIO(content))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                for row in csv_reader:
+                    if len(row) >= 2:
+                        question = row[0].strip()
+                        answer = row[1].strip()
+                        explanation = row[2].strip() if len(row) > 2 else ''
+                        question_type = row[3].strip() if len(row) > 3 else 'normal'
+                        
+                        if question and answer:
+                            cur.execute('''
+                                INSERT INTO input_questions (unit_id, question, answer, explanation, question_type)
+                                VALUES (?, ?, ?, ?, ?)
+                            ''', (unit_id, question, answer, explanation, question_type))
+                
+                conn.commit()
+                return jsonify({'message': '問題CSVファイルをアップロードしました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"問題CSVアップロードエラー: {e}")
+        return jsonify({'error': '問題CSVアップロードに失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/download_csv_template')
+@login_required
+def input_studies_download_csv_template():
+    """CSVテンプレートダウンロード"""
+    try:
+        import csv
+        import io
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # ヘッダー行
+        writer.writerow(['問題', '答え', '解説', '問題タイプ'])
+        
+        # サンプルデータ
+        writer.writerow(['日本の首都は？', '東京', '日本の首都は東京です', 'normal'])
+        writer.writerow(['1+1=?', '2', '基本的な足し算です', 'normal'])
+        
+        output.seek(0)
+        
+        from flask import Response
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=questions_template.csv'}
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"CSVテンプレートダウンロードエラー: {e}")
+        flash('CSVテンプレートダウンロードに失敗しました', 'error')
+        return redirect(url_for('admin.input_studies_admin_questions'))
+
+@admin_bp.route('/input_studies/admin/question/<int:question_id>')
+@login_required
+def input_studies_get_question(question_id):
+    """問題データ取得（API）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    SELECT id, question, answer, explanation, question_type, image_path
+                    FROM input_questions 
+                    WHERE id = ?
+                ''', (question_id,))
+                question_data = cur.fetchone()
+                
+                if not question_data:
+                    return jsonify({'error': '問題が見つかりません'}), 404
+                
+                question = {
+                    'id': question_data[0],
+                    'question': question_data[1],
+                    'answer': question_data[2],
+                    'explanation': question_data[3],
+                    'question_type': question_data[4],
+                    'image_path': question_data[5]
+                }
+                
+                return jsonify(question)
+                
+    except Exception as e:
+        current_app.logger.error(f"問題データ取得エラー: {e}")
+        return jsonify({'error': '問題データの取得に失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/upload_image/<int:question_id>', methods=['POST'])
+@login_required
+def input_studies_upload_image(question_id):
+    """問題画像アップロード処理（API）"""
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': '画像ファイルが選択されていません'}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'error': '画像ファイルが選択されていません'}), 400
+        
+        # 画像ファイルの処理（実際の実装では画像保存処理が必要）
+        # ここでは簡易的にファイル名を保存
+        image_path = f"uploads/questions/{question_id}_{file.filename}"
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    UPDATE input_questions 
+                    SET image_path = ?
+                    WHERE id = ?
+                ''', (image_path, question_id))
+                
+                conn.commit()
+                return jsonify({'message': '画像をアップロードしました', 'image_path': image_path})
+                
+    except Exception as e:
+        current_app.logger.error(f"画像アップロードエラー: {e}")
+        return jsonify({'error': '画像アップロードに失敗しました'}), 500
+
+@admin_bp.route('/input_studies/admin/delete_image/<int:question_id>', methods=['POST'])
+@login_required
+def input_studies_delete_image(question_id):
+    """問題画像削除処理（API）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    UPDATE input_questions 
+                    SET image_path = NULL
+                    WHERE id = ?
+                ''', (question_id,))
+                
+                conn.commit()
+                return jsonify({'message': '画像を削除しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"画像削除エラー: {e}")
+        return jsonify({'error': '画像削除に失敗しました'}), 500
+
 @admin_bp.route('/admin/input_studies/questions/<int:question_id>/edit')
 @login_required
 def input_studies_edit_question_page(question_id):
@@ -1288,188 +1691,3 @@ def input_studies_update_image_path(textbook_id, unit_id):
     except Exception as e:
         current_app.logger.error(f"画像URL更新エラー: {e}")
         return jsonify({'error': '画像URLの更新に失敗しました'}), 500 
-
-@admin_bp.route('/input_studies/admin/upload_unit_questions_csv', methods=['POST'])
-@login_required
-def input_studies_upload_unit_questions_csv():
-    """単元問題CSVアップロード処理"""
-    try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'ファイルが選択されていません'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'ファイルが選択されていません'}), 400
-        
-        if not file.filename.endswith('.csv'):
-            return jsonify({'error': 'CSVファイルを選択してください'}), 400
-        
-        textbook_id = request.form.get('textbook_id', type=int)
-        unit_id = request.form.get('unit_id', type=int)
-        
-        if not textbook_id or not unit_id:
-            return jsonify({'error': '教材IDまたは単元IDが指定されていません'}), 400
-        
-        with get_db_connection() as conn:
-            with get_db_cursor(conn) as cur:
-                # 教材と単元が存在するかチェック
-                placeholder = get_placeholder()
-                cur.execute(f'SELECT id FROM input_textbooks WHERE id = {placeholder}', (textbook_id,))
-                if not cur.fetchone():
-                    return jsonify({'error': '教材が見つかりません'}), 404
-                
-                cur.execute(f'SELECT id FROM input_units WHERE id = {placeholder}', (unit_id,))
-                if not cur.fetchone():
-                    return jsonify({'error': '単元が見つかりません'}), 404
-                
-                # CSVファイルを読み込み
-                import csv
-                import io
-                
-                content = file.read().decode('utf-8')
-                csv_reader = csv.DictReader(io.StringIO(content))
-                
-                added_count = 0
-                updated_count = 0
-                
-                for row in csv_reader:
-                    question_text = row.get('問題文', '').strip()
-                    answer_text = row.get('正解', '').strip()
-                    explanation = row.get('説明', '').strip()
-                    difficulty = row.get('難易度', 'basic').strip()
-                    
-                    if not question_text or not answer_text:
-                        continue
-                    
-                    # 既存の問題があるかチェック（問題文で判定）
-                    cur.execute(f'''
-                        SELECT id FROM input_questions 
-                        WHERE question = {placeholder} AND unit_id = {placeholder}
-                    ''', (question_text, unit_id))
-                    existing_question = cur.fetchone()
-                    
-                    if existing_question:
-                        # 既存の問題を更新
-                        cur.execute(f'''
-                            UPDATE input_questions 
-                            SET correct_answer = {placeholder}, explanation = {placeholder}, 
-                                difficulty_level = {placeholder}, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = {placeholder}
-                        ''', (answer_text, explanation, difficulty, existing_question[0]))
-                        updated_count += 1
-                    else:
-                        # 新しい問題を追加
-                        cur.execute(f'''
-                            INSERT INTO input_questions 
-                            (question, correct_answer, explanation, subject, difficulty_level, 
-                             textbook_id, unit_id, created_at)
-                            VALUES ({placeholder}, {placeholder}, {placeholder}, 
-                                   (SELECT subject FROM input_textbooks WHERE id = {placeholder}), 
-                                   {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                        ''', (question_text, answer_text, explanation, textbook_id, difficulty, textbook_id, unit_id))
-                        added_count += 1
-                
-                conn.commit()
-                
-                message = f'CSVアップロードが完了しました。追加: {added_count}件, 更新: {updated_count}件'
-                return jsonify({'message': message})
-                
-    except Exception as e:
-        current_app.logger.error(f"CSVアップロードエラー: {e}")
-        return jsonify({'error': 'CSVアップロードに失敗しました'}), 500 
-
-@admin_bp.route('/input_studies/admin/edit_question/<int:question_id>')
-@login_required
-def input_studies_admin_edit_question_get(question_id):
-    """問題編集データ取得（API）"""
-    try:
-        with get_db_connection() as conn:
-            with get_db_cursor(conn) as cur:
-                placeholder = get_placeholder()
-                cur.execute(f'''
-                    SELECT id, question, correct_answer, explanation, difficulty_level
-                    FROM input_questions 
-                    WHERE id = {placeholder}
-                ''', (question_id,))
-                question_data = cur.fetchone()
-                
-                if not question_data:
-                    return jsonify({'error': '問題が見つかりません'}), 404
-                
-                question = {
-                    'id': question_data[0],
-                    'question': question_data[1],
-                    'correct_answer': question_data[2],
-                    'explanation': question_data[3],
-                    'difficulty_level': question_data[4]
-                }
-                
-                return jsonify(question)
-                
-    except Exception as e:
-        current_app.logger.error(f"問題編集データ取得エラー: {e}")
-        return jsonify({'error': '問題データの取得に失敗しました'}), 500
-
-@admin_bp.route('/input_studies/admin/edit_question/<int:question_id>', methods=['POST'])
-@login_required
-def input_studies_admin_edit_question_post(question_id):
-    """問題編集処理（API）"""
-    try:
-        data = request.get_json()
-        question_text = data.get('question', '').strip()
-        answer_text = data.get('correct_answer', '').strip()
-        explanation = data.get('explanation', '').strip()
-        difficulty = data.get('difficulty_level', 'basic')
-        
-        if not question_text:
-            return jsonify({'error': '問題文は必須です'}), 400
-        
-        if not answer_text:
-            return jsonify({'error': '正解は必須です'}), 400
-        
-        with get_db_connection() as conn:
-            with get_db_cursor(conn) as cur:
-                # 問題が存在するかチェック
-                placeholder = get_placeholder()
-                cur.execute(f'SELECT id FROM input_questions WHERE id = {placeholder}', (question_id,))
-                if not cur.fetchone():
-                    return jsonify({'error': '問題が見つかりません'}), 404
-                
-                # 問題を更新
-                cur.execute(f'''
-                    UPDATE input_questions 
-                    SET question = {placeholder}, correct_answer = {placeholder}, 
-                        explanation = {placeholder}, difficulty_level = {placeholder}, 
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = {placeholder}
-                ''', (question_text, answer_text, explanation, difficulty, question_id))
-                
-                conn.commit()
-                return jsonify({'message': '問題を更新しました'})
-                
-    except Exception as e:
-        current_app.logger.error(f"問題編集エラー: {e}")
-        return jsonify({'error': '問題の更新に失敗しました'}), 500
-
-@admin_bp.route('/input_studies/admin/delete_question/<int:question_id>', methods=['DELETE'])
-@login_required
-def input_studies_admin_delete_question(question_id):
-    """問題削除処理（API）"""
-    try:
-        with get_db_connection() as conn:
-            with get_db_cursor(conn) as cur:
-                # 問題が存在するかチェック
-                placeholder = get_placeholder()
-                cur.execute(f'SELECT id FROM input_questions WHERE id = {placeholder}', (question_id,))
-                if not cur.fetchone():
-                    return jsonify({'error': '問題が見つかりません'}), 404
-                
-                # 問題を削除
-                cur.execute(f'DELETE FROM input_questions WHERE id = {placeholder}', (question_id,))
-                
-                conn.commit()
-                return jsonify({'message': '問題を削除しました'})
-                
-    except Exception as e:
-        current_app.logger.error(f"問題削除エラー: {e}")
-        return jsonify({'error': '問題の削除に失敗しました'}), 500 
