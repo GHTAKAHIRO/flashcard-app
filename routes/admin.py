@@ -1013,7 +1013,7 @@ def social_studies_edit_textbook_post(textbook_id):
 @admin_bp.route('/admin/social_studies/questions/<int:question_id>/edit')
 @login_required
 def social_studies_edit_question_page(question_id):
-    """社会科問題編集画面"""
+    """社会科問題編集画面（GET）"""
     try:
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
