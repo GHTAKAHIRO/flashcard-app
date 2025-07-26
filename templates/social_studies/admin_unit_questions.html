@@ -37,6 +37,7 @@
                         <th>問題番号</th>
                         <th>問題文</th>
                         <th>正解</th>
+                        <th>画像</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -44,8 +45,18 @@
                     {% for question in questions %}
                     <tr>
                         <td>{{ question.question_number or question.id }}</td>
-                        <td>{{ question.question|e }}</td>
-                        <td>{{ question.correct_answer|e }}</td>
+                        <td>{{ question.question_text|e }}</td>
+                        <td>{{ question.answer_text|e }}</td>
+                        <td>
+                            {% if question.image_title or question.image_name %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-image me-1"></i>
+                                    {% if question.image_title %}{{ question.image_title }}{% else %}{{ question.image_name }}{% endif %}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">なし</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
                                 <a href="{{ url_for('admin.social_studies_edit_question_page', question_id=question.id) }}" class="btn btn-outline-warning" title="編集">

@@ -71,12 +71,9 @@ app.config.update(
     # セッション最適化
     PERMANENT_SESSION_LIFETIME=timedelta(hours=2),
     
-    # 静的ファイルキャッシュ
+    # 静的ファイルキャッシュとパフォーマンス最適化
     SEND_FILE_MAX_AGE_DEFAULT=31536000,  # 1年
-    
-    # パフォーマンス最適化
     TEMPLATES_AUTO_RELOAD=False,
-    SEND_FILE_MAX_AGE_DEFAULT=31536000,
     
     # データベース設定
     DB_TYPE=os.getenv('DB_TYPE', 'sqlite'),

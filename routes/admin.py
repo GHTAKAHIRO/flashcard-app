@@ -797,7 +797,8 @@ def social_studies_admin_unit_questions(unit_id):
                 
                 # 問題一覧を取得
                 cur.execute(f'''
-                    SELECT id, question, correct_answer, explanation, difficulty_level, created_at
+                    SELECT id, question, correct_answer, explanation, difficulty_level, 
+                           image_name, image_title, image_url, created_at
                     FROM social_studies_questions 
                     WHERE unit_id = {placeholder}
                     ORDER BY created_at DESC
@@ -812,13 +813,35 @@ def social_studies_admin_unit_questions(unit_id):
                         'answer_text': q_data[2],    # correct_answerカラムをanswer_textとして扱う
                         'explanation': q_data[3],
                         'difficulty': q_data[4],     # difficulty_levelカラムをdifficultyとして扱う
-                        'created_at': q_data[5]
+                        'image_name': q_data[5],
+                        'image_title': q_data[6],
+                        'image_url': q_data[7],
+                        'created_at': q_data[8]
                     })
+                
+                # 画像パス情報を取得
+                from app import get_unit_image_folder_path_by_unit_id
+                folder_path = get_unit_image_folder_path_by_unit_id(unit_id)
+                
+                # 画像が設定されている問題数を取得
+                cur.execute(f'''
+                    SELECT COUNT(*) 
+                    FROM social_studies_questions 
+                    WHERE unit_id = {placeholder} AND (image_name IS NOT NULL OR image_title IS NOT NULL)
+                ''', (unit_id,))
+                image_questions_count = cur.fetchone()[0]
+                
+                image_path_info = {
+                    'base_url': f"https://s3.ap-northeast-1-ntt.wasabisys.com/so-image/{folder_path}",
+                    'folder_path': folder_path,
+                    'image_questions_count': image_questions_count
+                }
                 
                 return render_template('social_studies/admin_unit_questions.html', 
                                      textbook_info=textbook_info,
                                      unit_info=unit_info,
-                                     questions=questions)
+                                     questions=questions,
+                                     image_path_info=image_path_info)
                 
     except Exception as e:
         current_app.logger.error(f"社会科単元問題管理画面エラー: {e}")
@@ -1022,6 +1045,7 @@ def social_studies_edit_question_page(question_id):
                 cur.execute(f'''
                     SELECT q.id, q.question, q.correct_answer, q.explanation, q.subject, 
                            q.difficulty_level, q.textbook_id, q.unit_id,
+                           q.image_name, q.image_title, q.image_url,
                            t.name as textbook_name, u.name as unit_name
                     FROM social_studies_questions q
                     LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
@@ -1043,8 +1067,11 @@ def social_studies_edit_question_page(question_id):
                     'difficulty': question_data[5],     # difficulty_levelカラムをdifficultyとして扱う
                     'textbook_id': question_data[6],
                     'unit_id': question_data[7],
-                    'textbook_name': question_data[8] or '未設定',
-                    'unit_name': question_data[9] or '未設定'
+                    'image_name': question_data[8],
+                    'image_title': question_data[9],
+                    'image_url': question_data[10],
+                    'textbook_name': question_data[11] or '未設定',
+                    'unit_name': question_data[12] or '未設定'
                 }
                 
                 # 教材情報を取得
@@ -1071,8 +1098,18 @@ def social_studies_edit_question_page(question_id):
                             'chapter_number': unit_data[2]
                         }
                 
+                # 画像パス情報を取得
+                image_path_info = None
+                if question['unit_id']:
+                    from app import get_unit_image_folder_path_by_unit_id
+                    folder_path = get_unit_image_folder_path_by_unit_id(question['unit_id'])
+                    image_path_info = {
+                        'base_url': f"https://s3.ap-northeast-1-ntt.wasabisys.com/so-image/{folder_path}",
+                        'folder_path': folder_path
+                    }
+                
                 return render_template('social_studies/edit_question.html', 
-                                     question=question, textbook_info=textbook_info, unit_info=unit_info)
+                                     question=question, textbook_info=textbook_info, unit_info=unit_info, image_path_info=image_path_info)
                 
     except Exception as e:
         current_app.logger.error(f"社会科問題編集画面エラー: {e}")
