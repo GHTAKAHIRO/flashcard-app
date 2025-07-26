@@ -12,26 +12,22 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
     try:
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
-                # 基本の進捗情報を取得
+                # 基本の進捗情報を取得（新しいスキーマではchoice_questionsに進捗情報はないため、study_logから取得）
                 cur.execute('''
-                    SELECT is_completed, is_passed, completed_at, passed_at
-                    FROM choice_questions
-                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
+                    SELECT COUNT(*) as total_attempts,
+                           COUNT(CASE WHEN is_correct THEN 1 END) as correct_attempts
+                    FROM choice_study_log l
+                    JOIN choice_questions q ON l.question_id = q.id
+                    JOIN choice_units u ON q.unit_id = u.id
+                    JOIN choice_textbooks t ON u.textbook_id = t.id
+                    WHERE l.user_id = ? AND t.source = ? AND u.id = ? AND u.unit_number = ?
                 ''', (user_id, source, chapter_id, chunk_number))
                 result = cur.fetchone()
                 
-                # 正解数を取得
-                cur.execute('''
-                    SELECT COUNT(*) as correct_count
-                    FROM choice_study_log
-                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ? AND result = 'known'
-                ''', (user_id, source, chapter_id, chunk_number))
-                correct_result = cur.fetchone()
-                correct_count = correct_result[0] if correct_result else 0
-                
                 if result:
                     result = dict(result)
-                    result['correct_count'] = correct_count
+                    result['is_completed'] = result['total_attempts'] > 0
+                    result['is_passed'] = result['correct_attempts'] > 0
                 
                 return result
     except Exception as e:
@@ -39,64 +35,14 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
         return None
 
 def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, is_completed=False, is_passed=False):
-    """英単語チャンクの進捗状況を更新"""
+    """英単語チャンクの進捗状況を更新（新しいスキーマではstudy_logで管理）"""
     try:
         current_app.logger.info(f"進捗更新開始: user={user_id}, source={source}, chapter={chapter_id}, chunk={chunk_number}, completed={is_completed}, passed={is_passed}")
         
-        with get_db_connection() as conn:
-            with get_db_cursor(conn) as cur:
-                # 既存のレコードがあるかチェック
-                cur.execute('''
-                    SELECT id FROM choice_questions
-                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
-                ''', (user_id, source, chapter_id, chunk_number))
-                
-                existing = cur.fetchone()
-                now = datetime.now()
-                
-                current_app.logger.info(f"既存レコード: {existing}")
-                
-                if existing:
-                    # 既存レコードを更新
-                    update_fields = []
-                    params = []
-                    
-                    if is_completed:
-                        update_fields.append("is_completed = ?")
-                        update_fields.append("completed_at = ?")
-                        params.extend([True, now])
-                    
-                    if is_passed:
-                        update_fields.append("is_passed = ?")
-                        update_fields.append("passed_at = ?")
-                        params.extend([True, now])
-                    
-                    if update_fields:
-                        params.extend([user_id, source, chapter_id, chunk_number])
-                        query = f'''
-                            UPDATE choice_questions 
-                            SET {', '.join(update_fields)}
-                            WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
-                        '''
-                        cur.execute(query, params)
-                        current_app.logger.info(f"進捗更新完了: {len(update_fields)}フィールド")
-                else:
-                    # 新規レコードを作成
-                    cur.execute('''
-                        INSERT INTO choice_questions 
-                        (user_id, source, chapter_id, chunk_number, is_completed, is_passed, completed_at, passed_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        user_id, source, chapter_id, chunk_number,
-                        is_completed, is_passed,
-                        now if is_completed else None,
-                        now if is_passed else None
-                    ))
-                    current_app.logger.info("新規進捗レコード作成完了")
-                
-                conn.commit()
-                current_app.logger.info(f"進捗更新完了: user_id={user_id}, source={source}, chapter={chapter_id}, chunk={chunk_number}")
-                
+        # 新しいスキーマでは進捗はstudy_logで管理されるため、この関数は不要
+        # 実際の進捗更新はstudy_logへの記録で行われる
+        current_app.logger.info(f"進捗更新完了: user_id={user_id}, source={source}, chapter={chapter_id}, chunk={chunk_number}")
+        
     except Exception as e:
         current_app.logger.error(f"進捗更新エラー: {e}")
         raise
