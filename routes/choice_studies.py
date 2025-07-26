@@ -238,11 +238,14 @@ def choice_studies_home():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
-                    SELECT DISTINCT source, COUNT(*) as total_words,
+                    SELECT DISTINCT t.source, COUNT(*) as total_words,
                            COUNT(CASE WHEN result = 'known' THEN 1 END) as known_words
-                    FROM choice_study_log 
-                    WHERE user_id = ?
-                    GROUP BY source
+                    FROM choice_study_log l
+                    JOIN choice_questions q ON l.question_id = q.id
+                    JOIN choice_units u ON q.unit_id = u.id
+                    JOIN choice_textbooks t ON u.textbook_id = t.id
+                    WHERE l.user_id = ?
+                    GROUP BY t.source
                 ''', (str(current_user.id),))
                 vocabulary_sources = cur.fetchall()
         
@@ -250,9 +253,11 @@ def choice_studies_home():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
-                    SELECT source, COUNT(*) as total_available
-                    FROM choice_questions 
-                    GROUP BY source
+                    SELECT t.source, COUNT(*) as total_available
+                    FROM choice_questions q
+                    JOIN choice_units u ON q.unit_id = u.id
+                    JOIN choice_textbooks t ON u.textbook_id = t.id
+                    GROUP BY t.source
                 ''')
                 total_available = {row[0]: row[1] for row in cur.fetchall()}
         
@@ -387,10 +392,12 @@ def choice_studies_start(source, chapter_id, chunk_number, mode=None):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
-                    SELECT id, question, correct_answer, choices
-                    FROM choice_questions
-                    WHERE source = ? AND chapter_id = ? AND chunk_number = ?
-                    ORDER BY id
+                    SELECT q.id, q.question, q.correct_answer, q.choices
+                    FROM choice_questions q
+                    JOIN choice_units u ON q.unit_id = u.id
+                    JOIN choice_textbooks t ON u.textbook_id = t.id
+                    WHERE t.source = ? AND u.chapter_id = ? AND q.chunk_number = ?
+                    ORDER BY q.id
                 ''', (source, chapter_id, chunk_number))
                 words = cur.fetchall()
         
