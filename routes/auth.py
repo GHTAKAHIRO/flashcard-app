@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_user, logout_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from models.user import User  # Userクラスはmodels/user.pyに移動予定
-from utils.db import get_db_connection, get_db_cursor
+from utils.db import get_db_connection, get_db_cursor, get_placeholder
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -17,7 +17,8 @@ def login():
         try:
             with get_db_connection() as conn:
                 with get_db_cursor(conn) as cur:
-                    cur.execute("SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = ?", (username,))
+                    placeholder = get_placeholder()
+                    cur.execute(f"SELECT id, username, password_hash, full_name, is_admin FROM users WHERE username = {placeholder}", (username,))
                     user = cur.fetchone()
 
             if user and check_password_hash(user[2], password):
@@ -27,7 +28,8 @@ def login():
                 # 最終ログイン時刻を更新
                 with get_db_connection() as conn:
                     with get_db_cursor(conn) as cur:
-                        cur.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user[0],))
+                        placeholder = get_placeholder()
+                        cur.execute(f"UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = {placeholder}", (user[0],))
                         conn.commit()
                 
                 # 管理者の場合は管理者画面にリダイレクト
@@ -61,7 +63,8 @@ def register():
         try:
             with get_db_connection() as conn:
                 with get_db_cursor(conn) as cur:
-                    cur.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, password))
+                    placeholder = get_placeholder()
+                    cur.execute(f"INSERT INTO users (username, password_hash, full_name) VALUES ({placeholder}, {placeholder}, {placeholder})", (username, password, username))
                     conn.commit()
             return redirect(url_for('auth.login'))
         except Exception as e:

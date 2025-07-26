@@ -79,4 +79,16 @@ def get_db_cursor(conn, cursor_factory=None):
                 yield cursor
         else:
             with conn.cursor() as cursor:
-                yield cursor 
+                yield cursor
+
+def get_placeholder(db_type=None):
+    """
+    データベースタイプに応じたプレースホルダーを取得
+    """
+    if db_type is None:
+        db_type = os.getenv('DB_TYPE', 'sqlite')
+    
+    if db_type == 'sqlite':
+        return '?'
+    else:
+        return '%s' 
