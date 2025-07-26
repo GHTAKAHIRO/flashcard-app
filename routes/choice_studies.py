@@ -25,7 +25,7 @@ def get_choice_chunk_progress(user_id, source, chapter_id, chunk_number):
                 cur.execute('''
                     SELECT COUNT(*) as correct_count
                     FROM choice_study_log
-                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ? AND result = 'known'
+                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ? AND is_correct = 1
                 ''', (user_id, source, chapter_id, chunk_number))
                 correct_result = cur.fetchone()
                 correct_count = correct_result[0] if correct_result else 0
@@ -239,7 +239,7 @@ def choice_studies_home():
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT DISTINCT t.source, COUNT(*) as total_words,
-                           COUNT(CASE WHEN result = 'known' THEN 1 END) as known_words
+                        COUNT(CASE WHEN l.is_correct THEN 1 END) as known_words
                     FROM choice_study_log l
                     JOIN choice_questions q ON l.question_id = q.id
                     JOIN choice_units u ON q.unit_id = u.id
