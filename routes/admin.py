@@ -1163,3 +1163,234 @@ def social_studies_edit_question_post(question_id):
         else:
             flash('問題の更新に失敗しました', 'error')
             return redirect(url_for('admin.social_studies_edit_question_page', question_id=question_id)) 
+
+@admin_bp.route('/social_studies/admin/update_image_path/<int:textbook_id>/<int:unit_id>', methods=['POST'])
+@login_required
+def social_studies_update_image_path(textbook_id, unit_id):
+    """画像URL更新処理"""
+    try:
+        data = request.get_json()
+        image_url = data.get('image_url', '').strip()
+        update_questions = data.get('update_questions', False)
+        
+        if not image_url:
+            return jsonify({'error': '画像URLが指定されていません'}), 400
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材と単元が存在するかチェック
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM social_studies_textbooks WHERE id = {placeholder}', (textbook_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                cur.execute(f'SELECT id FROM social_studies_units WHERE id = {placeholder}', (unit_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '単元が見つかりません'}), 404
+                
+                updated_questions_count = 0
+                
+                if update_questions:
+                    # 該当する単元の問題の画像URLを更新
+                    cur.execute(f'''
+                        UPDATE social_studies_questions 
+                        SET image_url = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                        WHERE unit_id = {placeholder}
+                    ''', (image_url, unit_id))
+                    updated_questions_count = cur.rowcount
+                
+                conn.commit()
+                
+                return jsonify({
+                    'message': '画像URLを更新しました',
+                    'updated_questions_count': updated_questions_count
+                })
+                
+    except Exception as e:
+        current_app.logger.error(f"画像URL更新エラー: {e}")
+        return jsonify({'error': '画像URLの更新に失敗しました'}), 500 
+
+@admin_bp.route('/social_studies/admin/upload_unit_questions_csv', methods=['POST'])
+@login_required
+def social_studies_upload_unit_questions_csv():
+    """単元問題CSVアップロード処理"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({'error': 'CSVファイルを選択してください'}), 400
+        
+        textbook_id = request.form.get('textbook_id', type=int)
+        unit_id = request.form.get('unit_id', type=int)
+        
+        if not textbook_id or not unit_id:
+            return jsonify({'error': '教材IDまたは単元IDが指定されていません'}), 400
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材と単元が存在するかチェック
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM social_studies_textbooks WHERE id = {placeholder}', (textbook_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                cur.execute(f'SELECT id FROM social_studies_units WHERE id = {placeholder}', (unit_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '単元が見つかりません'}), 404
+                
+                # CSVファイルを読み込み
+                import csv
+                import io
+                
+                content = file.read().decode('utf-8')
+                csv_reader = csv.DictReader(io.StringIO(content))
+                
+                added_count = 0
+                updated_count = 0
+                
+                for row in csv_reader:
+                    question_text = row.get('問題文', '').strip()
+                    answer_text = row.get('正解', '').strip()
+                    explanation = row.get('説明', '').strip()
+                    difficulty = row.get('難易度', 'basic').strip()
+                    
+                    if not question_text or not answer_text:
+                        continue
+                    
+                    # 既存の問題があるかチェック（問題文で判定）
+                    cur.execute(f'''
+                        SELECT id FROM social_studies_questions 
+                        WHERE question = {placeholder} AND unit_id = {placeholder}
+                    ''', (question_text, unit_id))
+                    existing_question = cur.fetchone()
+                    
+                    if existing_question:
+                        # 既存の問題を更新
+                        cur.execute(f'''
+                            UPDATE social_studies_questions 
+                            SET correct_answer = {placeholder}, explanation = {placeholder}, 
+                                difficulty_level = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = {placeholder}
+                        ''', (answer_text, explanation, difficulty, existing_question[0]))
+                        updated_count += 1
+                    else:
+                        # 新しい問題を追加
+                        cur.execute(f'''
+                            INSERT INTO social_studies_questions 
+                            (question, correct_answer, explanation, subject, difficulty_level, 
+                             textbook_id, unit_id, created_at)
+                            VALUES ({placeholder}, {placeholder}, {placeholder}, 
+                                   (SELECT subject FROM social_studies_textbooks WHERE id = {placeholder}), 
+                                   {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                        ''', (question_text, answer_text, explanation, textbook_id, difficulty, textbook_id, unit_id))
+                        added_count += 1
+                
+                conn.commit()
+                
+                message = f'CSVアップロードが完了しました。追加: {added_count}件, 更新: {updated_count}件'
+                return jsonify({'message': message})
+                
+    except Exception as e:
+        current_app.logger.error(f"CSVアップロードエラー: {e}")
+        return jsonify({'error': 'CSVアップロードに失敗しました'}), 500 
+
+@admin_bp.route('/social_studies/admin/edit_question/<int:question_id>')
+@login_required
+def social_studies_admin_edit_question_get(question_id):
+    """問題編集データ取得（API）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                placeholder = get_placeholder()
+                cur.execute(f'''
+                    SELECT id, question, correct_answer, explanation, difficulty_level
+                    FROM social_studies_questions 
+                    WHERE id = {placeholder}
+                ''', (question_id,))
+                question_data = cur.fetchone()
+                
+                if not question_data:
+                    return jsonify({'error': '問題が見つかりません'}), 404
+                
+                question = {
+                    'id': question_data[0],
+                    'question': question_data[1],
+                    'correct_answer': question_data[2],
+                    'explanation': question_data[3],
+                    'difficulty_level': question_data[4]
+                }
+                
+                return jsonify(question)
+                
+    except Exception as e:
+        current_app.logger.error(f"問題編集データ取得エラー: {e}")
+        return jsonify({'error': '問題データの取得に失敗しました'}), 500
+
+@admin_bp.route('/social_studies/admin/edit_question/<int:question_id>', methods=['POST'])
+@login_required
+def social_studies_admin_edit_question_post(question_id):
+    """問題編集処理（API）"""
+    try:
+        data = request.get_json()
+        question_text = data.get('question', '').strip()
+        answer_text = data.get('correct_answer', '').strip()
+        explanation = data.get('explanation', '').strip()
+        difficulty = data.get('difficulty_level', 'basic')
+        
+        if not question_text:
+            return jsonify({'error': '問題文は必須です'}), 400
+        
+        if not answer_text:
+            return jsonify({'error': '正解は必須です'}), 400
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 問題が存在するかチェック
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM social_studies_questions WHERE id = {placeholder}', (question_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '問題が見つかりません'}), 404
+                
+                # 問題を更新
+                cur.execute(f'''
+                    UPDATE social_studies_questions 
+                    SET question = {placeholder}, correct_answer = {placeholder}, 
+                        explanation = {placeholder}, difficulty_level = {placeholder}, 
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = {placeholder}
+                ''', (question_text, answer_text, explanation, difficulty, question_id))
+                
+                conn.commit()
+                return jsonify({'message': '問題を更新しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"問題編集エラー: {e}")
+        return jsonify({'error': '問題の更新に失敗しました'}), 500
+
+@admin_bp.route('/social_studies/admin/delete_question/<int:question_id>', methods=['DELETE'])
+@login_required
+def social_studies_admin_delete_question(question_id):
+    """問題削除処理（API）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 問題が存在するかチェック
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM social_studies_questions WHERE id = {placeholder}', (question_id,))
+                if not cur.fetchone():
+                    return jsonify({'error': '問題が見つかりません'}), 404
+                
+                # 問題を削除
+                cur.execute(f'DELETE FROM social_studies_questions WHERE id = {placeholder}', (question_id,))
+                
+                conn.commit()
+                return jsonify({'message': '問題を削除しました'})
+                
+    except Exception as e:
+        current_app.logger.error(f"問題削除エラー: {e}")
+        return jsonify({'error': '問題の削除に失敗しました'}), 500 
