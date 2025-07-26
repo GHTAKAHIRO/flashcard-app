@@ -1191,13 +1191,41 @@ def social_studies_update_image_path(textbook_id, unit_id):
                 updated_questions_count = 0
                 
                 if update_questions:
-                    # 該当する単元の問題の画像URLを更新
+                    # 既存の問題の画像情報を取得
                     cur.execute(f'''
-                        UPDATE social_studies_questions 
-                        SET image_url = {placeholder}, updated_at = CURRENT_TIMESTAMP
-                        WHERE unit_id = {placeholder}
-                    ''', (image_url, unit_id))
-                    updated_questions_count = cur.rowcount
+                        SELECT id, image_name, image_title, image_url
+                        FROM social_studies_questions 
+                        WHERE unit_id = {placeholder} AND (image_name IS NOT NULL OR image_title IS NOT NULL)
+                    ''', (unit_id,))
+                    
+                    questions = cur.fetchall()
+                    
+                    for question in questions:
+                        question_id, image_name, image_title, current_image_url = question
+                        
+                        # 画像ファイル名を取得（image_nameまたはimage_titleから）
+                        filename = None
+                        if image_name and image_name.strip():
+                            filename = image_name.strip()
+                        elif image_title and image_title.strip():
+                            filename = image_title.strip()
+                        
+                        if filename:
+                            # 拡張子がない場合は.jpgを追加
+                            if not any(filename.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
+                                filename = f"{filename}.jpg"
+                            
+                            # 新しい画像URLを構築
+                            new_image_url = f"{image_url}/{filename}"
+                            
+                            # 問題の画像URLを更新
+                            cur.execute(f'''
+                                UPDATE social_studies_questions 
+                                SET image_url = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                                WHERE id = {placeholder}
+                            ''', (new_image_url, question_id))
+                            
+                            updated_questions_count += 1
                 
                 conn.commit()
                 

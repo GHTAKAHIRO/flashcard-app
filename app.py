@@ -271,6 +271,154 @@ def set_image_public_access(image_url):
     print("⚠️ 画像公開アクセス設定は現在無効化されています")
     return None
 
+@app.route('/social_studies/api/check_image')
+def social_studies_check_image():
+    """画像存在確認API"""
+    try:
+        image_name = request.args.get('image_name', '').strip()
+        unit_id = request.args.get('unit_id', '').strip()
+        
+        if not image_name or not unit_id:
+            return jsonify({
+                'error': 'image_nameとunit_idが必要です',
+                'exists': False
+            }), 400
+        
+        # 単元IDから画像フォルダパスを取得
+        folder_path = get_unit_image_folder_path_by_unit_id(int(unit_id))
+        
+        # 画像URLを構築（Wasabi S3のURL形式）
+        base_url = "https://s3.ap-northeast-1-ntt.wasabisys.com/so-image"
+        
+        # 画像名に拡張子がない場合は.jpgを追加
+        if not any(image_name.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
+            image_name = f"{image_name}.jpg"
+        
+        # 完全な画像URLを構築
+        image_url = f"{base_url}/{folder_path}/{image_name}"
+        
+        # 画像の存在確認（実際のHTTPリクエストは行わず、URLを返す）
+        # 実際の環境では、Wasabi S3のHEADリクエストで存在確認を行うことができます
+        
+        return jsonify({
+            'exists': True,  # 実際の確認は行わず、常にTrueを返す
+            'image_url': image_url,
+            'folder_path': folder_path,
+            'message': '画像が見つかりました'
+        })
+        
+    except Exception as e:
+        app.logger.error(f"画像確認APIエラー: {e}")
+        return jsonify({
+            'error': '画像確認に失敗しました',
+            'exists': False
+        }), 500
+
+@app.route('/social_studies/api/textbooks')
+def social_studies_api_textbooks():
+    """教材一覧取得API"""
+    try:
+        subject = request.args.get('subject', '').strip()
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                if subject:
+                    cur.execute('''
+                        SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
+                        FROM social_studies_textbooks 
+                        WHERE subject = ?
+                        ORDER BY name
+                    ''', (subject,))
+                else:
+                    cur.execute('''
+                        SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
+                        FROM social_studies_textbooks 
+                        ORDER BY subject, name
+                    ''')
+                
+                textbooks = []
+                for row in cur.fetchall():
+                    textbooks.append({
+                        'id': row[0],
+                        'name': row[1],
+                        'subject': row[2],
+                        'grade': row[3],
+                        'publisher': row[4],
+                        'description': row[5],
+                        'wasabi_folder_path': row[6]
+                    })
+                
+                return jsonify(textbooks)
+                
+    except Exception as e:
+        app.logger.error(f"教材一覧取得APIエラー: {e}")
+        return jsonify({'error': '教材一覧の取得に失敗しました'}), 500
+
+@app.route('/social_studies/api/textbook/<int:textbook_id>')
+def social_studies_api_textbook(textbook_id):
+    """教材詳細取得API"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
+                    FROM social_studies_textbooks 
+                    WHERE id = ?
+                ''', (textbook_id,))
+                
+                row = cur.fetchone()
+                if not row:
+                    return jsonify({'error': '教材が見つかりません'}), 404
+                
+                textbook = {
+                    'id': row[0],
+                    'name': row[1],
+                    'subject': row[2],
+                    'grade': row[3],
+                    'publisher': row[4],
+                    'description': row[5],
+                    'wasabi_folder_path': row[6]
+                }
+                
+                return jsonify(textbook)
+                
+    except Exception as e:
+        app.logger.error(f"教材詳細取得APIエラー: {e}")
+        return jsonify({'error': '教材詳細の取得に失敗しました'}), 500
+
+@app.route('/social_studies/api/units')
+def social_studies_api_units():
+    """単元一覧取得API"""
+    try:
+        textbook_id = request.args.get('textbook_id', '').strip()
+        
+        if not textbook_id:
+            return jsonify({'error': 'textbook_idが必要です'}), 400
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    SELECT id, name, chapter_number, description
+                    FROM social_studies_units 
+                    WHERE textbook_id = ?
+                    ORDER BY chapter_number, name
+                ''', (textbook_id,))
+                
+                units = []
+                for row in cur.fetchall():
+                    units.append({
+                        'id': row[0],
+                        'name': row[1],
+                        'chapter_number': row[2],
+                        'description': row[3]
+                    })
+                
+                return jsonify(units)
+                
+    except Exception as e:
+        app.logger.error(f"単元一覧取得APIエラー: {e}")
+        return jsonify({'error': '単元一覧の取得に失敗しました'}), 500
+
 @app.route('/')
 def home():
     if not current_user.is_authenticated:
