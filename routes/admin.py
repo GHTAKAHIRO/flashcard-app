@@ -1047,16 +1047,32 @@ def social_studies_edit_question_page(question_id):
                     'unit_name': question_data[9] or '未設定'
                 }
                 
-                # 教材一覧を取得
-                cur.execute('SELECT id, name, subject FROM social_studies_textbooks ORDER BY subject, name')
-                textbooks = cur.fetchall()
+                # 教材情報を取得
+                textbook_info = None
+                if question['textbook_id']:
+                    cur.execute(f'SELECT id, name, subject FROM social_studies_textbooks WHERE id = {placeholder}', (question['textbook_id'],))
+                    textbook_data = cur.fetchone()
+                    if textbook_data:
+                        textbook_info = {
+                            'id': textbook_data[0],
+                            'name': textbook_data[1],
+                            'subject': textbook_data[2]
+                        }
                 
-                # 単元一覧を取得
-                cur.execute('SELECT id, name, textbook_id FROM social_studies_units ORDER BY textbook_id, name')
-                units = cur.fetchall()
+                # 単元情報を取得
+                unit_info = None
+                if question['unit_id']:
+                    cur.execute(f'SELECT id, name, chapter_number FROM social_studies_units WHERE id = {placeholder}', (question['unit_id'],))
+                    unit_data = cur.fetchone()
+                    if unit_data:
+                        unit_info = {
+                            'id': unit_data[0],
+                            'name': unit_data[1],
+                            'chapter_number': unit_data[2]
+                        }
                 
                 return render_template('social_studies/edit_question.html', 
-                                     question=question, textbooks=textbooks, units=units)
+                                     question=question, textbook_info=textbook_info, unit_info=unit_info)
                 
     except Exception as e:
         current_app.logger.error(f"社会科問題編集画面エラー: {e}")

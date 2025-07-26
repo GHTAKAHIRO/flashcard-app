@@ -15,60 +15,28 @@
         <div class="card">
             <div class="card-body">
                 <form id="editQuestionForm" onsubmit="saveQuestion(event)">
-                    {% if textbook_info and unit_info %}
-                        <!-- 教材と単元が指定されている場合は固定表示 -->
-                        <div class="mb-3">
-                            <label class="form-label">科目 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" value="{{ question.subject or textbook_info.subject or '未設定' }}" readonly>
-                            <input type="hidden" name="subject" value="{{ question.subject or textbook_info.subject or '地理' }}">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-book me-1"></i>教材
-                            </label>
-                            <input type="text" class="form-control" value="{{ textbook_info.name if textbook_info else '未設定' }}" readonly>
-                            <input type="hidden" name="textbook_id" value="{{ question.textbook_id or '' }}">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-list-ol me-1"></i>単元・章
-                            </label>
-                            <input type="text" class="form-control" value="{{ unit_info.name if unit_info else '未設定' }}{% if unit_info and unit_info.chapter_number %} (第{{ unit_info.chapter_number }}章){% endif %}" readonly>
-                            <input type="hidden" id="unit_id" name="unit_id" value="{{ question.unit_id or '' }}">
-                        </div>
-                    {% else %}
-                        <!-- 通常の選択形式 -->
-                        <div class="mb-3">
-                            <label for="subject" class="form-label">科目 <span class="text-danger">*</span></label>
-                            <select class="form-select" id="subject" name="subject" required onchange="loadTextbooks()">
-                                <option value="">科目を選択してください</option>
-                                <option value="地理" {% if question.subject == '地理' %}selected{% endif %}>地理</option>
-                                <option value="歴史" {% if question.subject == '歴史' %}selected{% endif %}>歴史</option>
-                                <option value="公民" {% if question.subject == '公民' %}selected{% endif %}>公民</option>
-                                <option value="理科" {% if question.subject == '理科' %}selected{% endif %}>理科</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="textbook_id" class="form-label">
-                                <i class="fas fa-book me-1"></i>教材
-                            </label>
-                            <select class="form-select" id="textbook_id" name="textbook_id" onchange="loadUnits()">
-                                <option value="">教材を選択してください（オプション）</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="unit_id" class="form-label">
-                                <i class="fas fa-list-ol me-1"></i>単元・章
-                            </label>
-                            <select class="form-select" id="unit_id" name="unit_id">
-                                <option value="">単元・章を選択してください（オプション）</option>
-                            </select>
-                        </div>
-                    {% endif %}
+                    <!-- 科目・教材・単元は固定表示 -->
+                    <div class="mb-3">
+                        <label class="form-label">科目 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" value="{{ question.subject or (textbook_info.subject if textbook_info else '未設定') }}" readonly>
+                        <input type="hidden" name="subject" value="{{ question.subject or (textbook_info.subject if textbook_info else '地理') }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-book me-1"></i>教材
+                        </label>
+                        <input type="text" class="form-control" value="{{ textbook_info.name if textbook_info else '未設定' }}" readonly>
+                        <input type="hidden" name="textbook_id" value="{{ question.textbook_id or '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-list-ol me-1"></i>単元・章
+                        </label>
+                        <input type="text" class="form-control" value="{{ unit_info.name if unit_info else '未設定' }}{% if unit_info and unit_info.chapter_number %} (第{{ unit_info.chapter_number }}章){% endif %}" readonly>
+                        <input type="hidden" id="unit_id" name="unit_id" value="{{ question.unit_id or '' }}">
+                    </div>
                     
                     <div class="mb-3">
                         <label for="difficulty_level" class="form-label">難易度</label>
@@ -219,90 +187,16 @@ document.addEventListener('DOMContentLoaded', function() {
     //     checkImageExists();
     // }
     
-    // 教材と単元が固定されている場合の処理
-    {% if textbook_info and unit_info %}
-        {% if image_path_info %}
-        const imagePathDisplay = document.getElementById('image_path_display');
-        if (imagePathDisplay) {
-            imagePathDisplay.value = '{{ image_path_info.base_url }}';
-        }
-        {% endif %}
-    {% else %}
-        // 通常の選択形式の場合
-        {% if question.textbook_id %}
-        setTimeout(function() {
-            const textbookSelect = document.getElementById('textbook_id');
-            if (textbookSelect) {
-                textbookSelect.value = '{{ question.textbook_id }}';
-                loadUnits();
-            }
-        }, 500);
-        {% endif %}
-        
-        {% if question.unit_id %}
-        setTimeout(function() {
-            const unitSelect = document.getElementById('unit_id');
-            if (unitSelect) {
-                unitSelect.value = '{{ question.unit_id }}';
-            }
-        }, 1500);
-        {% endif %}
+    // 固定表示の場合の処理
+    {% if image_path_info %}
+    const imagePathDisplay = document.getElementById('image_path_display');
+    if (imagePathDisplay) {
+        imagePathDisplay.value = '{{ image_path_info.base_url }}';
+    }
     {% endif %}
 });
 
-function loadTextbooks() {
-    const subject = document.getElementById('subject').value;
-    const textbookSelect = document.getElementById('textbook_id');
-    const unitSelect = document.getElementById('unit_id');
-    
-    unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
-    
-    if (!subject) {
-        textbookSelect.innerHTML = '<option value="">教材を選択してください（オプション）</option>';
-        return;
-    }
-    
-    fetch(`/social_studies/api/textbooks?subject=${subject}`)
-        .then(response => response.json())
-        .then(data => {
-            textbookSelect.innerHTML = '<option value="">教材を選択してください（オプション）</option>';
-            data.forEach(textbook => {
-                const option = document.createElement('option');
-                option.value = textbook.id;
-                option.textContent = `${textbook.name} (${textbook.subject})`;
-                textbookSelect.appendChild(option);
-            });
-        })
-        .catch(error => {
-            console.error('教材取得エラー:', error);
-        });
-}
 
-function loadUnits() {
-    const textbookId = document.getElementById('textbook_id').value;
-    const unitSelect = document.getElementById('unit_id');
-    
-    if (!textbookId) {
-        unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
-        return;
-    }
-    
-    fetch(`/social_studies/api/units?textbook_id=${textbookId}`)
-        .then(response => response.json())
-        .then(data => {
-            unitSelect.innerHTML = '<option value="">単元・章を選択してください（オプション）</option>';
-            data.forEach(unit => {
-                const option = document.createElement('option');
-                option.value = unit.id;
-                const chapterText = unit.chapter_number ? `第${unit.chapter_number}章` : '';
-                option.textContent = `${chapterText} ${unit.name}`;
-                unitSelect.appendChild(option);
-            });
-        })
-        .catch(error => {
-            console.error('単元取得エラー:', error);
-        });
-}
 
 function updatePreview() {
     const suffixInput = document.getElementById('answer_suffix');
