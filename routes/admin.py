@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
-from utils.db import get_db_connection, get_db_cursor
+from utils.db import get_db_connection, get_db_cursor, get_placeholder
 import csv
 import io
 
@@ -88,7 +88,8 @@ def admin_add_user():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # ユーザーが既に存在するかチェック
-                cur.execute('SELECT id FROM users WHERE username = ? OR email = ?', (username, email))
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM users WHERE username = {placeholder} OR email = {placeholder}', (username, email))
                 if cur.fetchone():
                     flash('ユーザー名またはメールアドレスが既に使用されています', 'error')
                     return redirect(url_for('admin.admin_users'))
@@ -98,9 +99,9 @@ def admin_add_user():
                 hashed_password = generate_password_hash(password)
                 is_admin = (role == 'admin')
                 
-                cur.execute('''
+                cur.execute(f'''
                     INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
-                    VALUES (?, ?, ?, ?, ?, datetime('now'))
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
                 ''', (username, email, hashed_password, is_admin, username))
                 
                 conn.commit()
@@ -152,7 +153,8 @@ def admin_upload_users_csv():
                             continue
                         
                         # 重複チェック
-                        cur.execute('SELECT id FROM users WHERE username = ? OR email = ?', (username, email))
+                        placeholder = get_placeholder()
+                        cur.execute(f'SELECT id FROM users WHERE username = {placeholder} OR email = {placeholder}', (username, email))
                         if cur.fetchone():
                             error_count += 1
                             continue
@@ -162,9 +164,9 @@ def admin_upload_users_csv():
                         hashed_password = generate_password_hash(password)
                         is_admin = (role == 'admin')
                         
-                        cur.execute('''
+                        cur.execute(f'''
                             INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
-                            VALUES (?, ?, ?, ?, ?, datetime('now'))
+                            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
                         ''', (username, email, hashed_password, is_admin, full_name))
                         
                         success_count += 1
@@ -256,12 +258,13 @@ def admin_update_user(user_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # ユーザーが存在するかチェック
-                cur.execute('SELECT id FROM users WHERE id = ?', (user_id,))
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM users WHERE id = {placeholder}', (user_id,))
                 if not cur.fetchone():
                     return jsonify({'error': 'ユーザーが見つかりません'}), 404
                 
                 # ユーザー名とメールの重複チェック（自分以外）
-                cur.execute('SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?', 
+                cur.execute(f'SELECT id FROM users WHERE (username = {placeholder} OR email = {placeholder}) AND id != {placeholder}', 
                            (username, email, user_id))
                 if cur.fetchone():
                     return jsonify({'error': 'ユーザー名またはメールアドレスが既に使用されています'}), 400
@@ -271,17 +274,17 @@ def admin_update_user(user_id):
                     # パスワードも更新
                     from werkzeug.security import generate_password_hash
                     hashed_password = generate_password_hash(password)
-                    cur.execute('''
+                    cur.execute(f'''
                         UPDATE users 
-                        SET username = ?, email = ?, password_hash = ?, is_admin = ?
-                        WHERE id = ?
+                        SET username = {placeholder}, email = {placeholder}, password_hash = {placeholder}, is_admin = {placeholder}
+                        WHERE id = {placeholder}
                     ''', (username, email, hashed_password, is_admin, user_id))
                 else:
                     # パスワードは更新しない
-                    cur.execute('''
+                    cur.execute(f'''
                         UPDATE users 
-                        SET username = ?, email = ?, is_admin = ?
-                        WHERE id = ?
+                        SET username = {placeholder}, email = {placeholder}, is_admin = {placeholder}
+                        WHERE id = {placeholder}
                     ''', (username, email, is_admin, user_id))
                 
                 conn.commit()
@@ -299,7 +302,8 @@ def admin_delete_user(user_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # ユーザーが存在するかチェック
-                cur.execute('SELECT id FROM users WHERE id = ?', (user_id,))
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM users WHERE id = {placeholder}', (user_id,))
                 if not cur.fetchone():
                     return jsonify({'error': 'ユーザーが見つかりません'}), 404
                 
@@ -308,7 +312,7 @@ def admin_delete_user(user_id):
                     return jsonify({'error': '自分自身を削除することはできません'}), 400
                 
                 # ユーザーを削除
-                cur.execute('DELETE FROM users WHERE id = ?', (user_id,))
+                cur.execute(f'DELETE FROM users WHERE id = {placeholder}', (user_id,))
                 conn.commit()
                 
                 return jsonify({'message': 'ユーザーを削除しました'})
@@ -608,10 +612,11 @@ def social_studies_admin_textbook_unified(textbook_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 教材情報を取得
-                cur.execute('''
+                placeholder = get_placeholder()
+                cur.execute(f'''
                     SELECT id, name, subject, grade, publisher, description, created_at
                     FROM social_studies_textbooks 
-                    WHERE id = ?
+                    WHERE id = {placeholder}
                 ''', (textbook_id,))
                 textbook_data = cur.fetchone()
                 
@@ -630,10 +635,10 @@ def social_studies_admin_textbook_unified(textbook_id):
                 }
                 
                 # 単元一覧を取得
-                cur.execute('''
+                cur.execute(f'''
                     SELECT id, name, description, created_at
                     FROM social_studies_units 
-                    WHERE textbook_id = ?
+                    WHERE textbook_id = {placeholder}
                     ORDER BY name
                 ''', (textbook_id,))
                 units_data = cur.fetchall()
@@ -648,7 +653,7 @@ def social_studies_admin_textbook_unified(textbook_id):
                     })
                 
                 # 問題数を取得
-                cur.execute('SELECT COUNT(*) FROM social_studies_questions WHERE textbook_id = ?', (textbook_id,))
+                cur.execute(f'SELECT COUNT(*) FROM social_studies_questions WHERE textbook_id = {placeholder}', (textbook_id,))
                 question_count = cur.fetchone()[0]
                 
                 return render_template('social_studies/admin_textbook_unified.html', 
@@ -672,7 +677,8 @@ def social_studies_add_unit():
             with get_db_cursor(conn) as cur:
                 if textbook_id:
                     # 特定の教材の単元を追加する場合
-                    cur.execute('SELECT id, name, subject FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                    placeholder = get_placeholder()
+                    cur.execute(f'SELECT id, name, subject FROM social_studies_textbooks WHERE id = {placeholder}', (textbook_id,))
                     textbook_data = cur.fetchone()
                     
                     if not textbook_data:
