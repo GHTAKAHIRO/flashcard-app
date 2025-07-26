@@ -12,5 +12,7 @@ services:
         value: sqlite
       - key: DB_PATH
         value: flashcards.db
+      - key: FLASK_ENV
+        value: production
     healthCheckPath: /
     autoDeploy: true 
