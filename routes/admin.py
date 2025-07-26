@@ -1009,3 +1009,141 @@ def social_studies_edit_textbook_post(textbook_id):
     except Exception as e:
         current_app.logger.error(f"教材編集エラー: {e}")
         return jsonify({'error': '教材の更新に失敗しました'}), 500 
+
+@admin_bp.route('/admin/social_studies/questions/<int:question_id>/edit')
+@login_required
+def social_studies_edit_question_page(question_id):
+    """社会科問題編集画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 問題データを取得
+                placeholder = get_placeholder()
+                cur.execute(f'''
+                    SELECT q.id, q.question, q.correct_answer, q.explanation, q.subject, 
+                           q.difficulty_level, q.textbook_id, q.unit_id,
+                           t.name as textbook_name, u.name as unit_name
+                    FROM social_studies_questions q
+                    LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
+                    LEFT JOIN social_studies_units u ON q.unit_id = u.id
+                    WHERE q.id = {placeholder}
+                ''', (question_id,))
+                question_data = cur.fetchone()
+                
+                if not question_data:
+                    flash('問題が見つかりません', 'error')
+                    return redirect(url_for('admin.social_studies_admin_questions'))
+                
+                question = {
+                    'id': question_data[0],
+                    'question_text': question_data[1],  # questionカラムをquestion_textとして扱う
+                    'answer_text': question_data[2],    # correct_answerカラムをanswer_textとして扱う
+                    'explanation': question_data[3],
+                    'subject': question_data[4],
+                    'difficulty': question_data[5],     # difficulty_levelカラムをdifficultyとして扱う
+                    'textbook_id': question_data[6],
+                    'unit_id': question_data[7],
+                    'textbook_name': question_data[8] or '未設定',
+                    'unit_name': question_data[9] or '未設定'
+                }
+                
+                # 教材一覧を取得
+                cur.execute('SELECT id, name, subject FROM social_studies_textbooks ORDER BY subject, name')
+                textbooks = cur.fetchall()
+                
+                # 単元一覧を取得
+                cur.execute('SELECT id, name, textbook_id FROM social_studies_units ORDER BY textbook_id, name')
+                units = cur.fetchall()
+                
+                return render_template('social_studies/edit_question.html', 
+                                     question=question, textbooks=textbooks, units=units)
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科問題編集画面エラー: {e}")
+        flash('問題編集画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.social_studies_admin_questions'))
+
+@admin_bp.route('/admin/social_studies/questions/<int:question_id>/edit', methods=['POST'])
+@login_required
+def social_studies_edit_question_post(question_id):
+    """社会科問題編集処理"""
+    try:
+        # JSONデータとフォームデータの両方に対応
+        if request.is_json:
+            data = request.get_json()
+            question_text = data.get('question_text', '').strip()
+            answer_text = data.get('answer_text', '').strip()
+            explanation = data.get('explanation', '').strip()
+            subject = data.get('subject', '').strip()
+            difficulty = data.get('difficulty', 'normal')
+            textbook_id = data.get('textbook_id')
+            unit_id = data.get('unit_id')
+        else:
+            question_text = request.form.get('question_text', '').strip()
+            answer_text = request.form.get('answer_text', '').strip()
+            explanation = request.form.get('explanation', '').strip()
+            subject = request.form.get('subject', '').strip()
+            difficulty = request.form.get('difficulty', 'normal')
+            textbook_id = request.form.get('textbook_id', type=int)
+            unit_id = request.form.get('unit_id', type=int)
+        
+        # バリデーション
+        if not question_text:
+            flash('問題文は必須です', 'error')
+            return redirect(url_for('admin.social_studies_edit_question_page', question_id=question_id))
+        
+        if not answer_text:
+            flash('正解は必須です', 'error')
+            return redirect(url_for('admin.social_studies_edit_question_page', question_id=question_id))
+        
+        if not subject:
+            flash('科目は必須です', 'error')
+            return redirect(url_for('admin.social_studies_edit_question_page', question_id=question_id))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 問題が存在するかチェック
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM social_studies_questions WHERE id = {placeholder}', (question_id,))
+                if not cur.fetchone():
+                    flash('問題が見つかりません', 'error')
+                    return redirect(url_for('admin.social_studies_admin_questions'))
+                
+                # 教材・単元の存在チェック
+                if textbook_id:
+                    cur.execute(f'SELECT id FROM social_studies_textbooks WHERE id = {placeholder}', (textbook_id,))
+                    if not cur.fetchone():
+                        flash('指定された教材が見つかりません', 'error')
+                        return redirect(url_for('admin.social_studies_edit_question_page', question_id=question_id))
+                
+                if unit_id:
+                    cur.execute(f'SELECT id FROM social_studies_units WHERE id = {placeholder}', (unit_id,))
+                    if not cur.fetchone():
+                        flash('指定された単元が見つかりません', 'error')
+                        return redirect(url_for('admin.social_studies_edit_question_page', question_id=question_id))
+                
+                # 問題を更新
+                cur.execute(f'''
+                    UPDATE social_studies_questions 
+                    SET question = {placeholder}, correct_answer = {placeholder}, explanation = {placeholder}, 
+                        subject = {placeholder}, difficulty_level = {placeholder}, 
+                        textbook_id = {placeholder}, unit_id = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = {placeholder}
+                ''', (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id, question_id))
+                
+                conn.commit()
+                
+                # JSONリクエストの場合はJSONレスポンスを返す
+                if request.is_json:
+                    return jsonify({'message': '問題を更新しました'})
+                else:
+                    flash('問題を更新しました', 'success')
+                    return redirect(url_for('admin.social_studies_admin_questions'))
+                
+    except Exception as e:
+        current_app.logger.error(f"社会科問題編集エラー: {e}")
+        if request.is_json:
+            return jsonify({'error': '問題の更新に失敗しました'}), 500
+        else:
+            flash('問題の更新に失敗しました', 'error')
+            return redirect(url_for('admin.social_studies_edit_question_page', question_id=question_id)) 

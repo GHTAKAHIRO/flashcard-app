@@ -72,23 +72,23 @@
                     
                     <div class="mb-3">
                         <label for="difficulty_level" class="form-label">難易度</label>
-                        <select class="form-select" id="difficulty_level" name="difficulty_level">
-                            <option value="basic" {% if question.difficulty_level == 'basic' %}selected{% endif %}>基本</option>
-                            <option value="intermediate" {% if question.difficulty_level == 'intermediate' %}selected{% endif %}>中級</option>
-                            <option value="advanced" {% if question.difficulty_level == 'advanced' %}selected{% endif %}>上級</option>
+                        <select class="form-select" id="difficulty" name="difficulty">
+                            <option value="basic" {% if question.difficulty == 'basic' %}selected{% endif %}>基本</option>
+                            <option value="intermediate" {% if question.difficulty == 'intermediate' %}selected{% endif %}>中級</option>
+                            <option value="advanced" {% if question.difficulty == 'advanced' %}selected{% endif %}>上級</option>
                         </select>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="question" class="form-label">問題文 <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="question" name="question" rows="3" 
-                                  required>{{ question.question or '' }}</textarea>
+                        <label for="question_text" class="form-label">問題文 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="question_text" name="question_text" rows="3" 
+                                  required>{{ question.question_text or '' }}</textarea>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="correct_answer" class="form-label">正解 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="correct_answer" name="correct_answer" 
-                               value="{{ question.correct_answer or '' }}" required>
+                        <label for="answer_text" class="form-label">正解 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="answer_text" name="answer_text" 
+                               value="{{ question.answer_text or '' }}" required>
                     </div>
                     
                     <div class="mb-3">
@@ -487,20 +487,20 @@ function saveQuestion(event) {
         subject: document.querySelector('input[name="subject"]').value,
         textbook_id: document.querySelector('input[name="textbook_id"]').value || null,
         unit_id: document.querySelector('input[name="unit_id"]').value || null,
-        question: document.getElementById('question').value.trim(),
-        correct_answer: document.getElementById('correct_answer').value.trim(),
+        question_text: document.getElementById('question_text').value.trim(),
+        answer_text: document.getElementById('answer_text').value.trim(),
         acceptable_answers: document.getElementById('acceptable_answers').value.trim(),
         answer_suffix: document.getElementById('answer_suffix').value.trim(),
         explanation: document.getElementById('explanation').value.trim(),
-        difficulty_level: document.getElementById('difficulty_level').value,
+        difficulty: document.getElementById('difficulty').value,
         image_name: document.getElementById('image_name').value.trim()
     };
     
-    if (!formData.question) {
+    if (!formData.question_text) {
         alert('問題文を入力してください');
         return;
     }
-    if (!formData.correct_answer) {
+    if (!formData.answer_text) {
         alert('正解を入力してください');
         return;
     }
@@ -510,7 +510,7 @@ function saveQuestion(event) {
     submitButton.disabled = true;
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>更新中...';
     
-    fetch('{{ url_for("social_studies_edit_question", question_id=question.id) }}', {
+    fetch('{{ url_for("admin.social_studies_edit_question_post", question_id=question.id) }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
