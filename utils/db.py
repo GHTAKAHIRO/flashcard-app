@@ -1,6 +1,6 @@
 import sqlite3
 import psycopg2
-# import psycopg2  # SQLite使用時はコメントアウト
+from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
 from flask import current_app
 import os
@@ -32,8 +32,7 @@ def get_db_connection():
             if conn:
                 conn.close()
     else:
-        # PostgreSQL接続（既存のコード）
-        db_pool = getattr(current_app, 'db_pool', None)
+        # PostgreSQL接続
         DB_HOST = current_app.config.get('DB_HOST')
         DB_PORT = current_app.config.get('DB_PORT')
         DB_NAME = current_app.config.get('DB_NAME')
@@ -42,39 +41,21 @@ def get_db_connection():
         
         conn = None
         try:
-            if db_pool:
-                try:
-                    conn = db_pool.getconn()
-                except Exception as e:
-                    current_app.logger.error(f"プールから接続取得エラー: {e}")
-                    conn = None
-            if conn:
-                conn.autocommit = False
-                yield conn
-            else:
-                current_app.logger.warning("プール接続失敗、直接接続を試行")
-                conn = psycopg2.connect(
-                    host=DB_HOST, port=DB_PORT, database=DB_NAME,
-                    user=DB_USER, password=DB_PASSWORD
-                )
-                yield conn
+            conn = psycopg2.connect(
+                host=DB_HOST, port=DB_PORT, database=DB_NAME,
+                user=DB_USER, password=DB_PASSWORD
+            )
+            yield conn
         except Exception as e:
             if conn:
                 try:
                     conn.rollback()
                 except:
                     pass
-            current_app.logger.error(f"DB接続エラー: {e}")
+            current_app.logger.error(f"PostgreSQL接続エラー: {e}")
             raise
         finally:
-            if conn and db_pool:
-                try:
-                    db_pool.putconn(conn)
-                except Exception as e:
-                    current_app.logger.error(f"DB接続返却エラー: {e}")
-                    if conn:
-                        conn.close()
-            elif conn:
+            if conn:
                 conn.close() 
 
 @contextmanager
