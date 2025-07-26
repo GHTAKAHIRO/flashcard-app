@@ -251,7 +251,7 @@ def choice_studies_home():
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT source, COUNT(*) as total_available
-                    FROM choice_units 
+                    FROM choice_questions 
                     GROUP BY source
                 ''')
                 total_available = {row[0]: row[1] for row in cur.fetchall()}
@@ -387,15 +387,15 @@ def choice_studies_start(source, chapter_id, chunk_number, mode=None):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
-                    SELECT id, word, meaning, example_sentence
-                    FROM choice_units
+                    SELECT id, question, correct_answer, choices
+                    FROM choice_questions
                     WHERE source = ? AND chapter_id = ? AND chunk_number = ?
                     ORDER BY id
                 ''', (source, chapter_id, chunk_number))
                 words = cur.fetchall()
         
         if not words:
-            flash("単語が見つかりませんでした")
+            flash("問題が見つかりませんでした")
             return redirect(url_for('choice_studies.choice_studies_chunks', source=source, chapter_id=chapter_id))
         
         # セッション情報を更新
@@ -403,9 +403,9 @@ def choice_studies_start(source, chapter_id, chunk_number, mode=None):
         session['vocabulary_session']['words'] = [
             {
                 'id': word[0],
-                'word': word[1],
-                'meaning': word[2],
-                'example_sentence': word[3]
+                'question': word[1],
+                'correct_answer': word[2],
+                'choices': word[3]
             }
             for word in words
         ]
@@ -471,14 +471,14 @@ def choice_studies_answer():
         current_word = words[current_index]
         
         # 回答をチェック
-        is_correct, result_type = check_answer(user_answer, current_word['meaning'])
+        is_correct, result_type = check_answer(user_answer, current_word['correct_answer'])
         
         # 結果をログに記録
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     INSERT INTO choice_study_log
-                    (user_id, source, chapter_id, chunk_number, word_id, user_answer, 
+                    (user_id, source, chapter_id, chunk_number, question_id, user_answer, 
                      correct_answer, is_correct, result_type, answered_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
@@ -488,7 +488,7 @@ def choice_studies_answer():
                     session_data['chunk_number'],
                     current_word['id'],
                     user_answer,
-                    current_word['meaning'],
+                    current_word['correct_answer'],
                     is_correct,
                     result_type,
                     datetime.now()
@@ -596,11 +596,11 @@ def choice_studies_admin():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 総単語数
-                cur.execute('SELECT COUNT(*) FROM choice_units')
+                cur.execute('SELECT COUNT(*) FROM choice_questions')
                 total_words = cur.fetchone()[0]
                 
                 # 学習された単語数
-                cur.execute('SELECT COUNT(DISTINCT word_id) FROM choice_study_log')
+                cur.execute('SELECT COUNT(DISTINCT question_id) FROM choice_study_log')
                 studied_words = cur.fetchone()[0]
                 
                 # 正解率
