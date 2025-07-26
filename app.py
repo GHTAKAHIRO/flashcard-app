@@ -61,7 +61,7 @@ app.secret_key = 'your_secret_key'
 @app.context_processor
 def inject_csrf_token():
     return dict(csrf_token=lambda: '')
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 app.config.update(
     # JSON処理高速化
@@ -73,6 +73,10 @@ app.config.update(
     
     # 静的ファイルキャッシュ
     SEND_FILE_MAX_AGE_DEFAULT=31536000,  # 1年
+    
+    # パフォーマンス最適化
+    TEMPLATES_AUTO_RELOAD=False,
+    SEND_FILE_MAX_AGE_DEFAULT=31536000,
     
     # データベース設定
     DB_TYPE=os.getenv('DB_TYPE', 'sqlite'),
@@ -515,4 +519,5 @@ if __name__ == '__main__':
         print(f"データベース初期化エラー: {e}")
     
     # アプリケーションを起動
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(debug=False, host='0.0.0.0', port=port)
