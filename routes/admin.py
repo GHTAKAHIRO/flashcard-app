@@ -329,9 +329,10 @@ def social_studies_admin_questions():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 問題一覧を取得
-                cur.execute('''
-                    SELECT q.id, q.question_text, q.answer_text, q.explanation, 
-                           q.subject, q.difficulty, q.created_at,
+                placeholder = get_placeholder()
+                cur.execute(f'''
+                    SELECT q.id, q.question, q.correct_answer, q.explanation, 
+                           q.subject, q.difficulty_level, q.created_at,
                            t.name as textbook_name, u.name as unit_name
                     FROM social_studies_questions q
                     LEFT JOIN social_studies_textbooks t ON q.textbook_id = t.id
@@ -344,11 +345,11 @@ def social_studies_admin_questions():
                 for q_data in questions_data:
                     questions.append({
                         'id': q_data[0],
-                        'question_text': q_data[1],
-                        'answer_text': q_data[2],
+                        'question_text': q_data[1],  # questionカラムをquestion_textとして扱う
+                        'answer_text': q_data[2],    # correct_answerカラムをanswer_textとして扱う
                         'explanation': q_data[3],
                         'subject': q_data[4],
-                        'difficulty': q_data[5],
+                        'difficulty': q_data[5],     # difficulty_levelカラムをdifficultyとして扱う
                         'created_at': q_data[6],
                         'textbook_name': q_data[7] or '未設定',
                         'unit_name': q_data[8] or '未設定'
@@ -460,7 +461,7 @@ def social_studies_add_question_post():
                 # 問題を追加
                 cur.execute(f'''
                     INSERT INTO social_studies_questions 
-                    (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id, created_at)
+                    (question, correct_answer, explanation, subject, difficulty_level, textbook_id, unit_id, created_at)
                     VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
                 ''', (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id))
                 
@@ -796,7 +797,7 @@ def social_studies_admin_unit_questions(unit_id):
                 
                 # 問題一覧を取得
                 cur.execute(f'''
-                    SELECT id, question_text, answer_text, explanation, difficulty, created_at
+                    SELECT id, question, correct_answer, explanation, difficulty_level, created_at
                     FROM social_studies_questions 
                     WHERE unit_id = {placeholder}
                     ORDER BY created_at DESC
@@ -807,10 +808,10 @@ def social_studies_admin_unit_questions(unit_id):
                 for q_data in questions_data:
                     questions.append({
                         'id': q_data[0],
-                        'question_text': q_data[1],
-                        'answer_text': q_data[2],
+                        'question_text': q_data[1],  # questionカラムをquestion_textとして扱う
+                        'answer_text': q_data[2],    # correct_answerカラムをanswer_textとして扱う
                         'explanation': q_data[3],
-                        'difficulty': q_data[4],
+                        'difficulty': q_data[4],     # difficulty_levelカラムをdifficultyとして扱う
                         'created_at': q_data[5]
                     })
                 
@@ -898,7 +899,7 @@ def download_unit_questions_csv(unit_id):
                 
                 # 問題一覧を取得
                 cur.execute(f'''
-                    SELECT question_text, answer_text, explanation, difficulty
+                    SELECT question, correct_answer, explanation, difficulty_level
                     FROM social_studies_questions 
                     WHERE unit_id = {placeholder}
                     ORDER BY created_at
