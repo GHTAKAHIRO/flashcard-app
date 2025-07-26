@@ -830,7 +830,8 @@ def download_units_csv(textbook_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 教材情報を取得
-                cur.execute('SELECT name FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT name FROM social_studies_textbooks WHERE id = {placeholder}', (textbook_id,))
                 textbook_data = cur.fetchone()
                 
                 if not textbook_data:
@@ -838,10 +839,10 @@ def download_units_csv(textbook_id):
                     return redirect(url_for('admin.social_studies_admin_unified'))
                 
                 # 単元一覧を取得
-                cur.execute('''
+                cur.execute(f'''
                     SELECT name, chapter_number, description
                     FROM social_studies_units 
-                    WHERE textbook_id = ?
+                    WHERE textbook_id = {placeholder}
                     ORDER BY chapter_number, name
                 ''', (textbook_id,))
                 units_data = cur.fetchall()
@@ -880,11 +881,12 @@ def download_unit_questions_csv(unit_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 単元情報を取得
-                cur.execute('''
+                placeholder = get_placeholder()
+                cur.execute(f'''
                     SELECT u.name, t.id as textbook_id, t.name as textbook_name
                     FROM social_studies_units u
                     JOIN social_studies_textbooks t ON u.textbook_id = t.id
-                    WHERE u.id = ?
+                    WHERE u.id = {placeholder}
                 ''', (unit_id,))
                 unit_data = cur.fetchone()
                 
@@ -893,10 +895,10 @@ def download_unit_questions_csv(unit_id):
                     return redirect(url_for('admin.social_studies_admin_unified'))
                 
                 # 問題一覧を取得
-                cur.execute('''
+                cur.execute(f'''
                     SELECT question_text, answer_text, explanation, difficulty
                     FROM social_studies_questions 
-                    WHERE unit_id = ?
+                    WHERE unit_id = {placeholder}
                     ORDER BY created_at
                 ''', (unit_id,))
                 questions_data = cur.fetchall()

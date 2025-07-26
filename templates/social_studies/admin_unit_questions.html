@@ -85,7 +85,7 @@
                 <div class="mb-4">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="mb-0">CSVファイルの準備</h6>
-                        <a href="{{ url_for('download_unit_questions_csv', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-outline-primary btn-sm">
+                        <a href="{{ url_for('admin.download_unit_questions_csv', unit_id=unit_info.id) }}" class="btn btn-outline-primary btn-sm">
                             <i class="fas fa-download me-1"></i>CSVダウンロード
                         </a>
                     </div>
