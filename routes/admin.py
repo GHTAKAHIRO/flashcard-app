@@ -444,23 +444,24 @@ def social_studies_add_question_post():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 教材と単元の存在チェック
+                placeholder = get_placeholder()
                 if textbook_id:
-                    cur.execute('SELECT id FROM social_studies_textbooks WHERE id = ?', (textbook_id,))
+                    cur.execute(f'SELECT id FROM social_studies_textbooks WHERE id = {placeholder}', (textbook_id,))
                     if not cur.fetchone():
                         flash('指定された教材が見つかりません', 'error')
                         return redirect(url_for('admin.social_studies_add_question'))
                 
                 if unit_id:
-                    cur.execute('SELECT id FROM social_studies_units WHERE id = ?', (unit_id,))
+                    cur.execute(f'SELECT id FROM social_studies_units WHERE id = {placeholder}', (unit_id,))
                     if not cur.fetchone():
                         flash('指定された単元が見つかりません', 'error')
                         return redirect(url_for('admin.social_studies_add_question'))
                 
                 # 問題を追加
-                cur.execute('''
+                cur.execute(f'''
                     INSERT INTO social_studies_questions 
                     (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
                 ''', (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id))
                 
                 conn.commit()
@@ -769,11 +770,12 @@ def social_studies_admin_unit_questions(unit_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 単元情報を取得
-                cur.execute('''
+                placeholder = get_placeholder()
+                cur.execute(f'''
                     SELECT u.id, u.name, u.description, t.id as textbook_id, t.name as textbook_name
                     FROM social_studies_units u
                     JOIN social_studies_textbooks t ON u.textbook_id = t.id
-                    WHERE u.id = ?
+                    WHERE u.id = {placeholder}
                 ''', (unit_id,))
                 unit_data = cur.fetchone()
                 
@@ -793,10 +795,10 @@ def social_studies_admin_unit_questions(unit_id):
                 }
                 
                 # 問題一覧を取得
-                cur.execute('''
+                cur.execute(f'''
                     SELECT id, question_text, answer_text, explanation, difficulty, created_at
                     FROM social_studies_questions 
-                    WHERE unit_id = ?
+                    WHERE unit_id = {placeholder}
                     ORDER BY created_at DESC
                 ''', (unit_id,))
                 questions_data = cur.fetchall()
