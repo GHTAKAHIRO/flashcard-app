@@ -60,14 +60,14 @@
             <button class="btn btn-danger me-2" id="bulk-delete-btn" style="display: none;" onclick="bulkDeleteQuestions()">
                 <i class="fas fa-trash me-2"></i>選択削除
             </button>
-            <a href="{{ url_for('admin.social_studies_add_question') }}" class="btn btn-success me-2">
+            <a href="{{ url_for('admin.input_studies_add_question') }}" class="btn btn-success me-2">
                 <i class="fas fa-plus me-2"></i>新規追加
             </a>
             <button class="btn btn-info me-2" onclick="showCsvUpload()">
                 <i class="fas fa-upload me-2"></i>CSV一括登録
             </button>
-            <a href="{{ url_for('admin.social_studies_admin_unified') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i>教材管理画面に戻る
+            <a href="{{ url_for('admin.input_studies_admin_unified') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>管理画面に戻る
             </a>
         </div>
     </div>
@@ -204,7 +204,7 @@
                             </small>
                         </td>
                         <td class="action-buttons">
-                            <a href="{{ url_for('admin.social_studies_edit_question_page', question_id=question.id) }}" class="btn btn-sm btn-outline-primary">
+                            <a href="{{ url_for('admin.input_studies_edit_question_page', question_id=question.id) }}" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-edit"></i>
                             </a>
                             <button class="btn btn-sm btn-outline-info" onclick="showImageUpload({{ question.id }})">
@@ -225,7 +225,7 @@
             <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
             <h4 class="text-muted">まだ問題が登録されていません</h4>
             <p class="text-muted">新しい問題を追加してください</p>
-            <a href="{{ url_for('admin.social_studies_add_question') }}" class="btn btn-primary">
+            <a href="{{ url_for('admin.input_studies_add_question') }}" class="btn btn-primary">
                 <i class="fas fa-plus me-1"></i>問題を追加
             </a>
         </div>

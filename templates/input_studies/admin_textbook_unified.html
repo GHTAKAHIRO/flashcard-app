@@ -87,8 +87,8 @@
         </div>
         <div>
 
-            <a href="{{ url_for('admin.social_studies_admin_unified') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i>教材一覧に戻る
+            <a href="{{ url_for('admin.input_studies_admin_unified') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>管理画面に戻る
             </a>
         </div>
     </div>
@@ -160,7 +160,7 @@
 
 <!-- 単元管理テーブルのみ表示 -->
 <div class="mb-3">
-    <a href="{{ url_for('admin.social_studies_add_unit', textbook_id=textbook.id) }}" class="btn btn-success me-2">
+    <a href="{{ url_for('admin.input_studies_add_unit', textbook_id=textbook.id) }}" class="btn btn-success me-2">
         <i class="fas fa-plus me-2"></i>新規単元追加
     </a>
     <button class="btn btn-info me-2" onclick="showUnitsCsvUpload()">
@@ -188,7 +188,7 @@
                             <div class="fw-bold">{{ unit.name }}</div>
                         </td>
                         <td>
-                            <a href="{{ url_for('admin.social_studies_admin_unit_questions', textbook_id=textbook.id, unit_id=unit.id) }}" class="btn btn-info btn-sm" title="問題一覧">
+                            <a href="{{ url_for('admin.input_studies_admin_unit_questions', textbook_id=textbook.id, unit_id=unit.id) }}" class="btn btn-info btn-sm" title="問題一覧">
                                 <i class="fas fa-list me-1"></i>問題一覧
                             </a>
                         </td>
@@ -213,7 +213,7 @@
             <i class="fas fa-list fa-3x text-muted mb-3"></i>
             <h4 class="text-muted">まだ単元が登録されていません</h4>
             <p class="text-muted">新しい単元を追加してください</p>
-            <a href="{{ url_for('admin.social_studies_add_unit', textbook_id=textbook.id) }}" class="btn btn-primary">
+            <a href="{{ url_for('admin.input_studies_add_unit', textbook_id=textbook.id) }}" class="btn btn-primary">
                 <i class="fas fa-plus me-1"></i>単元を追加
             </a>
         </div>
