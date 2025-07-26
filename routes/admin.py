@@ -764,9 +764,9 @@ def input_studies_add_unit_post():
                 
                 # 単元を追加
                 cur.execute('''
-                    INSERT INTO input_units (name, chapter_number, description, textbook_id, created_at)
-                    VALUES (?, ?, ?, ?, datetime('now'))
-                ''', (name, chapter_num, description, textbook_id))
+                    INSERT INTO input_units (textbook_id, name, chapter_number, description)
+                    VALUES (?, ?, ?, ?)
+                ''', (textbook_id, name, chapter_num, description))
                 
                 conn.commit()
                 flash('単元を追加しました', 'success')
@@ -1055,7 +1055,7 @@ def input_studies_edit_unit_get(unit_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
-                    SELECT id, name, unit_number, description, textbook_id
+                    SELECT id, name, chapter_number, description, textbook_id
                     FROM input_units 
                     WHERE id = ?
                 ''', (unit_id,))
@@ -1067,7 +1067,7 @@ def input_studies_edit_unit_get(unit_id):
                 unit = {
                     'id': unit_data[0],
                     'name': unit_data[1],
-                    'unit_number': unit_data[2],
+                    'chapter_number': unit_data[2],
                     'description': unit_data[3],
                     'textbook_id': unit_data[4]
                 }
@@ -1085,18 +1085,18 @@ def input_studies_edit_unit_post(unit_id):
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
-        unit_number = data.get('unit_number', '').strip()
+        chapter_number = data.get('chapter_number', '').strip()
         description = data.get('description', '').strip()
         
         # バリデーション
         if not name:
             return jsonify({'error': '単元名は必須です'}), 400
         
-        if not unit_number:
+        if not chapter_number:
             return jsonify({'error': '単元番号は必須です'}), 400
         
         try:
-            unit_number = int(unit_number)
+            chapter_number = int(chapter_number)
         except ValueError:
             return jsonify({'error': '単元番号は数値で入力してください'}), 400
         
@@ -1111,17 +1111,17 @@ def input_studies_edit_unit_post(unit_id):
                 textbook_id = unit_info[1]
                 
                 # 単元番号の重複チェック（同じ教材内で、自分以外）
-                cur.execute('SELECT id FROM input_units WHERE textbook_id = ? AND unit_number = ? AND id != ?', 
-                          (textbook_id, unit_number, unit_id))
+                cur.execute('SELECT id FROM input_units WHERE textbook_id = ? AND chapter_number = ? AND id != ?', 
+                          (textbook_id, chapter_number, unit_id))
                 if cur.fetchone():
                     return jsonify({'error': 'この単元番号は既に使用されています'}), 400
                 
                 # 単元を更新
                 cur.execute('''
                     UPDATE input_units 
-                    SET name = ?, unit_number = ?, description = ?
+                    SET name = ?, chapter_number = ?, description = ?
                     WHERE id = ?
-                ''', (name, unit_number, description, unit_id))
+                ''', (name, chapter_number, description, unit_id))
                 
                 conn.commit()
                 return jsonify({'message': '単元を更新しました'})
@@ -1223,7 +1223,7 @@ def input_studies_upload_csv():
                             try:
                                 unit_number = int(unit_number)
                                 cur.execute('''
-                                    INSERT INTO input_units (textbook_id, name, unit_number, description)
+                                    INSERT INTO input_units (textbook_id, name, chapter_number, description)
                                     VALUES (?, ?, ?, ?)
                                 ''', (textbook_id, name, unit_number, description))
                             except ValueError:
@@ -1274,7 +1274,7 @@ def input_studies_upload_units_csv():
                             try:
                                 unit_number = int(unit_number)
                                 cur.execute('''
-                                    INSERT INTO input_units (textbook_id, name, unit_number, description)
+                                    INSERT INTO input_units (textbook_id, name, chapter_number, description)
                                     VALUES (?, ?, ?, ?)
                                 ''', (textbook_id, name, unit_number, description))
                             except ValueError:
