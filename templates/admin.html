@@ -84,11 +84,13 @@
                     <i class="fas fa-database me-2"></i>データ管理
                 </h5>
                 <p class="card-text">データベースのバックアップや復元を行います。</p>
-                <button class="btn btn-warning" onclick="alert('この機能は開発中です')">
-                    <i class="fas fa-download me-1"></i>バックアップ
-                </button>
+                <form method="POST" action="{{ url_for('admin.restore_data') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-warning" onclick="return confirm('初期データを復元しますか？')">
+                        <i class="fas fa-upload me-1"></i>初期データ復元
+                    </button>
+                </form>
                 <button class="btn btn-outline-warning" onclick="alert('この機能は開発中です')">
-                    <i class="fas fa-upload me-1"></i>復元
+                    <i class="fas fa-download me-1"></i>バックアップ
                 </button>
             </div>
         </div>

@@ -11,7 +11,7 @@ services:
       - key: DB_TYPE
         value: sqlite
       - key: DB_PATH
-        value: flashcards.db
+        value: /opt/render/project/src/flashcards.db
       - key: FLASK_ENV
         value: production
     healthCheckPath: /

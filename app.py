@@ -450,6 +450,11 @@ if __name__ == '__main__':
                 print("✅ SQLiteデータベースの初期化が完了しました")
             else:
                 print("✅ SQLiteデータベースは既に存在します")
+            
+            # 初期データの復元
+            print("🔄 初期データの復元を確認しています...")
+            from restore_data import restore_initial_data
+            restore_initial_data()
         
     except Exception as e:
         print(f"❌ データベース初期化エラー: {e}")

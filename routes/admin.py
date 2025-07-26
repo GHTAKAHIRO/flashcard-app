@@ -37,6 +37,20 @@ def admin():
         flash('管理画面の読み込みに失敗しました', 'error')
         return redirect(url_for('home'))
 
+@admin_bp.route('/admin/restore_data', methods=['POST'])
+@login_required
+def restore_data():
+    """初期データの復元"""
+    try:
+        from restore_data import restore_initial_data
+        restore_initial_data()
+        flash('初期データの復元が完了しました', 'success')
+    except Exception as e:
+        current_app.logger.error(f"データ復元エラー: {e}")
+        flash('データ復元に失敗しました', 'error')
+    
+    return redirect(url_for('admin.admin'))
+
 @admin_bp.route('/admin/users')
 @login_required
 def admin_users():
