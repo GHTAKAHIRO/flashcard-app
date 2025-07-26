@@ -88,8 +88,8 @@ def init_database():
             FOREIGN KEY (user_id) REFERENCES users (id)
         )""",
         
-        # 社会科テーブル
-        """CREATE TABLE IF NOT EXISTS social_studies_textbooks (
+        # 入力問題テーブル
+        """CREATE TABLE IF NOT EXISTS input_textbooks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             subject TEXT NOT NULL,
@@ -100,17 +100,17 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         
-        """CREATE TABLE IF NOT EXISTS social_studies_units (
+        """CREATE TABLE IF NOT EXISTS input_units (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             textbook_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             chapter_number INTEGER,
             description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (textbook_id) REFERENCES social_studies_textbooks (id)
+            FOREIGN KEY (textbook_id) REFERENCES input_textbooks (id)
         )""",
         
-        """CREATE TABLE IF NOT EXISTS social_studies_questions (
+        """CREATE TABLE IF NOT EXISTS input_questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             subject TEXT NOT NULL,
             textbook_id INTEGER NOT NULL,
@@ -127,11 +127,11 @@ def init_database():
             question_number INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (textbook_id) REFERENCES social_studies_textbooks (id),
-            FOREIGN KEY (unit_id) REFERENCES social_studies_units (id)
+            FOREIGN KEY (textbook_id) REFERENCES input_textbooks (id),
+            FOREIGN KEY (unit_id) REFERENCES input_units (id)
         )""",
-        # 社会科学習ログテーブル
-        """CREATE TABLE IF NOT EXISTS social_studies_study_log (
+        # 入力問題学習ログテーブル
+        """CREATE TABLE IF NOT EXISTS input_study_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             question_id INTEGER NOT NULL,
@@ -140,11 +140,11 @@ def init_database():
             subject TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (question_id) REFERENCES social_studies_questions (id)
+            FOREIGN KEY (question_id) REFERENCES input_questions (id)
         )""",
         
-        # 語彙テーブル
-        """CREATE TABLE IF NOT EXISTS vocabulary_chapters (
+        # 選択問題テーブル
+        """CREATE TABLE IF NOT EXISTS choice_textbooks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source TEXT NOT NULL,
             chapter_name TEXT NOT NULL,
@@ -152,45 +152,36 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",
         
-        """CREATE TABLE IF NOT EXISTS vocabulary_words (
+        """CREATE TABLE IF NOT EXISTS choice_units (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            chapter_id INTEGER NOT NULL,
-            word TEXT NOT NULL,
-            meaning TEXT NOT NULL,
-            chunk_number INTEGER NOT NULL,
+            textbook_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            unit_number INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (chapter_id) REFERENCES vocabulary_chapters (id)
+            FOREIGN KEY (textbook_id) REFERENCES choice_textbooks (id)
         )""",
         
-        """CREATE TABLE IF NOT EXISTS vocabulary_progress (
+        """CREATE TABLE IF NOT EXISTS choice_questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            chapter_id INTEGER NOT NULL,
-            chunk_number INTEGER NOT NULL,
-            is_completed BOOLEAN DEFAULT FALSE,
-            is_passed BOOLEAN DEFAULT FALSE,
+            unit_id INTEGER NOT NULL,
+            question TEXT NOT NULL,
+            correct_answer TEXT NOT NULL,
+            choices TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (chapter_id) REFERENCES vocabulary_chapters (id)
+            FOREIGN KEY (unit_id) REFERENCES choice_units (id)
         )""",
         
-        """CREATE TABLE IF NOT EXISTS vocabulary_study_log (
+        """CREATE TABLE IF NOT EXISTS choice_study_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            word_id INTEGER NOT NULL,
-            chapter_id INTEGER NOT NULL,
-            chunk_number INTEGER NOT NULL,
-            source TEXT NOT NULL,
+            question_id INTEGER NOT NULL,
             user_answer TEXT,
             correct_answer TEXT,
             is_correct BOOLEAN NOT NULL,
-            result_type TEXT,
             answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (word_id) REFERENCES vocabulary_words (id),
-            FOREIGN KEY (chapter_id) REFERENCES vocabulary_chapters (id)
+            FOREIGN KEY (question_id) REFERENCES choice_questions (id)
         )"""
     ]
     
@@ -211,11 +202,11 @@ def init_database():
             "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
             "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
             "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);",
-            "CREATE INDEX IF NOT EXISTS idx_questions_textbook_unit ON social_studies_questions(textbook_id, unit_id);",
-            "CREATE INDEX IF NOT EXISTS idx_vocabulary_words_chapter ON vocabulary_words(chapter_id, chunk_number);",
-            "CREATE INDEX IF NOT EXISTS idx_vocabulary_progress_user_chapter ON vocabulary_progress(user_id, chapter_id, chunk_number);",
-            "CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_user_word ON vocabulary_study_log(user_id, word_id);",
-            "CREATE INDEX IF NOT EXISTS idx_vocabulary_study_log_user_chapter ON vocabulary_study_log(user_id, chapter_id, chunk_number);"
+            "CREATE INDEX IF NOT EXISTS idx_questions_textbook_unit ON input_questions(textbook_id, unit_id);",
+            "CREATE INDEX IF NOT EXISTS idx_choice_units_textbook ON choice_units(textbook_id, unit_number);",
+            "CREATE INDEX IF NOT EXISTS idx_choice_questions_unit ON choice_questions(unit_id);",
+            "CREATE INDEX IF NOT EXISTS idx_choice_study_log_user_question ON choice_study_log(user_id, question_id);",
+            "CREATE INDEX IF NOT EXISTS idx_choice_study_log_user ON choice_study_log(user_id, answered_at);"
         ]
         
         for index_sql in indexes:

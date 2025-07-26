@@ -15,7 +15,7 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
                 # 基本の進捗情報を取得
                 cur.execute('''
                     SELECT is_completed, is_passed, completed_at, passed_at
-                    FROM vocabulary_chunk_progress
+                    FROM choice_questions
                     WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
                 ''', (user_id, source, chapter_id, chunk_number))
                 result = cur.fetchone()
@@ -23,7 +23,7 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
                 # 正解数を取得
                 cur.execute('''
                     SELECT COUNT(*) as correct_count
-                    FROM vocabulary_study_log
+                    FROM choice_study_log
                     WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ? AND result = 'known'
                 ''', (user_id, source, chapter_id, chunk_number))
                 correct_result = cur.fetchone()
@@ -47,7 +47,7 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
             with get_db_cursor(conn) as cur:
                 # 既存のレコードがあるかチェック
                 cur.execute('''
-                    SELECT id FROM vocabulary_chunk_progress
+                    SELECT id FROM choice_questions
                     WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
                 ''', (user_id, source, chapter_id, chunk_number))
                 
@@ -74,7 +74,7 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
                     if update_fields:
                         params.extend([user_id, source, chapter_id, chunk_number])
                         query = f'''
-                            UPDATE vocabulary_chunk_progress 
+                            UPDATE choice_questions 
                             SET {', '.join(update_fields)}
                             WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
                         '''
@@ -83,7 +83,7 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
                 else:
                     # 新規レコードを作成
                     cur.execute('''
-                        INSERT INTO vocabulary_chunk_progress 
+                        INSERT INTO choice_questions 
                         (user_id, source, chapter_id, chunk_number, is_completed, is_passed, completed_at, passed_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (

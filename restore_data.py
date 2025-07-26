@@ -35,14 +35,14 @@ def restore_initial_data():
         else:
             print("✅ 管理者ユーザーは既に存在します")
         
-        # 社会科教材の確認と作成
-        cursor.execute('SELECT id FROM social_studies_textbooks WHERE name = ?', ('ファイナルステージ',))
+        # 入力問題教材の確認と作成
+        cursor.execute('SELECT id FROM input_textbooks WHERE name = ?', ('ファイナルステージ',))
         if not cursor.fetchone():
             print("📚 初期教材を作成しています...")
             
             # 教材を作成
             cursor.execute('''
-                INSERT INTO social_studies_textbooks (name, subject, grade, publisher, description, created_at)
+                INSERT INTO input_textbooks (name, subject, grade, publisher, description, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', ('ファイナルステージ', '地理', '高校', '出版社名', '地理の総合問題集', datetime.now()))
             
@@ -60,7 +60,7 @@ def restore_initial_data():
             
             for unit_name, chapter_num, description in units:
                 cursor.execute('''
-                    INSERT INTO social_studies_units (textbook_id, name, chapter_number, description, created_at)
+                    INSERT INTO input_units (textbook_id, name, chapter_number, description, created_at)
                     VALUES (?, ?, ?, ?, ?)
                 ''', (textbook_id, unit_name, chapter_num, description, datetime.now()))
             
@@ -77,7 +77,7 @@ def restore_initial_data():
             
             for question, answer, explanation, difficulty in sample_questions:
                 cursor.execute('''
-                    INSERT INTO social_studies_questions 
+                    INSERT INTO input_questions 
                     (subject, textbook_id, question, correct_answer, explanation, difficulty_level, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', ('地理', textbook_id, question, answer, explanation, difficulty, datetime.now()))
@@ -91,13 +91,13 @@ def restore_initial_data():
         print("🎉 初期データの復元が完了しました")
         
         # 統計情報を表示
-        cursor.execute('SELECT COUNT(*) FROM social_studies_textbooks')
+        cursor.execute('SELECT COUNT(*) FROM input_textbooks')
         textbook_count = cursor.fetchone()[0]
         
-        cursor.execute('SELECT COUNT(*) FROM social_studies_units')
+        cursor.execute('SELECT COUNT(*) FROM input_units')
         unit_count = cursor.fetchone()[0]
         
-        cursor.execute('SELECT COUNT(*) FROM social_studies_questions')
+        cursor.execute('SELECT COUNT(*) FROM input_questions')
         question_count = cursor.fetchone()[0]
         
         print(f"📊 現在のデータ統計:")

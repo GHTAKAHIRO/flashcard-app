@@ -31,7 +31,7 @@ import uuid
 from routes.auth import auth_bp
 from routes.admin import admin_bp
 from routes.study import study_bp
-from routes.vocabulary import vocabulary_bp
+from routes.choice_studies import choice_studies_bp
 from models.user import User
 from utils.db import get_db_connection, get_db_cursor
 
@@ -100,7 +100,7 @@ def load_user(user_id):
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(study_bp)
-app.register_blueprint(vocabulary_bp)
+app.register_blueprint(choice_studies_bp)
 
 # --- ここからカスタムフィルタ追加 ---
 def to_kanji_circle(value):
@@ -170,9 +170,9 @@ def get_unit_image_folder_path(question_id):
                         t.subject, 
                         t.wasabi_folder_path,
                         u.chapter_number
-                    FROM social_studies_questions q
-                    JOIN social_studies_units u ON q.unit_id = u.id
-                    JOIN social_studies_textbooks t ON u.textbook_id = t.id
+                    FROM input_questions q
+                    JOIN input_units u ON q.unit_id = u.id
+                    JOIN input_textbooks t ON u.textbook_id = t.id
                     WHERE q.id = ?
                 ''', (question_id,))
                 result = cur.fetchone()
@@ -220,8 +220,8 @@ def get_unit_image_folder_path_by_unit_id(unit_id):
                         t.subject, 
                         t.wasabi_folder_path,
                         u.chapter_number
-                    FROM social_studies_units u
-                    JOIN social_studies_textbooks t ON u.textbook_id = t.id
+                    FROM input_units u
+                    JOIN input_textbooks t ON u.textbook_id = t.id
                     WHERE u.id = ?
                 ''', (unit_id,))
                 result = cur.fetchone()
@@ -326,14 +326,14 @@ def social_studies_api_textbooks():
                 if subject:
                     cur.execute('''
                         SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
-                        FROM social_studies_textbooks 
+                        FROM input_textbooks 
                         WHERE subject = ?
                         ORDER BY name
                     ''', (subject,))
                 else:
                     cur.execute('''
                         SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
-                        FROM social_studies_textbooks 
+                        FROM input_textbooks 
                         ORDER BY subject, name
                     ''')
                 
@@ -363,7 +363,7 @@ def social_studies_api_textbook(textbook_id):
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT id, name, subject, grade, publisher, description, wasabi_folder_path
-                    FROM social_studies_textbooks 
+                    FROM input_textbooks 
                     WHERE id = ?
                 ''', (textbook_id,))
                 
@@ -400,7 +400,7 @@ def social_studies_api_units():
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT id, name, chapter_number, description
-                    FROM social_studies_units 
+                    FROM input_units 
                     WHERE textbook_id = ?
                     ORDER BY chapter_number, name
                 ''', (textbook_id,))

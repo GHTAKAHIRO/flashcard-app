@@ -4,19 +4,19 @@ from datetime import datetime
 import re
 from utils.db import get_db_connection, get_db_cursor
 
-vocabulary_bp = Blueprint('vocabulary', __name__)
+choice_studies_bp = Blueprint('choice_studies', __name__)
 
-# ========== 語彙関連のユーティリティ関数 ==========
+# ========== 選択問題関連のユーティリティ関数 ==========
 
-def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
-    """英単語チャンクの進捗状況を取得"""
+def get_choice_chunk_progress(user_id, source, chapter_id, chunk_number):
+    """選択問題チャンクの進捗状況を取得"""
     try:
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 基本の進捗情報を取得
                 cur.execute('''
                     SELECT is_completed, is_passed, completed_at, passed_at
-                    FROM vocabulary_chunk_progress
+                    FROM choice_questions
                     WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
                 ''', (user_id, source, chapter_id, chunk_number))
                 result = cur.fetchone()
@@ -24,7 +24,7 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
                 # 正解数を取得
                 cur.execute('''
                     SELECT COUNT(*) as correct_count
-                    FROM vocabulary_study_log
+                    FROM choice_study_log
                     WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ? AND result = 'known'
                 ''', (user_id, source, chapter_id, chunk_number))
                 correct_result = cur.fetchone()
@@ -36,11 +36,11 @@ def get_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number):
                 
                 return result
     except Exception as e:
-        current_app.logger.error(f"英単語チャンク進捗取得エラー: {e}")
+        current_app.logger.error(f"選択問題チャンク進捗取得エラー: {e}")
         return None
 
-def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, is_completed=False, is_passed=False):
-    """英単語チャンクの進捗状況を更新"""
+def update_choice_chunk_progress(user_id, source, chapter_id, chunk_number, is_completed=False, is_passed=False):
+    """選択問題チャンクの進捗状況を更新"""
     try:
         current_app.logger.info(f"進捗更新開始: user={user_id}, source={source}, chapter={chapter_id}, chunk={chunk_number}, completed={is_completed}, passed={is_passed}")
         
@@ -48,7 +48,7 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
             with get_db_cursor(conn) as cur:
                 # 既存のレコードがあるかチェック
                 cur.execute('''
-                    SELECT id FROM vocabulary_chunk_progress
+                    SELECT id FROM choice_questions
                     WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
                 ''', (user_id, source, chapter_id, chunk_number))
                 
@@ -78,7 +78,7 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
                         params.extend([user_id, source, chapter_id, chunk_number])
                         
                         update_sql = f'''
-                            UPDATE vocabulary_chunk_progress
+                            UPDATE choice_questions
                             SET {', '.join(update_fields)}
                             WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
                         '''
@@ -89,7 +89,7 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
                 else:
                     # 新規レコードを作成
                     insert_sql = '''
-                        INSERT INTO vocabulary_chunk_progress 
+                        INSERT INTO choice_questions 
                         (user_id, source, chapter_id, chunk_number, is_completed, is_passed, completed_at, passed_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     '''
@@ -109,7 +109,7 @@ def update_vocabulary_chunk_progress(user_id, source, chapter_id, chunk_number, 
                 return True
                 
     except Exception as e:
-        current_app.logger.error(f"英単語チャンク進捗更新エラー: {e}")
+        current_app.logger.error(f"選択問題チャンク進捗更新エラー: {e}")
         current_app.logger.error(f"エラー詳細: {str(e)}")
         return False
 
@@ -227,20 +227,20 @@ def levenshtein_distance(str1, str2):
     
     return previous_row[-1]
 
-# ========== 語彙関連のルート ==========
+# ========== 選択問題関連のルート ==========
 
-@vocabulary_bp.route('/vocabulary')
+@choice_studies_bp.route('/choice_studies')
 @login_required
-def vocabulary_home():
-    """英単語学習のホーム画面"""
+def choice_studies_home():
+    """選択問題学習のホーム画面"""
     try:
-        # ユーザーの学習履歴を取得（vocabulary_study_logテーブルから）
+        # ユーザーの学習履歴を取得（choice_study_logテーブルから）
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT DISTINCT source, COUNT(*) as total_words,
                            COUNT(CASE WHEN result = 'known' THEN 1 END) as known_words
-                    FROM vocabulary_study_log 
+                    FROM choice_study_log 
                     WHERE user_id = ?
                     GROUP BY source
                 ''', (str(current_user.id),))
@@ -251,7 +251,7 @@ def vocabulary_home():
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT source, COUNT(*) as total_available
-                    FROM vocabulary_words 
+                    FROM choice_units 
                     GROUP BY source
                 ''')
                 total_available = {row[0]: row[1] for row in cur.fetchall()}
@@ -261,16 +261,16 @@ def vocabulary_home():
             source = list(source)  # タプルをリストに変換
             source.append(total_available.get(source[0], 0))  # total_availableを追加
         
-        return render_template('vocabulary/home.html', vocabulary_sources=vocabulary_sources)
+        return render_template('choice_studies/home.html', vocabulary_sources=vocabulary_sources)
     except Exception as e:
-        current_app.logger.error(f"英単語ホーム画面エラー: {e}")
+        current_app.logger.error(f"選択問題ホーム画面エラー: {e}")
         flash("エラーが発生しました")
         return redirect(url_for('admin.admin'))
 
-@vocabulary_bp.route('/vocabulary/chapters/<source>')
+@choice_studies_bp.route('/choice_studies/chapters/<source>')
 @login_required
-def vocabulary_chapters(source):
-    """英単語章選択画面"""
+def choice_studies_chapters(source):
+    """選択問題章選択画面"""
     try:
         # ソースタイトルの設定
         source_titles = {
@@ -305,20 +305,20 @@ def vocabulary_chapters(source):
             }
         ]
         
-        return render_template('vocabulary/chapters.html',
+        return render_template('choice_studies/chapters.html',
                              source=source,
                              source_title=source_title,
                              chapters=chapters)
         
     except Exception as e:
-        current_app.logger.error(f"英単語章選択エラー: {e}")
+        current_app.logger.error(f"選択問題章選択エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_home'))
+        return redirect(url_for('choice_studies.choice_studies_home'))
 
-@vocabulary_bp.route('/vocabulary/chunks/<source>/<int:chapter_id>')
+@choice_studies_bp.route('/choice_studies/chunks/<source>/<int:chapter_id>')
 @login_required
-def vocabulary_chunks(source, chapter_id):
-    """英単語チャンク選択画面"""
+def choice_studies_chunks(source, chapter_id):
+    """選択問題チャンク選択画面"""
     try:
         # ソースタイトルの設定
         source_titles = {
@@ -339,7 +339,7 @@ def vocabulary_chunks(source, chapter_id):
         # チャンクデータを取得（仮の実装）
         chunks = []
         for i in range(1, 6):  # 5つのチャンク
-            progress = get_vocabulary_chunk_progress(current_user.id, source, chapter_id, i)
+            progress = get_choice_chunk_progress(current_user.id, source, chapter_id, i)
             chunks.append({
                 'number': i,
                 'title': f'Chunk {i}',
@@ -349,7 +349,7 @@ def vocabulary_chunks(source, chapter_id):
                 'correct_count': progress.get('correct_count', 0) if progress else 0
             })
         
-        return render_template('vocabulary/chunks.html',
+        return render_template('choice_studies/chunks.html',
                              source=source,
                              source_title=source_title,
                              chapter_id=chapter_id,
@@ -357,15 +357,15 @@ def vocabulary_chunks(source, chapter_id):
                              chunks=chunks)
         
     except Exception as e:
-        current_app.logger.error(f"英単語チャンク選択エラー: {e}")
+        current_app.logger.error(f"選択問題チャンク選択エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_chapters', source=source))
+        return redirect(url_for('choice_studies.choice_studies_chapters', source=source))
 
-@vocabulary_bp.route('/vocabulary/start/<source>/<int:chapter_id>/<int:chunk_number>')
-@vocabulary_bp.route('/vocabulary/start/<source>/<int:chapter_id>/<int:chunk_number>/<mode>')
+@choice_studies_bp.route('/choice_studies/start/<source>/<int:chapter_id>/<int:chunk_number>')
+@choice_studies_bp.route('/choice_studies/start/<source>/<int:chapter_id>/<int:chunk_number>/<mode>')
 @login_required
-def vocabulary_start(source, chapter_id, chunk_number, mode=None):
-    """英単語学習開始"""
+def choice_studies_start(source, chapter_id, chunk_number, mode=None):
+    """選択問題学習開始"""
     try:
         # デフォルトモードを設定
         if mode is None:
@@ -388,7 +388,7 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     SELECT id, word, meaning, example_sentence
-                    FROM vocabulary_words
+                    FROM choice_units
                     WHERE source = ? AND chapter_id = ? AND chunk_number = ?
                     ORDER BY id
                 ''', (source, chapter_id, chunk_number))
@@ -396,7 +396,7 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
         
         if not words:
             flash("単語が見つかりませんでした")
-            return redirect(url_for('vocabulary.vocabulary_chunks', source=source, chapter_id=chapter_id))
+            return redirect(url_for('choice_studies.choice_studies_chunks', source=source, chapter_id=chapter_id))
         
         # セッション情報を更新
         session['vocabulary_session']['total_words'] = len(words)
@@ -410,34 +410,34 @@ def vocabulary_start(source, chapter_id, chunk_number, mode=None):
             for word in words
         ]
         
-        return redirect(url_for('vocabulary.vocabulary_study', source=source))
+        return redirect(url_for('choice_studies.choice_studies_study', source=source))
         
     except Exception as e:
-        current_app.logger.error(f"英単語学習開始エラー: {e}")
+        current_app.logger.error(f"選択問題学習開始エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_chunks', source=source, chapter_id=chapter_id))
+        return redirect(url_for('choice_studies.choice_studies_chunks', source=source, chapter_id=chapter_id))
 
-@vocabulary_bp.route('/vocabulary/study/<source>')
+@choice_studies_bp.route('/choice_studies/study/<source>')
 @login_required
-def vocabulary_study(source):
-    """英単語学習画面"""
+def choice_studies_study(source):
+    """選択問題学習画面"""
     try:
         # セッション情報を取得
         session_data = session.get('vocabulary_session')
         if not session_data or session_data['source'] != source:
             flash("学習セッションが見つかりません")
-            return redirect(url_for('vocabulary.vocabulary_home'))
+            return redirect(url_for('choice_studies.choice_studies_home'))
         
         current_index = session_data['current_word_index']
         words = session_data['words']
         
         if current_index >= len(words):
             # 学習完了
-            return redirect(url_for('vocabulary.vocabulary_complete'))
+            return redirect(url_for('choice_studies.choice_studies_complete'))
         
         current_word = words[current_index]
         
-        return render_template('vocabulary/study.html',
+        return render_template('choice_studies/study.html',
                              source=source,
                              word=current_word,
                              current_index=current_index + 1,
@@ -445,20 +445,20 @@ def vocabulary_study(source):
                              mode=session_data['mode'])
         
     except Exception as e:
-        current_app.logger.error(f"英単語学習画面エラー: {e}")
+        current_app.logger.error(f"選択問題学習画面エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_home'))
+        return redirect(url_for('choice_studies.choice_studies_home'))
 
-@vocabulary_bp.route('/vocabulary/answer', methods=['POST'])
+@choice_studies_bp.route('/choice_studies/answer', methods=['POST'])
 @login_required
-def vocabulary_answer():
-    """英単語回答処理"""
+def choice_studies_answer():
+    """選択問題回答処理"""
     try:
         # セッション情報を取得
         session_data = session.get('vocabulary_session')
         if not session_data:
             flash("学習セッションが見つかりません")
-            return redirect(url_for('vocabulary.vocabulary_home'))
+            return redirect(url_for('choice_studies.choice_studies_home'))
         
         user_answer = request.form.get('answer', '').strip()
         current_index = session_data['current_word_index']
@@ -466,7 +466,7 @@ def vocabulary_answer():
         
         if current_index >= len(words):
             flash("学習が完了しています")
-            return redirect(url_for('vocabulary.vocabulary_complete'))
+            return redirect(url_for('choice_studies.choice_studies_complete'))
         
         current_word = words[current_index]
         
@@ -477,7 +477,7 @@ def vocabulary_answer():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
-                    INSERT INTO vocabulary_study_log
+                    INSERT INTO choice_study_log
                     (user_id, source, chapter_id, chunk_number, word_id, user_answer, 
                      correct_answer, is_correct, result_type, answered_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -504,25 +504,25 @@ def vocabulary_answer():
         
         # 次の単語へ
         if session_data['current_word_index'] >= len(words):
-            return redirect(url_for('vocabulary.vocabulary_complete'))
+            return redirect(url_for('choice_studies.choice_studies_complete'))
         else:
-            return redirect(url_for('vocabulary.vocabulary_study', source=session_data['source']))
+            return redirect(url_for('choice_studies.choice_studies_study', source=session_data['source']))
         
     except Exception as e:
-        current_app.logger.error(f"英単語回答処理エラー: {e}")
+        current_app.logger.error(f"選択問題回答処理エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_home'))
+        return redirect(url_for('choice_studies.choice_studies_home'))
 
-@vocabulary_bp.route('/vocabulary/complete', methods=['POST'])
+@choice_studies_bp.route('/choice_studies/complete', methods=['POST'])
 @login_required
-def vocabulary_complete():
-    """英単語学習完了処理"""
+def choice_studies_complete():
+    """選択問題学習完了処理"""
     try:
         # セッション情報を取得
         session_data = session.get('vocabulary_session')
         if not session_data:
             flash("学習セッションが見つかりません")
-            return redirect(url_for('vocabulary.vocabulary_home'))
+            return redirect(url_for('choice_studies.choice_studies_home'))
         
         # 進捗を更新
         total_words = session_data['total_words']
@@ -534,7 +534,7 @@ def vocabulary_complete():
         is_passed = accuracy >= 60
         
         # 進捗をデータベースに保存
-        update_vocabulary_chunk_progress(
+        update_choice_chunk_progress(
             current_user.id,
             session_data['source'],
             session_data['chapter_id'],
@@ -546,17 +546,17 @@ def vocabulary_complete():
         # セッションをクリア
         session.pop('vocabulary_session', None)
         
-        return redirect(url_for('vocabulary.vocabulary_result', source=session_data['source']))
+        return redirect(url_for('choice_studies.choice_studies_result', source=session_data['source']))
         
     except Exception as e:
-        current_app.logger.error(f"英単語学習完了処理エラー: {e}")
+        current_app.logger.error(f"選択問題学習完了処理エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_home'))
+        return redirect(url_for('choice_studies.choice_studies_home'))
 
-@vocabulary_bp.route('/vocabulary/result/<source>')
+@choice_studies_bp.route('/choice_studies/result/<source>')
 @login_required
-def vocabulary_result(source):
-    """英単語学習結果表示"""
+def choice_studies_result(source):
+    """選択問題学習結果表示"""
     try:
         # 最近の学習結果を取得
         with get_db_connection() as conn:
@@ -565,7 +565,7 @@ def vocabulary_result(source):
                     SELECT chapter_id, chunk_number, COUNT(*) as total_words,
                            COUNT(CASE WHEN is_correct THEN 1 END) as correct_words,
                            MAX(answered_at) as last_studied
-                    FROM vocabulary_study_log
+                    FROM choice_study_log
                     WHERE user_id = ? AND source = ?
                     GROUP BY chapter_id, chunk_number
                     ORDER BY last_studied DESC
@@ -573,48 +573,48 @@ def vocabulary_result(source):
                 ''', (current_user.id, source))
                 recent_results = cur.fetchall()
         
-        return render_template('vocabulary/result.html',
+        return render_template('choice_studies/result.html',
                              source=source,
                              recent_results=recent_results)
         
     except Exception as e:
-        current_app.logger.error(f"英単語結果表示エラー: {e}")
+        current_app.logger.error(f"選択問題結果表示エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_home'))
+        return redirect(url_for('choice_studies.choice_studies_home'))
 
-@vocabulary_bp.route('/vocabulary/admin')
+@choice_studies_bp.route('/choice_studies/admin')
 @login_required
-def vocabulary_admin():
-    """英単語管理画面"""
+def choice_studies_admin():
+    """選択問題管理画面"""
     try:
         # 管理者権限チェック
         if not current_user.is_admin:
             flash("管理者権限が必要です")
-            return redirect(url_for('vocabulary.vocabulary_home'))
+            return redirect(url_for('choice_studies.choice_studies_home'))
         
         # 統計情報を取得
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 総単語数
-                cur.execute('SELECT COUNT(*) FROM vocabulary_words')
+                cur.execute('SELECT COUNT(*) FROM choice_units')
                 total_words = cur.fetchone()[0]
                 
                 # 学習された単語数
-                cur.execute('SELECT COUNT(DISTINCT word_id) FROM vocabulary_study_log')
+                cur.execute('SELECT COUNT(DISTINCT word_id) FROM choice_study_log')
                 studied_words = cur.fetchone()[0]
                 
                 # 正解率
                 cur.execute('''
                     SELECT COUNT(*) as total_answers,
                            COUNT(CASE WHEN is_correct THEN 1 END) as correct_answers
-                    FROM vocabulary_study_log
+                    FROM choice_study_log
                 ''')
                 result = cur.fetchone()
                 total_answers = result[0] if result else 0
                 correct_answers = result[1] if result else 0
                 accuracy = (correct_answers / total_answers * 100) if total_answers > 0 else 0
         
-        return render_template('vocabulary/admin.html',
+        return render_template('choice_studies/admin.html',
                              total_words=total_words,
                              studied_words=studied_words,
                              total_answers=total_answers,
@@ -622,25 +622,25 @@ def vocabulary_admin():
                              accuracy=accuracy)
         
     except Exception as e:
-        current_app.logger.error(f"英単語管理画面エラー: {e}")
+        current_app.logger.error(f"選択問題管理画面エラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_home'))
+        return redirect(url_for('choice_studies.choice_studies_home'))
 
-@vocabulary_bp.route('/vocabulary/upload', methods=['POST'])
+@choice_studies_bp.route('/choice_studies/upload', methods=['POST'])
 @login_required
-def vocabulary_upload():
-    """英単語データアップロード"""
+def choice_studies_upload():
+    """選択問題データアップロード"""
     try:
         # 管理者権限チェック
         if not current_user.is_admin:
             flash("管理者権限が必要です")
-            return redirect(url_for('vocabulary.vocabulary_admin'))
+            return redirect(url_for('choice_studies.choice_studies_admin'))
         
         # CSVファイルの処理（簡易実装）
         flash("アップロード機能は現在開発中です")
-        return redirect(url_for('vocabulary.vocabulary_admin'))
+        return redirect(url_for('choice_studies.choice_studies_admin'))
         
     except Exception as e:
-        current_app.logger.error(f"英単語アップロードエラー: {e}")
+        current_app.logger.error(f"選択問題アップロードエラー: {e}")
         flash("エラーが発生しました")
-        return redirect(url_for('vocabulary.vocabulary_admin')) 
+        return redirect(url_for('choice_studies.choice_studies_admin')) 
