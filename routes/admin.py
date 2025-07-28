@@ -412,7 +412,8 @@ def input_studies_add_question():
                     }
                     
                     return render_template('input_studies/add_question.html', 
-                                         textbook_info=textbook_info, unit_info=unit_info)
+                                         textbook_info=textbook_info, unit_info=unit_info,
+                                         textbook_id=textbook_id, unit_id=unit_id)
                 else:
                     # 教材一覧を取得
                     cur.execute('SELECT id, name, subject FROM input_textbooks ORDER BY subject, name')
@@ -423,7 +424,8 @@ def input_studies_add_question():
                     units = cur.fetchall()
                     
                     return render_template('input_studies/add_question.html', 
-                                         textbooks=textbooks, units=units)
+                                         textbooks=textbooks, units=units,
+                                         textbook_id=None, unit_id=None)
                 
     except Exception as e:
         current_app.logger.error(f"社会科問題追加画面エラー: {e}")

@@ -512,8 +512,17 @@ function checkImageExists() {
     const containerDiv = document.getElementById('image-preview-container');
     
     // 単元IDを取得（固定表示の場合はhidden inputから、選択の場合はselectから）
-    const unitIdElement = document.getElementById('unit_id');
-    const unitId = unitIdElement ? unitIdElement.value : null;
+    let unitId = null;
+    
+    // 固定表示モードの場合（hidden inputから取得）
+    const hiddenUnitId = document.querySelector('input[name="unit_id"]');
+    if (hiddenUnitId) {
+        unitId = hiddenUnitId.value;
+    } else {
+        // 選択モードの場合（selectから取得）
+        const unitIdElement = document.getElementById('unit_id');
+        unitId = unitIdElement ? unitIdElement.value : null;
+    }
     
     console.log('🔍 画像確認開始:', { imageName, unitId: unitId });
     
