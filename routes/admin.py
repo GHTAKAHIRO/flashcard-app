@@ -652,10 +652,10 @@ def input_studies_admin_textbook_unified(textbook_id):
                 
                 # 単元一覧を取得
                 cur.execute(f'''
-                    SELECT id, name, description, created_at
+                    SELECT id, name, chapter_number, description, created_at
                     FROM input_units 
                     WHERE textbook_id = {placeholder}
-                    ORDER BY name
+                    ORDER BY chapter_number, name
                 ''', (textbook_id,))
                 units_data = cur.fetchall()
                 
@@ -664,18 +664,30 @@ def input_studies_admin_textbook_unified(textbook_id):
                     units.append({
                         'id': unit_data[0],
                         'name': unit_data[1],
-                        'description': unit_data[2],
-                        'created_at': unit_data[3]
+                        'chapter_number': unit_data[2],
+                        'description': unit_data[3],
+                        'created_at': unit_data[4]
                     })
                 
                 # 問題数を取得
                 cur.execute(f'SELECT COUNT(*) FROM input_questions WHERE textbook_id = {placeholder}', (textbook_id,))
                 question_count = cur.fetchone()[0]
                 
+                # 学習ログ数を取得
+                cur.execute(f'''
+                    SELECT COUNT(*) FROM input_study_log 
+                    WHERE question_id IN (
+                        SELECT id FROM input_questions WHERE textbook_id = {placeholder}
+                    )
+                ''', (textbook_id,))
+                study_log_count = cur.fetchone()[0]
+                
                 return render_template('input_studies/admin_textbook_unified.html', 
                                      textbook=textbook_info, 
                                      units=units,
-                                     question_count=question_count)
+                                     total_units=len(units),
+                                     total_questions=question_count,
+                                     total_study_logs=study_log_count)
                 
     except Exception as e:
         current_app.logger.error(f"社会科教材詳細管理画面エラー: {e}")

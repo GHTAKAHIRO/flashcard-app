@@ -1,6 +1,7 @@
 import sqlite3
-import psycopg2
-from psycopg2.extras import RealDictCursor
+# PostgreSQL関連のインポートをコメントアウト（SQLite使用時）
+# import psycopg2
+# from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
 from flask import current_app
 import os
