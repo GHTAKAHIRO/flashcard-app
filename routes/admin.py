@@ -901,9 +901,12 @@ def download_units_csv(textbook_id):
                 ''', (textbook_id,))
                 units_data = cur.fetchall()
                 
-                # CSVデータを作成
-                output = io.StringIO()
-                writer = csv.writer(output)
+                # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
+                output = io.BytesIO()
+                # BOMを追加
+                output.write(b'\xef\xbb\xbf')
+                # UTF-8でエンコード
+                writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
                 writer.writerow(['単元名', '章番号', '説明'])
                 
                 for unit_data in units_data:
@@ -918,8 +921,11 @@ def download_units_csv(textbook_id):
                 from flask import Response
                 return Response(
                     output.getvalue(),
-                    mimetype='text/csv',
-                    headers={'Content-Disposition': f'attachment; filename=units_{textbook_id}.csv'}
+                    mimetype='text/csv; charset=utf-8',
+                    headers={
+                        'Content-Disposition': f'attachment; filename=units_{textbook_id}.csv',
+                        'Content-Type': 'text/csv; charset=utf-8'
+                    }
                 )
                 
     except Exception as e:
@@ -948,26 +954,44 @@ def download_unit_questions_csv(unit_id):
                     flash('単元が見つかりません', 'error')
                     return redirect(url_for('admin.input_studies_admin_unified'))
                 
+                # 単元の章番号を取得
+                cur.execute(f'''
+                    SELECT chapter_number FROM input_units WHERE id = {placeholder}
+                ''', (unit_id,))
+                chapter_number = cur.fetchone()[0]
+                
                 # 問題一覧を取得
                 cur.execute(f'''
-                    SELECT question, correct_answer, explanation, difficulty_level
+                    SELECT question, correct_answer, acceptable_answers, answer_suffix, 
+                           explanation, difficulty_level, image_name, question_number
                     FROM input_questions 
                     WHERE unit_id = {placeholder}
-                    ORDER BY created_at
+                    ORDER BY question_number, created_at
                 ''', (unit_id,))
                 questions_data = cur.fetchall()
                 
-                # CSVデータを作成
-                output = io.StringIO()
-                writer = csv.writer(output)
-                writer.writerow(['問題文', '正解', '説明', '難易度'])
+                # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
+                output = io.BytesIO()
+                # BOMを追加
+                output.write(b'\xef\xbb\xbf')
+                # UTF-8でエンコード
+                writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
+                writer.writerow(['章番号', '問題番号', '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像ファイル名'])
                 
                 for question_data in questions_data:
                     writer.writerow([
-                        question_data[0] or '',
-                        question_data[1] or '',
-                        question_data[2] or '',
-                        question_data[3] or 'normal'
+                        chapter_number or '',  # 章番号
+                        question_data[7] or '',  # 問題番号
+                        unit_data[2] or '',  # 教材名
+                        unit_data[0] or '',  # 単元名
+                        question_data[0] or '',  # 問題文
+                        question_data[1] or '',  # 正解
+                        question_data[2] or '',  # 許容回答
+                        question_data[3] or '',  # 解答欄の補足
+                        question_data[4] or '',  # 解説
+                        question_data[5] or 'normal',  # 難易度
+                        '',  # 画像URL（空）
+                        question_data[6] or ''  # 画像ファイル名
                     ])
                 
                 output.seek(0)
@@ -975,8 +999,11 @@ def download_unit_questions_csv(unit_id):
                 from flask import Response
                 return Response(
                     output.getvalue(),
-                    mimetype='text/csv',
-                    headers={'Content-Disposition': f'attachment; filename=questions_unit_{unit_id}.csv'}
+                    mimetype='text/csv; charset=utf-8',
+                    headers={
+                        'Content-Disposition': f'attachment; filename=questions_unit_{unit_id}.csv',
+                        'Content-Type': 'text/csv; charset=utf-8'
+                    }
                 )
                 
     except Exception as e:
@@ -1222,7 +1249,11 @@ def input_studies_upload_csv():
         import csv
         import io
         
-        content = file.read().decode('utf-8')
+        # ファイルの内容を読み込み、BOMを除去してUTF-8でデコード
+        content = file.read()
+        if content.startswith(b'\xef\xbb\xbf'):
+            content = content[3:]  # BOMを除去
+        content = content.decode('utf-8')
         csv_reader = csv.reader(io.StringIO(content))
         
         with get_db_connection() as conn:
@@ -1273,7 +1304,11 @@ def input_studies_upload_units_csv():
         import csv
         import io
         
-        content = file.read().decode('utf-8')
+        # ファイルの内容を読み込み、BOMを除去してUTF-8でデコード
+        content = file.read()
+        if content.startswith(b'\xef\xbb\xbf'):
+            content = content[3:]  # BOMを除去
+        content = content.decode('utf-8')
         csv_reader = csv.reader(io.StringIO(content))
         
         with get_db_connection() as conn:
@@ -1324,23 +1359,63 @@ def input_studies_upload_questions_csv():
         import csv
         import io
         
-        content = file.read().decode('utf-8')
+        # ファイルの内容を読み込み、BOMを除去してUTF-8でデコード
+        content = file.read()
+        if content.startswith(b'\xef\xbb\xbf'):
+            content = content[3:]  # BOMを除去
+        content = content.decode('utf-8')
         csv_reader = csv.reader(io.StringIO(content))
         
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
-                for row in csv_reader:
-                    if len(row) >= 2:
-                        question = row[0].strip()
-                        answer = row[1].strip()
-                        explanation = row[2].strip() if len(row) > 2 else ''
-                        question_type = row[3].strip() if len(row) > 3 else 'normal'
+                # 単元情報を取得
+                placeholder = get_placeholder()
+                cur.execute(f'''
+                    SELECT u.textbook_id, t.subject, t.name as textbook_name, u.name as unit_name
+                    FROM input_units u
+                    JOIN input_textbooks t ON u.textbook_id = t.id
+                    WHERE u.id = {placeholder}
+                ''', (unit_id,))
+                unit_info = cur.fetchone()
+                
+                if not unit_info:
+                    return jsonify({'error': '単元情報が見つかりません'}), 400
+                
+                textbook_id = unit_info[0]
+                subject = unit_info[1]
+                textbook_name = unit_info[2]
+                unit_name = unit_info[3]
+                
+                for row_num, row in enumerate(csv_reader, 1):
+                    if row_num == 1:  # ヘッダー行をスキップ
+                        continue
+                    
+                    if len(row) >= 6:  # 最低限必要な列数
+                        # CSVの列: 章番号,問題番号,教材名,単元名,問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像ファイル名
+                        chapter_number = row[0].strip() if len(row) > 0 else ''
+                        question_number = row[1].strip() if len(row) > 1 else ''
+                        question = row[4].strip() if len(row) > 4 else ''  # 問題文
+                        answer = row[5].strip() if len(row) > 5 else ''    # 正解
+                        acceptable_answers = row[6].strip() if len(row) > 6 else ''
+                        answer_suffix = row[7].strip() if len(row) > 7 else ''
+                        explanation = row[8].strip() if len(row) > 8 else ''
+                        difficulty = row[9].strip() if len(row) > 9 else 'normal'
+                        image_name = row[11].strip() if len(row) > 11 else ''
                         
                         if question and answer:
+                            # 問題番号を数値に変換（空の場合はNone）
+                            try:
+                                question_number_int = int(question_number) if question_number else None
+                            except ValueError:
+                                question_number_int = None
+                            
                             cur.execute('''
-                                INSERT INTO input_questions (unit_id, question, answer, explanation, question_type)
-                                VALUES (?, ?, ?, ?, ?)
-                            ''', (unit_id, question, answer, explanation, question_type))
+                                INSERT INTO input_questions 
+                                (unit_id, textbook_id, subject, question, correct_answer, acceptable_answers, 
+                                 answer_suffix, explanation, difficulty_level, image_name, question_number, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                            ''', (unit_id, textbook_id, subject, question, answer, acceptable_answers,
+                                  answer_suffix, explanation, difficulty, image_name, question_number_int))
                 
                 conn.commit()
                 return jsonify({'message': '問題CSVファイルをアップロードしました'})
@@ -1357,23 +1432,30 @@ def input_studies_download_csv_template():
         import csv
         import io
         
-        output = io.StringIO()
-        writer = csv.writer(output)
+        # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
+        output = io.BytesIO()
+        # BOMを追加
+        output.write(b'\xef\xbb\xbf')
+        # UTF-8でエンコード
+        writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
         
         # ヘッダー行
-        writer.writerow(['問題', '答え', '解説', '問題タイプ'])
+        writer.writerow(['章番号', '問題番号', '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像ファイル名'])
         
         # サンプルデータ
-        writer.writerow(['日本の首都は？', '東京', '日本の首都は東京です', 'normal'])
-        writer.writerow(['1+1=?', '2', '基本的な足し算です', 'normal'])
+        writer.writerow(['1', '1', '地理教材', '日本の地理', '日本の首都は？', '東京', '東京都,Tokyo', '', '日本の首都は東京です', 'normal', '', '1.jpg'])
+        writer.writerow(['1', '2', '地理教材', '日本の地理', '日本で最も高い山は？', '富士山', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'intermediate', '', '2.jpg'])
         
         output.seek(0)
         
         from flask import Response
         return Response(
             output.getvalue(),
-            mimetype='text/csv',
-            headers={'Content-Disposition': 'attachment; filename=questions_template.csv'}
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': 'attachment; filename=questions_template.csv',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
         )
         
     except Exception as e:
