@@ -13,20 +13,29 @@ def get_choice_chunk_progress(user_id, source, chapter_id, chunk_number):
     try:
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
-                # 基本の進捗情報を取得
+                # 基本の進捗情報を取得（chunk_progressテーブルを使用）
                 cur.execute('''
-                    SELECT is_completed, is_passed, completed_at, passed_at
-                    FROM choice_questions
-                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
+                    SELECT is_completed, is_passed, created_at, updated_at
+                    FROM chunk_progress
+                    WHERE user_id = ? AND source = ? AND stage = ? AND chunk_number = ?
                 ''', (user_id, source, chapter_id, chunk_number))
                 result = cur.fetchone()
                 
-                # 正解数を取得
+                # 正解数を取得（choice_study_logテーブルから）
                 cur.execute('''
                     SELECT COUNT(*) as correct_count
-                    FROM choice_study_log
-                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ? AND is_correct = 1
-                ''', (user_id, source, chapter_id, chunk_number))
+                    FROM choice_study_log csl
+                    JOIN choice_questions cq ON csl.question_id = cq.id
+                    JOIN choice_units cu ON cq.unit_id = cu.id
+                    JOIN choice_textbooks ct ON cu.textbook_id = ct.id
+                    WHERE csl.user_id = ? AND ct.source = ? AND ct.id = ? AND cq.id IN (
+                        SELECT id FROM choice_questions 
+                        WHERE unit_id IN (
+                            SELECT id FROM choice_units 
+                            WHERE textbook_id = ? AND unit_number = ?
+                        )
+                    ) AND csl.is_correct = 1
+                ''', (user_id, source, chapter_id, chapter_id, chunk_number))
                 correct_result = cur.fetchone()
                 correct_count = correct_result[0] if correct_result else 0
                 
@@ -46,10 +55,10 @@ def update_choice_chunk_progress(user_id, source, chapter_id, chunk_number, is_c
         
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
-                # 既存のレコードがあるかチェック
+                # 既存のレコードがあるかチェック（chunk_progressテーブルを使用）
                 cur.execute('''
-                    SELECT id FROM choice_questions
-                    WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
+                    SELECT id FROM chunk_progress
+                    WHERE user_id = ? AND source = ? AND stage = ? AND chunk_number = ?
                 ''', (user_id, source, chapter_id, chunk_number))
                 
                 existing = cur.fetchone()
@@ -64,13 +73,9 @@ def update_choice_chunk_progress(user_id, source, chapter_id, chunk_number, is_c
                     
                     if is_completed:
                         update_fields.append("is_completed = TRUE")
-                        update_fields.append("completed_at = ?")
-                        params.append(now)
                     
                     if is_passed:
                         update_fields.append("is_passed = TRUE")
-                        update_fields.append("passed_at = ?")
-                        params.append(now)
                     
                     if update_fields:
                         update_fields.append("updated_at = ?")
@@ -78,9 +83,9 @@ def update_choice_chunk_progress(user_id, source, chapter_id, chunk_number, is_c
                         params.extend([user_id, source, chapter_id, chunk_number])
                         
                         update_sql = f'''
-                            UPDATE choice_questions
+                            UPDATE chunk_progress
                             SET {', '.join(update_fields)}
-                            WHERE user_id = ? AND source = ? AND chapter_id = ? AND chunk_number = ?
+                            WHERE user_id = ? AND source = ? AND stage = ? AND chunk_number = ?
                         '''
                         current_app.logger.info(f"更新SQL: {update_sql}")
                         current_app.logger.info(f"更新パラメータ: {params}")
@@ -89,15 +94,14 @@ def update_choice_chunk_progress(user_id, source, chapter_id, chunk_number, is_c
                 else:
                     # 新規レコードを作成
                     insert_sql = '''
-                        INSERT INTO choice_questions 
-                        (user_id, source, chapter_id, chunk_number, is_completed, is_passed, completed_at, passed_at)
+                        INSERT INTO chunk_progress 
+                        (user_id, source, stage, chunk_number, is_completed, is_passed, created_at, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     '''
                     insert_params = (
                         user_id, source, chapter_id, chunk_number,
                         is_completed, is_passed,
-                        now if is_completed else None,
-                        now if is_passed else None
+                        now, now
                     )
                     current_app.logger.info(f"挿入SQL: {insert_sql}")
                     current_app.logger.info(f"挿入パラメータ: {insert_params}")
