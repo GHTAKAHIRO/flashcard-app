@@ -5,6 +5,8 @@ from functools import wraps
 import csv
 import io
 
+admin_bp = Blueprint('admin', __name__)
+
 def admin_required(f):
     """管理者権限が必要なデコレータ"""
     @wraps(f)
