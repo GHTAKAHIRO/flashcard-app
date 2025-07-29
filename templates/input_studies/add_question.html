@@ -40,83 +40,27 @@
             <div class="card-body">
                 <form method="POST">
                     {% if textbook_info and unit_info %}
-                        <!-- 教材と単元が指定されている場合は固定表示 -->
-                        <div class="mb-3">
-                            <label class="form-label">科目 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" value="{{ textbook_info.subject or '未設定' }}" readonly>
-                            <input type="hidden" name="subject" value="{{ textbook_info.subject or '地理' }}">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-book me-1"></i>教材
-                            </label>
-                            <input type="text" class="form-control" value="{{ textbook_info.name }}" readonly>
-                            <input type="hidden" name="textbook_id" value="{{ textbook_info.id }}">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-list-ol me-1"></i>単元・章
-                            </label>
-                            <input type="text" class="form-control" value="{{ unit_info.name }}{% if unit_info.chapter_number %} (第{{ unit_info.chapter_number }}章){% endif %}" readonly>
-                            <input type="hidden" name="unit_id" value="{{ unit_info.id }}">
-                        </div>
-                        
+                        <!-- 教材と単元が指定されている場合はhidden inputとして保持 -->
+                        <input type="hidden" name="subject" value="{{ textbook_info.subject or '地理' }}">
+                        <input type="hidden" name="textbook_id" value="{{ textbook_info.id }}">
+                        <input type="hidden" name="unit_id" value="{{ unit_info.id }}">
                     {% else %}
-                        <!-- 通常の選択形式 -->
-                        <div class="mb-3">
-                            <label for="subject" class="form-label">科目 <span class="text-danger">*</span></label>
-                            <select class="form-select" id="subject" name="subject" required onchange="loadTextbooks()">
-                                <option value="">科目を選択してください</option>
-                                <option value="地理">地理</option>
-                                <option value="歴史">歴史</option>
-                                <option value="公民">公民</option>
-                                <option value="理科">理科</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="textbook_id" class="form-label">
-                                <i class="fas fa-book me-1"></i>教材
-                            </label>
-                            <select class="form-select" id="textbook_id" name="textbook_id" onchange="loadUnits()">
-                                <option value="">教材を選択してください（オプション）</option>
-                            </select>
-                            <div class="form-text">問題に関連する教材があれば選択してください</div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="unit_id" class="form-label">
-                                <i class="fas fa-list-ol me-1"></i>単元・章
-                            </label>
-                            <select class="form-select" id="unit_id" name="unit_id" onchange="updateImagePathOnUnitChange()">
-                                <option value="">単元・章を選択してください（オプション）</option>
-                            </select>
-                            <div class="form-text">教材を選択すると、関連する単元・章が表示されます</div>
-                            <div id="selection-status" class="mt-2" style="display: none;">
-                                <small class="text-info">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    <span id="status-text"></span>
-                                </small>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3" id="image_path_section" style="display: none;">
-                            <label class="form-label">
-                                <i class="fas fa-folder-open me-1"></i>画像保存先
-                            </label>
-                            <input type="text" class="form-control" id="image_path_display" value="" readonly>
-                        </div>
+                        <!-- 通常の選択形式の場合もhidden inputとして保持 -->
+                        <input type="hidden" name="subject" value="地理">
+                        <input type="hidden" name="textbook_id" value="">
+                        <input type="hidden" name="unit_id" value="">
                     {% endif %}
                     
                     <div class="mb-3">
-                        <label for="difficulty_level" class="form-label">難易度</label>
-                        <select class="form-select" id="difficulty_level" name="difficulty_level">
-                            <option value="basic">基本</option>
-                            <option value="intermediate">中級</option>
-                            <option value="advanced">上級</option>
-                        </select>
+                        <label for="question_number" class="form-label">
+                            <i class="fas fa-hashtag me-1"></i>問題番号
+                        </label>
+                        <input type="number" class="form-control" id="question_number" name="question_number" 
+                               placeholder="例: 1" min="1">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            空欄の場合は自動的に次の番号が割り当てられます
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -129,6 +73,15 @@
                         <label for="correct_answer" class="form-label">正解 <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="correct_answer" name="correct_answer" 
                                placeholder="例: 東京" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="difficulty_level" class="form-label">難易度</label>
+                        <select class="form-select" id="difficulty_level" name="difficulty_level">
+                            <option value="basic">基本</option>
+                            <option value="intermediate">中級</option>
+                            <option value="advanced">上級</option>
+                        </select>
                     </div>
                     
                     <div class="mb-3">
@@ -157,18 +110,6 @@
                         <label for="explanation" class="form-label">解説</label>
                         <textarea class="form-control" id="explanation" name="explanation" rows="2" 
                                   placeholder="問題の解説や補足情報があれば入力してください"></textarea>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="question_number" class="form-label">
-                            <i class="fas fa-hashtag me-1"></i>問題番号
-                        </label>
-                        <input type="number" class="form-control" id="question_number" name="question_number" 
-                               placeholder="例: 1" min="1">
-                        <div class="form-text">
-                            <i class="fas fa-info-circle me-1"></i>
-                            空欄の場合は自動的に次の番号が割り当てられます
-                        </div>
                     </div>
                     
                     <div class="mb-3">

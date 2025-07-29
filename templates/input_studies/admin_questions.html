@@ -691,11 +691,11 @@ function uploadCsv() {
 // サンプルCSVダウンロード
 function downloadSampleCsv() {
     const sampleData = [
-        ['subject', 'question', 'correct_answer', 'acceptable_answers', 'answer_suffix', 'explanation', 'textbook_id', 'unit_id'],
-        ['# 地理', '# 日本の首都は？', '# 東京', '# 東京都', '# 都', '# 日本の首都は東京です', '# ', '# '],
-        ['地理', '日本の首都は？', '東京', '東京都', '都', '日本の首都は東京です', '', ''],
-        ['歴史', '織田信長が本能寺の変で倒れた年は？', '1582年', '天正10年', '年', '本能寺の変は1582年（天正10年）に発生', '', ''],
-        ['公民', '日本の国会は何院制？', '二院制', '2院制,両院制', '制', '日本の国会は衆議院と参議院の二院制', '', '']
+        ['question_number', 'subject', 'question', 'correct_answer', 'difficulty_level', 'acceptable_answers', 'answer_suffix', 'explanation', 'textbook_id', 'unit_id'],
+        ['# 1', '# 地理', '# 日本の首都は？', '# 東京', '# basic', '# 東京都', '# 都', '# 日本の首都は東京です', '# ', '# '],
+        ['1', '地理', '日本の首都は？', '東京', 'basic', '東京都', '都', '日本の首都は東京です', '', ''],
+        ['2', '歴史', '織田信長が本能寺の変で倒れた年は？', '1582年', 'intermediate', '天正10年', '年', '本能寺の変は1582年（天正10年）に発生', '', ''],
+        ['3', '公民', '日本の国会は何院制？', '二院制', 'advanced', '2院制,両院制', '制', '日本の国会は衆議院と参議院の二院制', '', '']
     ];
     
     const csvContent = sampleData.map(row => row.join(',')).join('\n');

@@ -1004,17 +1004,17 @@ def download_unit_questions_csv(unit_id):
                 # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
                 output = io.StringIO()
                 writer = csv.writer(output)
-                writer.writerow(['問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '問題番号', '画像ファイル名'])
+                writer.writerow(['問題番号', '問題文', '正解', '難易度', '許容回答', '解答欄の補足', '解説', '画像ファイル名'])
                 
                 for question_data in questions_data:
                     writer.writerow([
+                        question_data[7] or '',  # 問題番号
                         question_data[0] or '',  # 問題文
                         question_data[1] or '',  # 正解
+                        question_data[5] or 'normal',  # 難易度
                         question_data[2] or '',  # 許容回答
                         question_data[3] or '',  # 解答欄の補足
                         question_data[4] or '',  # 解説
-                        question_data[5] or 'normal',  # 難易度
-                        question_data[7] or '',  # 問題番号
                         question_data[6] or ''  # 画像ファイル名
                     ])
                 
@@ -1556,11 +1556,11 @@ def input_studies_download_csv_template():
         writer = csv.writer(output)
         
         # ヘッダー行
-        writer.writerow(['科目', '教材名', '単元名', '章番号', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '問題番号', '画像パス'])
+        writer.writerow(['科目', '教材名', '単元名', '章番号', '問題番号', '問題文', '正解', '難易度', '許容回答', '解答欄の補足', '解説', '画像パス'])
         
         # サンプルデータ
-        writer.writerow(['地理', '地理A', '日本の地形', '1', '日本の首都は？', '東京', '東京都,Tokyo', '', '日本の首都は東京です', 'basic', '1', '/static/images/1.jpg'])
-        writer.writerow(['地理', '地理A', '日本の地形', '1', '日本で最も高い山は？', '富士山', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'intermediate', '2', 'https://example.com/fuji.jpg'])
+        writer.writerow(['地理', '地理A', '日本の地形', '1', '1', '日本の首都は？', '東京', 'basic', '東京都,Tokyo', '', '日本の首都は東京です', '/static/images/1.jpg'])
+        writer.writerow(['地理', '地理A', '日本の地形', '1', '2', '日本で最も高い山は？', '富士山', 'intermediate', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'https://example.com/fuji.jpg'])
         
         # BOM付きUTF-8でエンコード
         csv_content = output.getvalue()
