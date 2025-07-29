@@ -1004,7 +1004,7 @@ def download_unit_questions_csv(unit_id):
                 # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
                 output = io.StringIO()
                 writer = csv.writer(output)
-                writer.writerow(['問題番号', '問題文', '正解', '難易度', '許容回答', '解答欄の補足', '解説', '画像ファイル名'])
+                writer.writerow(['問題番号', '問題文', '正解', '難易度', '許容回答', '解答欄の補足', '解説', '画像パス'])
                 
                 for question_data in questions_data:
                     writer.writerow([
@@ -1015,7 +1015,7 @@ def download_unit_questions_csv(unit_id):
                         question_data[2] or '',  # 許容回答
                         question_data[3] or '',  # 解答欄の補足
                         question_data[4] or '',  # 解説
-                        question_data[6] or ''  # 画像ファイル名
+                        question_data[6] or ''  # 画像パス
                     ])
                 
                 # BOM付きUTF-8でエンコード
@@ -1439,76 +1439,21 @@ def input_studies_upload_questions_csv():
                     if row_num == 1:  # ヘッダー行をスキップ
                         continue
                     
-                    if len(row) >= 5:  # 最低限必要な列数（科目,教材名,単元名,章番号,問題文）
-                        # CSVの列: 科目,教材名,単元名,章番号,問題文,正解,許容回答,解答欄の補足,解説,難易度,問題番号,画像パス
-                        subject = row[0].strip() if len(row) > 0 else ''
-                        textbook_name = row[1].strip() if len(row) > 1 else ''
-                        unit_name = row[2].strip() if len(row) > 2 else ''
-                        chapter_number = row[3].strip() if len(row) > 3 else ''
-                        question = row[4].strip() if len(row) > 4 else ''  # 問題文
-                        answer = row[5].strip() if len(row) > 5 else ''    # 正解
-                        acceptable_answers = row[6].strip() if len(row) > 6 else ''
-                        answer_suffix = row[7].strip() if len(row) > 7 else ''
-                        explanation = row[8].strip() if len(row) > 8 else ''
-                        difficulty = row[9].strip() if len(row) > 9 else 'normal'
-                        question_number = row[10].strip() if len(row) > 10 else ''
-                        image_path = row[11].strip() if len(row) > 11 else ''
+                    if len(row) >= 2:  # 最低限必要な列数（問題番号,問題文）
+                        # CSVの列: 問題番号,問題文,正解,難易度,許容回答,解答欄の補足,解説,画像パス
+                        question_number = row[0].strip() if len(row) > 0 else ''
+                        question = row[1].strip() if len(row) > 1 else ''  # 問題文
+                        answer = row[2].strip() if len(row) > 2 else ''    # 正解
+                        difficulty = row[3].strip() if len(row) > 3 else ''
+                        acceptable_answers = row[4].strip() if len(row) > 4 else ''
+                        answer_suffix = row[5].strip() if len(row) > 5 else ''
+                        explanation = row[6].strip() if len(row) > 6 else ''
+                        image_path = row[7].strip() if len(row) > 7 else ''
                         
                         if question and answer:  # 問題文と正解が存在する場合のみ処理
-                            # 科目の検証
-                            if subject and subject not in ['地理', '歴史', '公民', '理科']:
-                                continue  # 無効な科目はスキップ
-                            
-                            # 教材の取得または作成
+                            # 教材と単元のIDを取得（固定値として使用）
                             textbook_id_to_use = textbook_id
-                            if textbook_name:
-                                # 教材が存在するかチェック
-                                cur.execute('SELECT id FROM input_textbooks WHERE name = ? AND subject = ?', 
-                                          (textbook_name, subject or '地理'))
-                                existing_textbook = cur.fetchone()
-                                
-                                if existing_textbook:
-                                    textbook_id_to_use = existing_textbook[0]
-                                else:
-                                    # 新しい教材を作成
-                                    cur.execute('''
-                                        INSERT INTO input_textbooks (name, subject, grade, publisher, wasabi_folder_path, created_at)
-                                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                                    ''', (textbook_name, subject or '地理', '', '', f'social_studies/{subject or "地理"}/{textbook_name}'))
-                                    textbook_id_to_use = cur.lastrowid
-                            
-                            # 単元の取得または作成
                             unit_id_to_use = unit_id
-                            if unit_name and textbook_id_to_use:
-                                # 章番号を数値に変換
-                                try:
-                                    chapter_number_int = int(chapter_number) if chapter_number else None
-                                except ValueError:
-                                    chapter_number_int = None
-                                
-                                # 単元が存在するかチェック
-                                cur.execute('SELECT id FROM input_units WHERE name = ? AND textbook_id = ?', 
-                                          (unit_name, textbook_id_to_use))
-                                existing_unit = cur.fetchone()
-                                
-                                if existing_unit:
-                                    unit_id_to_use = existing_unit[0]
-                                else:
-                                    # 新しい単元を作成
-                                    if not chapter_number_int:
-                                        # 章番号が空の場合は自動割り当て
-                                        cur.execute('''
-                                            SELECT COALESCE(MAX(chapter_number), 0) + 1 
-                                            FROM input_units 
-                                            WHERE textbook_id = ?
-                                        ''', (textbook_id_to_use,))
-                                        chapter_number_int = cur.fetchone()[0]
-                                    
-                                    cur.execute('''
-                                        INSERT INTO input_units (textbook_id, name, chapter_number, description, created_at)
-                                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                                    ''', (textbook_id_to_use, unit_name, chapter_number_int, ''))
-                                    unit_id_to_use = cur.lastrowid
                             
                             # 問題番号を数値に変換（空の場合はNone）
                             try:
@@ -1516,16 +1461,16 @@ def input_studies_upload_questions_csv():
                             except ValueError:
                                 question_number_int = None
                             
-                            # 難易度の検証
-                            if difficulty not in ['basic', 'intermediate', 'advanced']:
-                                difficulty = 'normal'
+                            # 難易度の検証（空の場合はそのまま）
+                            if difficulty and difficulty not in ['basic', 'intermediate', 'advanced']:
+                                difficulty = ''
                             
                             cur.execute('''
                                 INSERT INTO input_questions 
                                 (unit_id, textbook_id, subject, question, correct_answer, acceptable_answers, 
                                  answer_suffix, explanation, difficulty_level, image_path, question_number, created_at)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                            ''', (unit_id_to_use, textbook_id_to_use, subject or '地理', question, answer, acceptable_answers,
+                            ''', (unit_id_to_use, textbook_id_to_use, subject, question, answer, acceptable_answers,
                                   answer_suffix, explanation, difficulty, image_path, question_number_int))
                             
                             success_count += 1
@@ -1556,11 +1501,11 @@ def input_studies_download_csv_template():
         writer = csv.writer(output)
         
         # ヘッダー行
-        writer.writerow(['科目', '教材名', '単元名', '章番号', '問題番号', '問題文', '正解', '難易度', '許容回答', '解答欄の補足', '解説', '画像パス'])
+        writer.writerow(['問題番号', '問題文', '正解', '難易度', '許容回答', '解答欄の補足', '解説', '画像パス'])
         
         # サンプルデータ
-        writer.writerow(['地理', '地理A', '日本の地形', '1', '1', '日本の首都は？', '東京', 'basic', '東京都,Tokyo', '', '日本の首都は東京です', '/static/images/1.jpg'])
-        writer.writerow(['地理', '地理A', '日本の地形', '1', '2', '日本で最も高い山は？', '富士山', 'intermediate', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'https://example.com/fuji.jpg'])
+        writer.writerow(['1', '日本の首都は？', '東京', 'basic', '東京都,Tokyo', '', '日本の首都は東京です', '/static/images/1.jpg'])
+        writer.writerow(['2', '日本で最も高い山は？', '富士山', 'intermediate', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'https://example.com/fuji.jpg'])
         
         # BOM付きUTF-8でエンコード
         csv_content = output.getvalue()
