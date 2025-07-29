@@ -163,8 +163,20 @@ def admin_upload_users_csv():
                         full_name = row.get('表示名（氏名）', row.get('full_name', '')).strip()
                         username = row.get('ログインID', row.get('username', '')).strip()
                         password = row.get('パスワード', row.get('password', '')).strip()
-                        grade = row.get('学年', row.get('grade', '')).strip()
+                        grade_raw = row.get('学年', row.get('grade', '')).strip()
                         role = row.get('役割', row.get('role', 'user')).strip()
+                        
+                        # 学年表記の統一
+                        grade = ''
+                        if grade_raw:
+                            grade_mapping = {
+                                '1年生': '小4', '2年生': '小5', '3年生': '小6', '4年生': '小4', '5年生': '小5', '6年生': '小6',
+                                '小学1年生': '小4', '小学2年生': '小5', '小学3年生': '小6', '小学4年生': '小4', '小学5年生': '小5', '小学6年生': '小6',
+                                '中学1年生': '中1', '中学2年生': '中2', '中学3年生': '中3',
+                                '高校1年生': '高1', '高校2年生': '高1', '高校3年生': '高1',
+                                '小4': '小4', '小5': '小5', '小6': '小6', '中1': '中1', '中2': '中2', '中3': '中3', '高1': '高1'
+                            }
+                            grade = grade_mapping.get(grade_raw, grade_raw)
                         
                         if not all([full_name, username, password]):
                             error_count += 1
@@ -228,8 +240,8 @@ def admin_users_csv_template():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['表示名（氏名）', 'ログインID', 'パスワード', '学年', '役割'])
-    writer.writerow(['田中太郎', 'tanaka001', 'So-12345', '1年生', 'user'])
-    writer.writerow(['佐藤花子', 'sato002', 'So-67890', '中学2年生', 'user'])
+    writer.writerow(['田中太郎', 'tanaka001', 'So-12345', '小4', 'user'])
+    writer.writerow(['佐藤花子', 'sato002', 'So-67890', '中2', 'user'])
     
     # BOM付きUTF-8でエンコード
     csv_content = output.getvalue()
