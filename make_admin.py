@@ -57,30 +57,60 @@ def list_users():
     """全ユーザーの一覧を表示"""
     db_path = os.getenv('DB_PATH', 'flashcards.db')
     
+    print(f"🔍 データベースパス: {db_path}")
+    print(f"📁 ファイル存在: {os.path.exists(db_path)}")
+    
     if not os.path.exists(db_path):
         print("❌ データベースファイルが見つかりません")
         return
     
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
     try:
-        cursor.execute('SELECT id, username, is_admin, full_name, created_at FROM users ORDER BY id')
-        users = cursor.fetchall()
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
         
-        print("👥 ユーザー一覧:")
-        print("ID | ユーザー名 | 管理者権限 | 表示名 | 作成日")
-        print("-" * 70)
+        print("🔍 データベースに接続しました")
         
-        for user in users:
-            user_id, username, is_admin, full_name, created_at = user
-            admin_status = "✅" if is_admin else "❌"
-            print(f"{user_id:2d} | {username:10s} | {admin_status:8s} | {full_name or '':10s} | {created_at}")
+        # テーブル一覧を確認
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        print("📋 テーブル一覧:")
+        for table in tables:
+            print(f"  - {table[0]}")
+        
+        # usersテーブルの構造を確認
+        cursor.execute("PRAGMA table_info(users)")
+        columns = cursor.fetchall()
+        print("📋 usersテーブルの構造:")
+        for col in columns:
+            print(f"  - {col[1]} ({col[2]})")
+        
+        # ユーザー数を確認
+        cursor.execute('SELECT COUNT(*) FROM users')
+        user_count = cursor.fetchone()[0]
+        print(f"👥 ユーザー数: {user_count}")
+        
+        if user_count > 0:
+            cursor.execute('SELECT id, username, is_admin, full_name, created_at FROM users ORDER BY id')
+            users = cursor.fetchall()
+            
+            print("👥 ユーザー一覧:")
+            print("ID | ユーザー名 | 管理者権限 | 表示名 | 作成日")
+            print("-" * 70)
+            
+            for user in users:
+                user_id, username, is_admin, full_name, created_at = user
+                admin_status = "✅" if is_admin else "❌"
+                print(f"{user_id:2d} | {username:10s} | {admin_status:8s} | {full_name or '':10s} | {created_at}")
+        else:
+            print("❌ ユーザーが見つかりません")
         
     except Exception as e:
         print(f"❌ エラーが発生しました: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
 if __name__ == "__main__":
     import sys
