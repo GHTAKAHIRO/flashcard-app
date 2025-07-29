@@ -37,14 +37,14 @@ def login():
                     current_app.logger.info("管理者ユーザー: 管理画面にリダイレクト")
                     return redirect(url_for('admin.admin'))
                 
-                # 通常ユーザーの場合はnextパラメータまたはダッシュボードにリダイレクト
+                # 通常ユーザーの場合はnextパラメータまたはホーム画面にリダイレクト
                 next_page = request.args.get('next')
                 if next_page:
                     current_app.logger.info(f"nextパラメータ: {next_page}にリダイレクト")
                     return redirect(next_page)
                 
-                current_app.logger.info("通常ユーザー: ダッシュボードにリダイレクト")
-                return redirect(url_for('admin.admin'))
+                current_app.logger.info("通常ユーザー: ホーム画面にリダイレクト")
+                return redirect(url_for('home'))
             else:
                 current_app.logger.warning(f"ログイン失敗: username={username}")
                 flash("ログインに失敗しました。")
