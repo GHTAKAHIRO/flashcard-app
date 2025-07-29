@@ -185,8 +185,10 @@
                         <input type="file" class="form-control" id="csv-user-file" name="csv_file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            CSV形式: 生徒番号,ユーザー名,学年,メールアドレス,管理者フラグ（1=管理者,0=一般）<br>
-                            <small class="text-muted">パスワードは自動的に「So-生徒番号」となります</small>
+                            CSV形式: ユーザー名,メールアドレス,パスワード,権限,氏名<br>
+                            <small class="text-muted">※ ユーザー名、メールアドレス、パスワードは必須項目です</small><br>
+                            <small class="text-muted">※ 権限は「user」または「admin」を入力してください</small><br>
+                            <small class="text-muted">※ パスワードは手動で入力してください（例：So-12345）</small>
                         </div>
                     </div>
                 </form>

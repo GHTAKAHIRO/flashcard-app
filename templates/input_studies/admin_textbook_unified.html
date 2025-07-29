@@ -374,8 +374,9 @@
                         <input type="file" class="form-control" id="csv-file" name="csv_file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            CSVファイルの形式: 単元ID,問題文,正解,解説,難易度<br>
-                            <small class="text-muted">※ 単元IDは空でも可（未設定として登録）</small>
+                            CSVファイルの形式: 問題文,正解,許容回答,解答欄の補足,解説,難易度,問題番号,画像ファイル名<br>
+                            <small class="text-muted">※ 問題文と正解は必須項目です</small><br>
+                            <small class="text-muted">※ 問題番号を空にすると自動的に割り当てられます</small>
                         </div>
                     </div>
                 </form>

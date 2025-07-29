@@ -145,9 +145,12 @@ def admin_upload_users_csv():
         return redirect(url_for('admin.admin_users'))
     
     try:
-        # CSVファイルを読み込み
-        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
-        csv_reader = csv.DictReader(stream)
+        # CSVファイルを読み込み（BOM対応）
+        content = file.read()
+        if content.startswith(b'\xef\xbb\xbf'):
+            content = content[3:]  # BOMを除去
+        content = content.decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(content))
         
         success_count = 0
         error_count = 0
@@ -156,11 +159,12 @@ def admin_upload_users_csv():
             with get_db_cursor(conn) as cur:
                 for row in csv_reader:
                     try:
-                        username = row.get('username', '').strip()
-                        email = row.get('email', '').strip()
-                        password = row.get('password', '').strip()
-                        role = row.get('role', 'user').strip()
-                        full_name = row.get('full_name', username).strip()
+                        # 日本語ヘッダーと英語ヘッダーの両方に対応
+                        username = row.get('ユーザー名', row.get('username', '')).strip()
+                        email = row.get('メールアドレス', row.get('email', '')).strip()
+                        password = row.get('パスワード', row.get('password', '')).strip()
+                        role = row.get('権限', row.get('role', 'user')).strip()
+                        full_name = row.get('氏名', row.get('full_name', username)).strip()
                         
                         if not all([username, email, password]):
                             error_count += 1
@@ -176,7 +180,8 @@ def admin_upload_users_csv():
                         # ユーザー追加
                         from werkzeug.security import generate_password_hash
                         hashed_password = generate_password_hash(password)
-                        is_admin = (role == 'admin')
+                        # 権限の日本語対応
+                        is_admin = (role.lower() in ['admin', '管理者'])
                         
                         cur.execute(f'''
                             INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
@@ -208,20 +213,26 @@ def admin_users_csv_template():
     """ユーザーCSVテンプレートのダウンロード"""
     from flask import send_file
     
-    # CSVテンプレートを作成
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['username', 'email', 'password', 'role', 'full_name'])
-    writer.writerow(['user1', 'user1@example.com', 'password123', 'user', 'User One'])
-    writer.writerow(['user2', 'user2@example.com', 'password456', 'user', 'User Two'])
+    # CSVテンプレートを作成（BOM付きUTF-8で文字化けを防ぐ）
+    output = io.BytesIO()
+    # BOMを追加
+    output.write(b'\xef\xbb\xbf')
+    # UTF-8でエンコード
+    writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
+    writer.writerow(['ユーザー名', 'メールアドレス', 'パスワード', '権限', '氏名'])
+    writer.writerow(['user1', 'user1@example.com', 'So-12345', 'user', '田中太郎'])
+    writer.writerow(['user2', 'user2@example.com', 'So-67890', 'user', '佐藤花子'])
     
     output.seek(0)
     
-    return send_file(
-        io.BytesIO(output.getvalue().encode('utf-8')),
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name='users_template.csv'
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': 'attachment; filename=users_template.csv',
+            'Content-Type': 'text/csv; charset=utf-8'
+        }
     )
 
 @admin_bp.route('/admin/users/<int:user_id>')
@@ -976,21 +987,17 @@ def download_unit_questions_csv(unit_id):
                 output.write(b'\xef\xbb\xbf')
                 # UTF-8でエンコード
                 writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
-                writer.writerow(['章番号', '問題番号', '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像ファイル名'])
+                writer.writerow(['問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '問題番号', '画像ファイル名'])
                 
                 for question_data in questions_data:
                     writer.writerow([
-                        chapter_number or '',  # 章番号
-                        question_data[7] or '',  # 問題番号
-                        unit_data[2] or '',  # 教材名
-                        unit_data[0] or '',  # 単元名
                         question_data[0] or '',  # 問題文
                         question_data[1] or '',  # 正解
                         question_data[2] or '',  # 許容回答
                         question_data[3] or '',  # 解答欄の補足
                         question_data[4] or '',  # 解説
                         question_data[5] or 'normal',  # 難易度
-                        '',  # 画像URL（空）
+                        question_data[7] or '',  # 問題番号
                         question_data[6] or ''  # 画像ファイル名
                     ])
                 
@@ -1319,15 +1326,32 @@ def input_studies_upload_units_csv():
                         unit_number = row[1].strip()
                         description = row[2].strip() if len(row) > 2 else ''
                         
-                        if name and unit_number:
-                            try:
-                                unit_number = int(unit_number)
+                        if name:  # 単元名のみ必須
+                            # 章番号が空の場合は自動的に次の番号を割り当て
+                            if unit_number:
+                                try:
+                                    unit_number_int = int(unit_number)
+                                except ValueError:
+                                    # 章番号が数値でない場合は自動割り当て
+                                    cur.execute('''
+                                        SELECT COALESCE(MAX(chapter_number), 0) + 1 
+                                        FROM input_units 
+                                        WHERE textbook_id = ?
+                                    ''', (textbook_id,))
+                                    unit_number_int = cur.fetchone()[0]
+                            else:
+                                # 章番号が空の場合は自動割り当て
                                 cur.execute('''
-                                    INSERT INTO input_units (textbook_id, name, chapter_number, description)
-                                    VALUES (?, ?, ?, ?)
-                                ''', (textbook_id, name, unit_number, description))
-                            except ValueError:
-                                continue
+                                    SELECT COALESCE(MAX(chapter_number), 0) + 1 
+                                    FROM input_units 
+                                    WHERE textbook_id = ?
+                                ''', (textbook_id,))
+                                unit_number_int = cur.fetchone()[0]
+                            
+                            cur.execute('''
+                                INSERT INTO input_units (textbook_id, name, chapter_number, description)
+                                VALUES (?, ?, ?, ?)
+                            ''', (textbook_id, name, unit_number_int, description))
                 
                 conn.commit()
                 return jsonify({'message': '単元CSVファイルをアップロードしました'})
@@ -1390,17 +1414,16 @@ def input_studies_upload_questions_csv():
                     if row_num == 1:  # ヘッダー行をスキップ
                         continue
                     
-                    if len(row) >= 6:  # 最低限必要な列数
-                        # CSVの列: 章番号,問題番号,教材名,単元名,問題文,正解,許容回答,解答欄の補足,解説,難易度,画像URL,画像ファイル名
-                        chapter_number = row[0].strip() if len(row) > 0 else ''
-                        question_number = row[1].strip() if len(row) > 1 else ''
-                        question = row[4].strip() if len(row) > 4 else ''  # 問題文
-                        answer = row[5].strip() if len(row) > 5 else ''    # 正解
-                        acceptable_answers = row[6].strip() if len(row) > 6 else ''
-                        answer_suffix = row[7].strip() if len(row) > 7 else ''
-                        explanation = row[8].strip() if len(row) > 8 else ''
-                        difficulty = row[9].strip() if len(row) > 9 else 'normal'
-                        image_name = row[11].strip() if len(row) > 11 else ''
+                    if len(row) >= 2:  # 最低限必要な列数（問題文と正解）
+                        # CSVの列: 問題文,正解,許容回答,解答欄の補足,解説,難易度,問題番号,画像ファイル名
+                        question = row[0].strip() if len(row) > 0 else ''  # 問題文
+                        answer = row[1].strip() if len(row) > 1 else ''    # 正解
+                        acceptable_answers = row[2].strip() if len(row) > 2 else ''
+                        answer_suffix = row[3].strip() if len(row) > 3 else ''
+                        explanation = row[4].strip() if len(row) > 4 else ''
+                        difficulty = row[5].strip() if len(row) > 5 else 'normal'
+                        question_number = row[6].strip() if len(row) > 6 else ''
+                        image_name = row[7].strip() if len(row) > 7 else ''
                         
                         if question and answer:
                             # 問題番号を数値に変換（空の場合はNone）
@@ -1440,11 +1463,11 @@ def input_studies_download_csv_template():
         writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
         
         # ヘッダー行
-        writer.writerow(['章番号', '問題番号', '教材名', '単元名', '問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '画像URL', '画像ファイル名'])
+        writer.writerow(['問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '問題番号', '画像ファイル名'])
         
         # サンプルデータ
-        writer.writerow(['1', '1', '地理教材', '日本の地理', '日本の首都は？', '東京', '東京都,Tokyo', '', '日本の首都は東京です', 'normal', '', '1.jpg'])
-        writer.writerow(['1', '2', '地理教材', '日本の地理', '日本で最も高い山は？', '富士山', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'intermediate', '', '2.jpg'])
+        writer.writerow(['日本の首都は？', '東京', '東京都,Tokyo', '', '日本の首都は東京です', 'normal', '1', ''])
+        writer.writerow(['日本で最も高い山は？', '富士山', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'intermediate', '2', ''])
         
         output.seek(0)
         
@@ -1453,7 +1476,7 @@ def input_studies_download_csv_template():
             output.getvalue(),
             mimetype='text/csv; charset=utf-8',
             headers={
-                'Content-Disposition': 'attachment; filename=questions_template.csv',
+                'Content-Disposition': 'attachment; filename=input_studies_questions_template.csv',
                 'Content-Type': 'text/csv; charset=utf-8'
             }
         )
