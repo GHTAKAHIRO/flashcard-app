@@ -35,7 +35,7 @@
             <div class="card-body">
                 <i class="fas fa-user-check fa-2x text-success mb-2"></i>
                 <h6 class="card-title">管理者数</h6>
-                <p class="card-text h4">{{ users|selectattr('role', 'equalto', 'admin')|list|length }}</p>
+                <p class="card-text h4">{{ users|selectattr('is_admin', 'equalto', true)|list|length }}</p>
             </div>
         </div>
     </div>
@@ -43,8 +43,8 @@
         <div class="card text-center">
             <div class="card-body">
                 <i class="fas fa-user-plus fa-2x text-info mb-2"></i>
-                <h6 class="card-title">一般ユーザー数</h6>
-                <p class="card-text h4">{{ users|selectattr('role', 'equalto', 'user')|list|length }}</p>
+                <h6 class="card-title">生徒数</h6>
+                <p class="card-text h4">{{ users|selectattr('is_admin', 'equalto', false)|list|length }}</p>
             </div>
         </div>
     </div>
@@ -70,9 +70,8 @@
             <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
-                        <th>ID</th>
-                        <th>ユーザー名</th>
-                        <th>メールアドレス</th>
+                        <th>生徒番号</th>
+                        <th>表示名</th>
                         <th>役割</th>
                         <th>登録日</th>
                         <th>最終ログイン</th>
@@ -82,19 +81,15 @@
                 <tbody>
                     {% for user in users %}
                     <tr>
-                        <td>{{ user.id }}</td>
                         <td>
                             <div class="fw-bold">{{ user.username }}</div>
-                            {% if user.role == 'admin' %}
-                                <span class="badge bg-danger">管理者</span>
-                            {% endif %}
                         </td>
-                        <td>{{ user.email or '未設定' }}</td>
+                        <td>{{ user.full_name or '未設定' }}</td>
                         <td>
-                            {% if user.role == 'admin' %}
+                            {% if user.is_admin %}
                                 <span class="badge bg-danger">管理者</span>
                             {% else %}
-                                <span class="badge bg-primary">一般ユーザー</span>
+                                <span class="badge bg-primary">生徒</span>
                             {% endif %}
                         </td>
                         <td>{{ user.created_at or '不明' }}</td>
@@ -156,7 +151,7 @@
                     <div class="mb-3">
                         <label for="role" class="form-label">役割</label>
                         <select class="form-select" id="role" name="role">
-                            <option value="user">一般ユーザー</option>
+                            <option value="user">生徒</option>
                             <option value="admin">管理者</option>
                         </select>
                     </div>
@@ -187,7 +182,7 @@
                             <i class="fas fa-info-circle me-1"></i>
                             CSV形式: 表示名（氏名）,ログインID,パスワード,役割<br>
                             <small class="text-muted">※ 表示名、ログインID、パスワードは必須項目です</small><br>
-                            <small class="text-muted">※ 役割は「user」または「admin」を入力してください</small><br>
+                            <small class="text-muted">※ 役割は「user」（生徒）または「admin」（管理者）を入力してください</small><br>
                             <small class="text-muted">※ パスワードは手動で入力してください（例：So-12345）</small>
                         </div>
                     </div>
@@ -217,12 +212,12 @@
             <div class="modal-body">
                 <form id="editUserForm">
                     <div class="mb-3">
-                        <label for="edit-username" class="form-label">ユーザー名 <span class="text-danger">*</span></label>
+                        <label for="edit-username" class="form-label">生徒番号（ログインID） <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="edit-username" name="username" required>
                     </div>
                     <div class="mb-3">
-                        <label for="edit-email" class="form-label">メールアドレス</label>
-                        <input type="email" class="form-control" id="edit-email" name="email">
+                        <label for="edit-full-name" class="form-label">表示名（氏名） <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="edit-full-name" name="full_name" required>
                     </div>
                     <div class="mb-3">
                         <label for="edit-password" class="form-label">新しいパスワード</label>
@@ -350,7 +345,7 @@ function editUser(userId) {
             }
             
             document.getElementById('edit-username').value = data.username || '';
-            document.getElementById('edit-email').value = data.email || '';
+            document.getElementById('edit-full-name').value = data.full_name || '';
             document.getElementById('edit-password').value = '';
             document.getElementById('edit-is-admin').checked = data.is_admin || false;
             
@@ -371,7 +366,7 @@ function saveUserEdit() {
     
     const formData = {
         username: document.getElementById('edit-username').value.trim(),
-        email: document.getElementById('edit-email').value.trim(),
+        full_name: document.getElementById('edit-full-name').value.trim(),
         password: document.getElementById('edit-password').value,
         is_admin: document.getElementById('edit-is-admin').checked
     };

@@ -60,7 +60,7 @@ def admin_users():
             with get_db_cursor(conn) as cur:
                 # 実際のデータベースからユーザーを取得
                 cur.execute('''
-                    SELECT id, username, email, is_admin, full_name, created_at, last_login
+                    SELECT id, username, is_admin, full_name, created_at, last_login
                     FROM users 
                     ORDER BY created_at DESC
                 ''')
@@ -71,11 +71,10 @@ def admin_users():
                     users.append({
                         'id': user_data[0],
                         'username': user_data[1],
-                        'email': user_data[2],
-                        'role': 'admin' if user_data[3] else 'user',
-                        'full_name': user_data[4],
-                        'created_at': user_data[5],
-                        'last_login': user_data[6]
+                        'is_admin': bool(user_data[2]),
+                        'full_name': user_data[3],
+                        'created_at': user_data[4],
+                        'last_login': user_data[5]
                     })
                 
                 return render_template('admin_users.html', users=users)
@@ -274,12 +273,12 @@ def admin_update_user(user_id):
     try:
         data = request.get_json()
         username = data.get('username', '').strip()
-        email = data.get('email', '').strip()
+        full_name = data.get('full_name', '').strip()
         password = data.get('password', '').strip()
         is_admin = data.get('is_admin', False)
         
-        if not username:
-            return jsonify({'error': 'ユーザー名は必須です'}), 400
+        if not username or not full_name:
+            return jsonify({'error': 'ユーザー名と表示名は必須です'}), 400
         
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
@@ -289,11 +288,11 @@ def admin_update_user(user_id):
                 if not cur.fetchone():
                     return jsonify({'error': 'ユーザーが見つかりません'}), 404
                 
-                # ユーザー名とメールの重複チェック（自分以外）
-                cur.execute(f'SELECT id FROM users WHERE (username = {placeholder} OR email = {placeholder}) AND id != {placeholder}', 
-                           (username, email, user_id))
+                # ユーザー名の重複チェック（自分以外）
+                cur.execute(f'SELECT id FROM users WHERE username = {placeholder} AND id != {placeholder}', 
+                           (username, user_id))
                 if cur.fetchone():
-                    return jsonify({'error': 'ユーザー名またはメールアドレスが既に使用されています'}), 400
+                    return jsonify({'error': 'ユーザー名が既に使用されています'}), 400
                 
                 # 更新処理
                 if password:
@@ -302,16 +301,16 @@ def admin_update_user(user_id):
                     hashed_password = generate_password_hash(password)
                     cur.execute(f'''
                         UPDATE users 
-                        SET username = {placeholder}, email = {placeholder}, password_hash = {placeholder}, is_admin = {placeholder}
+                        SET username = {placeholder}, full_name = {placeholder}, password_hash = {placeholder}, is_admin = {placeholder}
                         WHERE id = {placeholder}
-                    ''', (username, email, hashed_password, is_admin, user_id))
+                    ''', (username, full_name, hashed_password, is_admin, user_id))
                 else:
                     # パスワードは更新しない
                     cur.execute(f'''
                         UPDATE users 
-                        SET username = {placeholder}, email = {placeholder}, is_admin = {placeholder}
+                        SET username = {placeholder}, full_name = {placeholder}, is_admin = {placeholder}
                         WHERE id = {placeholder}
-                    ''', (username, email, is_admin, user_id))
+                    ''', (username, full_name, is_admin, user_id))
                 
                 conn.commit()
                 return jsonify({'message': 'ユーザーを更新しました'})
