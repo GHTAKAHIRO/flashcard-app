@@ -172,7 +172,10 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-primary" onclick="addUser()">登録</button>
+                <button type="button" class="btn btn-primary" id="add-user-btn" onclick="addUser()">
+                    <span id="add-user-btn-text">登録</span>
+                    <span id="add-user-btn-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
             </div>
         </div>
     </div>
@@ -209,7 +212,10 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-primary" onclick="uploadCsvUsers()">アップロード</button>
+                <button type="button" class="btn btn-primary" id="csv-upload-btn" onclick="uploadCsvUsers()">
+                    <span id="upload-btn-text">アップロード</span>
+                    <span id="upload-btn-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
             </div>
         </div>
     </div>
@@ -262,7 +268,10 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                <button type="button" class="btn btn-primary" onclick="saveUserEdit()">保存</button>
+                <button type="button" class="btn btn-primary" id="edit-user-btn" onclick="saveUserEdit()">
+                    <span id="edit-user-btn-text">保存</span>
+                    <span id="edit-user-btn-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
             </div>
         </div>
     </div>
@@ -303,6 +312,15 @@ function addUser() {
         return;
     }
     
+    const addUserBtn = document.getElementById('add-user-btn');
+    const addUserBtnText = document.getElementById('add-user-btn-text');
+    const addUserBtnSpinner = document.getElementById('add-user-btn-spinner');
+    
+    // 登録中の表示
+    addUserBtn.disabled = true;
+    addUserBtnText.textContent = '登録中...';
+    addUserBtnSpinner.classList.remove('d-none');
+    
     // フォームデータをFormDataに変換
     const submitData = new FormData();
     submitData.append('full_name', formData.full_name);
@@ -326,6 +344,12 @@ function addUser() {
     .catch(error => {
         console.error('ユーザー登録エラー:', error);
         alert('ユーザーの登録に失敗しました');
+    })
+    .finally(() => {
+        // 登録完了後の表示を元に戻す
+        addUserBtn.disabled = false;
+        addUserBtnText.textContent = '登録';
+        addUserBtnSpinner.classList.add('d-none');
     });
 }
 
@@ -338,10 +362,20 @@ function showCsvUserUploadModal() {
 function uploadCsvUsers() {
     const formData = new FormData();
     const fileInput = document.getElementById('csv-user-file');
+    const uploadBtn = document.getElementById('csv-upload-btn');
+    const uploadBtnText = document.getElementById('upload-btn-text');
+    const uploadBtnSpinner = document.getElementById('upload-btn-spinner');
+    
     if (!fileInput.files[0]) {
         alert('CSVファイルを選択してください');
         return;
     }
+    
+    // アップロード中の表示
+    uploadBtn.disabled = true;
+    uploadBtnText.textContent = 'アップロード中...';
+    uploadBtnSpinner.classList.remove('d-none');
+    
     formData.append('csv_file', fileInput.files[0]);
     fetch('/admin/users/upload_csv', {
         method: 'POST',
@@ -359,6 +393,12 @@ function uploadCsvUsers() {
     .catch(error => {
         console.error('CSVアップロードエラー:', error);
         alert('CSVアップロードに失敗しました');
+    })
+    .finally(() => {
+        // アップロード完了後の表示を元に戻す
+        uploadBtn.disabled = false;
+        uploadBtnText.textContent = 'アップロード';
+        uploadBtnSpinner.classList.add('d-none');
     });
 }
 
@@ -407,6 +447,15 @@ function saveUserEdit() {
         return;
     }
     
+    const editUserBtn = document.getElementById('edit-user-btn');
+    const editUserBtnText = document.getElementById('edit-user-btn-text');
+    const editUserBtnSpinner = document.getElementById('edit-user-btn-spinner');
+    
+    // 保存中の表示
+    editUserBtn.disabled = true;
+    editUserBtnText.textContent = '保存中...';
+    editUserBtnSpinner.classList.remove('d-none');
+    
     fetch(`/admin/users/${currentEditUserId}`, {
         method: 'POST',
         headers: {
@@ -426,6 +475,12 @@ function saveUserEdit() {
     .catch(error => {
         console.error('ユーザー更新エラー:', error);
         alert('ユーザーの更新に失敗しました');
+    })
+    .finally(() => {
+        // 保存完了後の表示を元に戻す
+        editUserBtn.disabled = false;
+        editUserBtnText.textContent = '保存';
+        editUserBtnSpinner.classList.add('d-none');
     });
 }
 
