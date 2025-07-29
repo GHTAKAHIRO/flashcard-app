@@ -1,13 +1,25 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
 from utils.db import get_db_connection, get_db_cursor, get_placeholder
+from functools import wraps
 import csv
 import io
 
-admin_bp = Blueprint('admin', __name__)
+def admin_required(f):
+    """管理者権限が必要なデコレータ"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login'))
+        if not current_user.is_admin:
+            flash('管理者権限が必要です', 'error')
+            return redirect(url_for('home'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @admin_bp.route('/admin')
 @login_required
+@admin_required
 def admin():
     """管理画面のメインページ"""
     try:
@@ -39,6 +51,7 @@ def admin():
 
 @admin_bp.route('/admin/restore_data', methods=['POST'])
 @login_required
+@admin_required
 def restore_data():
     """初期データの復元"""
     try:
@@ -53,6 +66,7 @@ def restore_data():
 
 @admin_bp.route('/admin/users')
 @login_required
+@admin_required
 def admin_users():
     """ユーザー管理画面"""
     try:
@@ -86,6 +100,7 @@ def admin_users():
 
 @admin_bp.route('/admin/users/add', methods=['POST'])
 @login_required
+@admin_required
 def admin_add_user():
     """ユーザー追加"""
     full_name = request.form.get('full_name')
@@ -129,6 +144,7 @@ def admin_add_user():
 
 @admin_bp.route('/admin/users/upload_csv', methods=['POST'])
 @login_required
+@admin_required
 def admin_upload_users_csv():
     """CSVファイルからユーザーを一括追加"""
     if 'csv_file' not in request.files:
@@ -232,6 +248,7 @@ def admin_upload_users_csv():
 
 @admin_bp.route('/admin/users/csv_template')
 @login_required
+@admin_required
 def admin_users_csv_template():
     """ユーザーCSVテンプレートのダウンロード"""
     from flask import send_file
@@ -262,6 +279,7 @@ def admin_users_csv_template():
 
 @admin_bp.route('/admin/users/<int:user_id>')
 @login_required
+@admin_required
 def admin_get_user(user_id):
     """ユーザー情報の取得（編集用）"""
     try:
@@ -294,6 +312,7 @@ def admin_get_user(user_id):
 
 @admin_bp.route('/admin/users/<int:user_id>', methods=['POST'])
 @login_required
+@admin_required
 def admin_update_user(user_id):
     """ユーザー情報の更新"""
     try:
@@ -348,6 +367,7 @@ def admin_update_user(user_id):
 
 @admin_bp.route('/admin/users/<int:user_id>', methods=['DELETE'])
 @login_required
+@admin_required
 def admin_delete_user(user_id):
     """ユーザーの削除"""
     try:
@@ -375,6 +395,7 @@ def admin_delete_user(user_id):
 
 @admin_bp.route('/admin/input_studies/questions')
 @login_required
+@admin_required
 def input_studies_admin_questions():
     """社会科問題一覧管理画面"""
     try:
@@ -416,6 +437,7 @@ def input_studies_admin_questions():
 
 @admin_bp.route('/admin/input_studies/questions/add')
 @login_required
+@admin_required
 def input_studies_add_question():
     """社会科問題追加画面"""
     try:
@@ -472,6 +494,7 @@ def input_studies_add_question():
 
 @admin_bp.route('/admin/input_studies/questions/add', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_add_question_post():
     """社会科問題追加処理"""
     try:
@@ -554,6 +577,7 @@ def input_studies_add_question_post():
 
 @admin_bp.route('/admin/input_studies/unified')
 @login_required
+@admin_required
 def input_studies_admin_unified():
     """社会科統合管理画面"""
     try:
@@ -609,6 +633,7 @@ def input_studies_admin_unified():
 
 @admin_bp.route('/admin/input_studies/textbooks/add')
 @login_required
+@admin_required
 def input_studies_add_textbook():
     """社会科教材追加画面"""
     try:
@@ -620,6 +645,7 @@ def input_studies_add_textbook():
 
 @admin_bp.route('/admin/input_studies/textbooks/add', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_add_textbook_post():
     """社会科教材追加処理"""
     try:
@@ -679,6 +705,7 @@ def input_studies_add_textbook_post():
 
 @admin_bp.route('/admin/input_studies/textbooks/<int:textbook_id>')
 @login_required
+@admin_required
 def input_studies_admin_textbook_unified(textbook_id):
     """社会科教材詳細管理画面"""
     try:
@@ -753,6 +780,7 @@ def input_studies_admin_textbook_unified(textbook_id):
 
 @admin_bp.route('/admin/input_studies/units/add')
 @login_required
+@admin_required
 def input_studies_add_unit():
     """社会科単元追加画面"""
     try:
@@ -791,6 +819,7 @@ def input_studies_add_unit():
 
 @admin_bp.route('/admin/input_studies/units/add', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_add_unit_post():
     """社会科単元追加処理"""
     try:
@@ -848,6 +877,7 @@ def input_studies_add_unit_post():
 
 @admin_bp.route('/admin/input_studies/units/<int:unit_id>/questions')
 @login_required
+@admin_required
 def input_studies_admin_unit_questions(unit_id):
     """社会科単元問題管理画面"""
     try:
@@ -933,6 +963,7 @@ def input_studies_admin_unit_questions(unit_id):
 
 @admin_bp.route('/admin/input_studies/textbooks/<int:textbook_id>/units/csv')
 @login_required
+@admin_required
 def download_units_csv(textbook_id):
     """単元CSVダウンロード"""
     try:
@@ -992,6 +1023,7 @@ def download_units_csv(textbook_id):
 
 @admin_bp.route('/admin/input_studies/units/<int:unit_id>/questions/csv')
 @login_required
+@admin_required
 def download_unit_questions_csv(unit_id):
     """単元問題CSVダウンロード"""
     try:
@@ -1068,6 +1100,7 @@ def download_unit_questions_csv(unit_id):
 
 @admin_bp.route('/input_studies/admin/edit_textbook/<int:textbook_id>')
 @login_required
+@admin_required
 def input_studies_edit_textbook_get(textbook_id):
     """教材編集データ取得（API）"""
     try:
@@ -1100,6 +1133,7 @@ def input_studies_edit_textbook_get(textbook_id):
 
 @admin_bp.route('/input_studies/admin/edit_textbook/<int:textbook_id>', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_edit_textbook_post(textbook_id):
     """教材編集処理（API）"""
     try:
@@ -1145,6 +1179,7 @@ def input_studies_edit_textbook_post(textbook_id):
 
 @admin_bp.route('/input_studies/admin/edit_unit/<int:unit_id>')
 @login_required
+@admin_required
 def input_studies_edit_unit_get(unit_id):
     """単元編集データ取得（API）"""
     try:
@@ -1176,6 +1211,7 @@ def input_studies_edit_unit_get(unit_id):
 
 @admin_bp.route('/input_studies/admin/edit_unit/<int:unit_id>', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_edit_unit_post(unit_id):
     """単元編集処理（API）"""
     try:
@@ -1228,6 +1264,7 @@ def input_studies_edit_unit_post(unit_id):
 
 @admin_bp.route('/input_studies/admin/delete_unit/<int:unit_id>', methods=['DELETE'])
 @login_required
+@admin_required
 def input_studies_delete_unit(unit_id):
     """単元削除処理（API）"""
     try:
@@ -1258,6 +1295,7 @@ def input_studies_delete_unit(unit_id):
 
 @admin_bp.route('/input_studies/admin/bulk_delete_questions', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_bulk_delete_questions():
     """問題一括削除処理（API）"""
     try:
@@ -1283,6 +1321,7 @@ def input_studies_bulk_delete_questions():
 
 @admin_bp.route('/input_studies/admin/upload_csv', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_upload_csv():
     """CSVアップロード処理（API）"""
     try:
@@ -1338,6 +1377,7 @@ def input_studies_upload_csv():
 
 @admin_bp.route('/input_studies/admin/upload_units_csv', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_upload_units_csv():
     """単元CSVアップロード処理（API）"""
     try:
@@ -1410,6 +1450,7 @@ def input_studies_upload_units_csv():
 
 @admin_bp.route('/input_studies/admin/upload_questions_csv', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_upload_questions_csv():
     """問題CSVアップロード処理（API）"""
     try:
@@ -1516,6 +1557,7 @@ def input_studies_upload_questions_csv():
 
 @admin_bp.route('/input_studies/admin/download_csv_template')
 @login_required
+@admin_required
 def input_studies_download_csv_template():
     """CSVテンプレートダウンロード"""
     try:
@@ -1557,6 +1599,7 @@ def input_studies_download_csv_template():
 
 @admin_bp.route('/input_studies/admin/question/<int:question_id>')
 @login_required
+@admin_required
 def input_studies_get_question(question_id):
     """問題データ取得（API）"""
     try:
@@ -1589,6 +1632,7 @@ def input_studies_get_question(question_id):
 
 @admin_bp.route('/input_studies/admin/upload_image/<int:question_id>', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_upload_image(question_id):
     """問題画像アップロード処理（API）"""
     try:
@@ -1620,6 +1664,7 @@ def input_studies_upload_image(question_id):
 
 @admin_bp.route('/input_studies/admin/delete_image/<int:question_id>', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_delete_image(question_id):
     """問題画像削除処理（API）"""
     try:
@@ -1640,6 +1685,7 @@ def input_studies_delete_image(question_id):
 
 @admin_bp.route('/admin/input_studies/questions/<int:question_id>/edit')
 @login_required
+@admin_required
 def input_studies_edit_question_page(question_id):
     """社会科問題編集画面（GET）"""
     try:
@@ -1723,6 +1769,7 @@ def input_studies_edit_question_page(question_id):
 
 @admin_bp.route('/admin/input_studies/questions/<int:question_id>/edit', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_edit_question_post(question_id):
     """社会科問題編集処理"""
     try:
@@ -1808,6 +1855,7 @@ def input_studies_edit_question_post(question_id):
 
 @admin_bp.route('/input_studies/admin/update_image_path/<int:textbook_id>/<int:unit_id>', methods=['POST'])
 @login_required
+@admin_required
 def input_studies_update_image_path(textbook_id, unit_id):
     """画像パス一括更新処理"""
     try:
