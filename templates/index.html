@@ -1,46 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}社会科一問一答アプリ - ホーム{% endblock %}
+{% block title %}暗記アプリ - ホーム{% endblock %}
 
 {% block content %}
 <div class="text-center">
     <div class="mb-5">
         <h1 class="display-4 fw-bold text-primary mb-3">
-            <i class="fas fa-globe-asia me-3"></i>社会科一問一答アプリ
+            <i class="fas fa-brain me-3"></i>暗記アプリ
         </h1>
         <p class="lead text-muted">
-            地理・歴史・公民の知識を楽しく学ぼう！
+            効率的に暗記を進めよう！
         </p>
-    </div>
-
-    <div class="row g-4 mb-5">
-        <div class="col-md-4">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-map-marked-alt fa-3x text-primary mb-3"></i>
-                    <h5 class="card-title">地理</h5>
-                    <p class="card-text">日本の地理、世界の国々、地形や気候について学びます。</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-landmark fa-3x text-primary mb-3"></i>
-                    <h5 class="card-title">歴史</h5>
-                    <p class="card-text">日本の歴史、世界史、重要な出来事や人物について学びます。</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <i class="fas fa-balance-scale fa-3x text-primary mb-3"></i>
-                    <h5 class="card-title">公民</h5>
-                    <p class="card-text">政治、経済、憲法、国際社会について学びます。</p>
-                </div>
-            </div>
-        </div>
     </div>
 
     {% if current_user.is_authenticated %}
