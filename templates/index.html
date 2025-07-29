@@ -44,11 +44,22 @@
     </div>
 
     {% if current_user.is_authenticated %}
-        <div class="d-grid gap-3 d-md-block">
-            <a href="{{ url_for('admin.admin') }}" class="btn btn-primary btn-lg">
-                <i class="fas fa-cog me-2"></i>管理画面へ
-            </a>
-        </div>
+        {% if current_user.is_admin %}
+            <div class="d-grid gap-3 d-md-block">
+                <a href="{{ url_for('admin.admin') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-cog me-2"></i>管理画面へ
+                </a>
+            </div>
+        {% else %}
+            <div class="d-grid gap-3 d-md-block">
+                <a href="{{ url_for('study.study') }}" class="btn btn-primary btn-lg me-md-3">
+                    <i class="fas fa-graduation-cap me-2"></i>学習を始める
+                </a>
+                <a href="{{ url_for('choice_studies.choice_studies_home') }}" class="btn btn-outline-primary btn-lg">
+                    <i class="fas fa-list me-2"></i>選択式学習
+                </a>
+            </div>
+        {% endif %}
     {% else %}
         <div class="d-grid gap-3 d-md-block">
                             <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg me-md-3">

@@ -425,7 +425,11 @@ def home():
     if not current_user.is_authenticated:
         return redirect(url_for('auth.login'))
     else:
-        return redirect(url_for('admin.admin'))
+        # 管理者の場合は管理画面、通常ユーザーの場合は生徒用ダッシュボード
+        if current_user.is_admin:
+            return redirect(url_for('admin.admin'))
+        else:
+            return render_template('index.html')
 
 if __name__ == '__main__':
     # データベース初期化

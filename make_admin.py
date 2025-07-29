@@ -59,6 +59,7 @@ def list_users():
     
     print(f"🔍 データベースパス: {db_path}")
     print(f"📁 ファイル存在: {os.path.exists(db_path)}")
+    print(f"📁 ファイルサイズ: {os.path.getsize(db_path) if os.path.exists(db_path) else 'N/A'} bytes")
     
     if not os.path.exists(db_path):
         print("❌ データベースファイルが見つかりません")
