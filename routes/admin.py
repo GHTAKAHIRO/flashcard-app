@@ -456,6 +456,8 @@ def input_studies_add_question_post():
         difficulty = request.form.get('difficulty', 'normal')
         textbook_id = request.form.get('textbook_id', type=int)
         unit_id = request.form.get('unit_id', type=int)
+        question_number = request.form.get('question_number', type=int)
+        image_path = request.form.get('image_path', '').strip()
         
         # バリデーション
         if not question_text:
@@ -486,12 +488,27 @@ def input_studies_add_question_post():
                         flash('指定された単元が見つかりません', 'error')
                         return redirect(url_for('admin.input_studies_add_question'))
                 
+                # 問題番号の自動割り当て
+                if not question_number:
+                    if unit_id:
+                        # 単元が指定されている場合、その単元内での次の番号を取得
+                        cur.execute(f'''
+                            SELECT COALESCE(MAX(question_number), 0) + 1 
+                            FROM input_questions 
+                            WHERE unit_id = {placeholder}
+                        ''', (unit_id,))
+                        question_number = cur.fetchone()[0]
+                    else:
+                        # 単元が指定されていない場合、全体での次の番号を取得
+                        cur.execute('SELECT COALESCE(MAX(question_number), 0) + 1 FROM input_questions')
+                        question_number = cur.fetchone()[0]
+                
                 # 問題を追加
                 cur.execute(f'''
                     INSERT INTO input_questions 
-                    (question, correct_answer, explanation, subject, difficulty_level, textbook_id, unit_id, created_at)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                ''', (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id))
+                    (question, correct_answer, explanation, subject, difficulty_level, textbook_id, unit_id, question_number, image_path, created_at)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                ''', (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id, question_number, image_path))
                 
                 conn.commit()
                 flash('問題を追加しました', 'success')
@@ -916,12 +933,12 @@ def download_units_csv(textbook_id):
                 # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
                 output = io.StringIO()
                 writer = csv.writer(output)
-                writer.writerow(['単元名', '章番号', '説明'])
+                writer.writerow(['章番号', '単元名', '説明'])
                 
                 for unit_data in units_data:
                     writer.writerow([
-                        unit_data[0] or '',
                         unit_data[1] or '',
+                        unit_data[0] or '',
                         unit_data[2] or ''
                     ])
                 
@@ -1327,8 +1344,8 @@ def input_studies_upload_units_csv():
             with get_db_cursor(conn) as cur:
                 for row in csv_reader:
                     if len(row) >= 2:
-                        name = row[0].strip()
-                        unit_number = row[1].strip()
+                        unit_number = row[0].strip()
+                        name = row[1].strip()
                         description = row[2].strip() if len(row) > 2 else ''
                         
                         if name:  # 単元名のみ必須
@@ -1420,7 +1437,7 @@ def input_studies_upload_questions_csv():
                         continue
                     
                     if len(row) >= 2:  # 最低限必要な列数（問題文と正解）
-                        # CSVの列: 問題文,正解,許容回答,解答欄の補足,解説,難易度,問題番号,画像ファイル名
+                        # CSVの列: 問題文,正解,許容回答,解答欄の補足,解説,難易度,問題番号,画像パス
                         question = row[0].strip() if len(row) > 0 else ''  # 問題文
                         answer = row[1].strip() if len(row) > 1 else ''    # 正解
                         acceptable_answers = row[2].strip() if len(row) > 2 else ''
@@ -1428,7 +1445,7 @@ def input_studies_upload_questions_csv():
                         explanation = row[4].strip() if len(row) > 4 else ''
                         difficulty = row[5].strip() if len(row) > 5 else 'normal'
                         question_number = row[6].strip() if len(row) > 6 else ''
-                        image_name = row[7].strip() if len(row) > 7 else ''
+                        image_path = row[7].strip() if len(row) > 7 else ''
                         
                         if question and answer:
                             # 問題番号を数値に変換（空の場合はNone）
@@ -1440,10 +1457,10 @@ def input_studies_upload_questions_csv():
                             cur.execute('''
                                 INSERT INTO input_questions 
                                 (unit_id, textbook_id, subject, question, correct_answer, acceptable_answers, 
-                                 answer_suffix, explanation, difficulty_level, image_name, question_number, created_at)
+                                 answer_suffix, explanation, difficulty_level, image_path, question_number, created_at)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                             ''', (unit_id, textbook_id, subject, question, answer, acceptable_answers,
-                                  answer_suffix, explanation, difficulty, image_name, question_number_int))
+                                  answer_suffix, explanation, difficulty, image_path, question_number_int))
                 
                 conn.commit()
                 return jsonify({'message': '問題CSVファイルをアップロードしました'})
@@ -1465,11 +1482,11 @@ def input_studies_download_csv_template():
         writer = csv.writer(output)
         
         # ヘッダー行
-        writer.writerow(['問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '問題番号', '画像ファイル名'])
+        writer.writerow(['問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '問題番号', '画像パス'])
         
         # サンプルデータ
-        writer.writerow(['日本の首都は？', '東京', '東京都,Tokyo', '', '日本の首都は東京です', 'normal', '1', ''])
-        writer.writerow(['日本で最も高い山は？', '富士山', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'intermediate', '2', ''])
+        writer.writerow(['日本の首都は？', '東京', '東京都,Tokyo', '', '日本の首都は東京です', 'normal', '1', '/static/images/1.jpg'])
+        writer.writerow(['日本で最も高い山は？', '富士山', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'intermediate', '2', 'https://example.com/fuji.jpg'])
         
         # BOM付きUTF-8でエンコード
         csv_content = output.getvalue()
@@ -1747,14 +1764,14 @@ def input_studies_edit_question_post(question_id):
 @admin_bp.route('/input_studies/admin/update_image_path/<int:textbook_id>/<int:unit_id>', methods=['POST'])
 @login_required
 def input_studies_update_image_path(textbook_id, unit_id):
-    """画像URL更新処理"""
+    """画像パス一括更新処理"""
     try:
         data = request.get_json()
-        image_url = data.get('image_url', '').strip()
+        new_image_path = data.get('image_path', '').strip()
         update_questions = data.get('update_questions', False)
         
-        if not image_url:
-            return jsonify({'error': '画像URLが指定されていません'}), 400
+        if not new_image_path:
+            return jsonify({'error': '画像パスが指定されていません'}), 400
         
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
@@ -1771,49 +1788,22 @@ def input_studies_update_image_path(textbook_id, unit_id):
                 updated_questions_count = 0
                 
                 if update_questions:
-                    # 既存の問題の画像情報を取得
+                    # この単元の全問題の画像パスを一括更新
                     cur.execute(f'''
-                        SELECT id, image_name, image_title, image_url
-                        FROM input_questions 
-                        WHERE unit_id = {placeholder} AND (image_name IS NOT NULL OR image_title IS NOT NULL)
-                    ''', (unit_id,))
+                        UPDATE input_questions 
+                        SET image_path = {placeholder}, updated_at = CURRENT_TIMESTAMP
+                        WHERE unit_id = {placeholder}
+                    ''', (new_image_path, unit_id))
                     
-                    questions = cur.fetchall()
-                    
-                    for question in questions:
-                        question_id, image_name, image_title, current_image_url = question
-                        
-                        # 画像ファイル名を取得（image_nameまたはimage_titleから）
-                        filename = None
-                        if image_name and image_name.strip():
-                            filename = image_name.strip()
-                        elif image_title and image_title.strip():
-                            filename = image_title.strip()
-                        
-                        if filename:
-                            # 拡張子がない場合は.jpgを追加
-                            if not any(filename.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
-                                filename = f"{filename}.jpg"
-                            
-                            # 新しい画像URLを構築
-                            new_image_url = f"{image_url}/{filename}"
-                            
-                            # 問題の画像URLを更新
-                            cur.execute(f'''
-                                UPDATE input_questions 
-                                SET image_url = {placeholder}, updated_at = CURRENT_TIMESTAMP
-                                WHERE id = {placeholder}
-                            ''', (new_image_url, question_id))
-                            
-                            updated_questions_count += 1
+                    updated_questions_count = cur.rowcount
                 
                 conn.commit()
                 
                 return jsonify({
-                    'message': '画像URLを更新しました',
+                    'message': '画像パスを一括更新しました',
                     'updated_questions_count': updated_questions_count
                 })
                 
     except Exception as e:
-        current_app.logger.error(f"画像URL更新エラー: {e}")
-        return jsonify({'error': '画像URLの更新に失敗しました'}), 500 
+        current_app.logger.error(f"画像パス一括更新エラー: {e}")
+        return jsonify({'error': '画像パスの一括更新に失敗しました'}), 500 

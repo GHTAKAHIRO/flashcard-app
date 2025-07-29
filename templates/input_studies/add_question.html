@@ -21,15 +21,11 @@
             </p>
         </div>
         <div>
-            {% if textbook_info and unit_info %}
-                <a href="{{ url_for('admin.input_studies_admin_unit_questions', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-1"></i>単元問題一覧に戻る
-                </a>
-            {% elif textbook_info %}
+            {% if textbook_info and not unit_info %}
                 <a href="{{ url_for('admin.input_studies_admin_textbook_unified', textbook_id=textbook_info.id) }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-1"></i>教材管理に戻る
                 </a>
-            {% else %}
+            {% elif not textbook_info %}
                 <a href="{{ url_for('admin.input_studies_admin_questions') }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-1"></i>問題一覧に戻る
                 </a>
@@ -67,16 +63,6 @@
                             <input type="hidden" name="unit_id" value="{{ unit_info.id }}">
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-folder-open me-1"></i>画像データのパス
-                            </label>
-                            <input type="text" class="form-control" id="image_path_display" value="読み込み中..." readonly>
-                            <div class="form-text">
-                                <i class="fas fa-info-circle me-1"></i>
-                                この単元の画像は上記のパスに保存されます
-                            </div>
-                        </div>
                     {% else %}
                         <!-- 通常の選択形式 -->
                         <div class="mb-3">
@@ -174,81 +160,46 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="image_name" class="form-label">
-                            <i class="fas fa-image me-1"></i>画像名
+                        <label for="question_number" class="form-label">
+                            <i class="fas fa-hashtag me-1"></i>問題番号
                         </label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="image_name" name="image_name" 
-                                   placeholder="{% if textbook_info and unit_info %}例: 2（問題番号のみ）{% else %}例: 1-2{% endif %}" 
-                                   onchange="checkImageExists()">
-                            <button type="button" class="btn btn-outline-secondary" onclick="checkImageExists()">
-                                <i class="fas fa-search"></i>確認
-                            </button>
+                        <input type="number" class="form-control" id="question_number" name="question_number" 
+                               placeholder="例: 1" min="1">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            空欄の場合は自動的に次の番号が割り当てられます
                         </div>
-
-                        <div id="image-preview" class="mt-2" style="display: none;">
-                            <div class="alert alert-info">
-                                <small>
-                                    <strong>画像プレビュー:</strong> 
-                                    <span id="image-status"></span>
-                                    <div id="image-preview-container" class="mt-2 text-center"></div>
-                                </small>
-                            </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="image_path" class="form-label">
+                            <i class="fas fa-image me-1"></i>画像パス
+                        </label>
+                        <input type="text" class="form-control" id="image_path" name="image_path" 
+                               placeholder="例: /static/images/1.jpg または https://example.com/image.jpg">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            画像のフルパスを入力してください（ローカルファイルまたはURL）
                         </div>
                     </div>
                     
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                         {% if textbook_info and unit_info %}
-                            <a href="{{ url_for('admin.input_studies_admin_unit_questions', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-secondary me-md-2">単元問題一覧に戻る</a>
+                            <a href="{{ url_for('admin.input_studies_admin_unit_questions', textbook_id=textbook_info.id, unit_id=unit_info.id) }}" class="btn btn-secondary me-md-2">キャンセル</a>
                         {% elif textbook_info %}
-                            <a href="{{ url_for('admin.input_studies_admin_textbook_unified', textbook_id=textbook_info.id) }}" class="btn btn-secondary me-md-2">教材管理に戻る</a>
+                            <a href="{{ url_for('admin.input_studies_admin_textbook_unified', textbook_id=textbook_info.id) }}" class="btn btn-secondary me-md-2">キャンセル</a>
                         {% else %}
-                            <a href="{{ url_for('admin.input_studies_admin_questions') }}" class="btn btn-secondary me-md-2">問題一覧に戻る</a>
+                            <a href="{{ url_for('admin.input_studies_admin_questions') }}" class="btn btn-secondary me-md-2">キャンセル</a>
                         {% endif %}
                         <button type="submit" class="btn btn-success">
-                            <i class="fas fa-save me-1"></i>問題を追加
+                            <i class="fas fa-save me-1"></i>保存
                         </button>
                     </div>
                 </form>
             </div>
         </div>
         
-        <!-- 入力例 -->
-        <div class="card mt-4">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="fas fa-lightbulb me-2"></i>入力例
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <h6>地理の例</h6>
-                        <ul class="list-unstyled">
-                            <li><strong>問題:</strong> 日本の首都はどこですか？</li>
-                            <li><strong>正解:</strong> 東京</li>
-                            <li><strong>許容回答:</strong> 東京都, Tokyo</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-4">
-                        <h6>歴史の例</h6>
-                        <ul class="list-unstyled">
-                            <li><strong>問題:</strong> 江戸幕府を開いた人物は誰ですか？</li>
-                            <li><strong>正解:</strong> 徳川家康</li>
-                            <li><strong>許容回答:</strong> 徳川家康公, Tokugawa Ieyasu</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-4">
-                        <h6>理科の例</h6>
-                        <ul class="list-unstyled">
-                            <li><strong>問題:</strong> 水の化学式は何ですか？</li>
-                            <li><strong>正解:</strong> H₂O</li>
-                            <li><strong>許容回答:</strong> H2O, 水</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+
     </div>
 </div>
 
