@@ -72,8 +72,8 @@
                     <tr>
                         <th>生徒番号</th>
                         <th>表示名</th>
+                        <th>学年</th>
                         <th>役割</th>
-                        <th>登録日</th>
                         <th>最終ログイン</th>
                         <th>操作</th>
                     </tr>
@@ -85,6 +85,7 @@
                             <div class="fw-bold">{{ user.username }}</div>
                         </td>
                         <td>{{ user.full_name or '未設定' }}</td>
+                        <td>{{ user.grade or '未設定' }}</td>
                         <td>
                             {% if user.is_admin %}
                                 <span class="badge bg-danger">管理者</span>
@@ -92,7 +93,6 @@
                                 <span class="badge bg-primary">生徒</span>
                             {% endif %}
                         </td>
-                        <td>{{ user.created_at or '不明' }}</td>
                         <td>{{ user.last_login or '未ログイン' }}</td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
@@ -149,6 +149,24 @@
                         <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
                     </div>
                     <div class="mb-3">
+                        <label for="grade" class="form-label">学年</label>
+                        <select class="form-select" id="grade" name="grade">
+                            <option value="">選択してください</option>
+                            <option value="1年生">1年生</option>
+                            <option value="2年生">2年生</option>
+                            <option value="3年生">3年生</option>
+                            <option value="4年生">4年生</option>
+                            <option value="5年生">5年生</option>
+                            <option value="6年生">6年生</option>
+                            <option value="中学1年生">中学1年生</option>
+                            <option value="中学2年生">中学2年生</option>
+                            <option value="中学3年生">中学3年生</option>
+                            <option value="高校1年生">高校1年生</option>
+                            <option value="高校2年生">高校2年生</option>
+                            <option value="高校3年生">高校3年生</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label for="role" class="form-label">役割</label>
                         <select class="form-select" id="role" name="role">
                             <option value="user">生徒</option>
@@ -180,8 +198,9 @@
                         <input type="file" class="form-control" id="csv-user-file" name="csv_file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            CSV形式: 表示名（氏名）,ログインID,パスワード,役割<br>
+                            CSV形式: 表示名（氏名）,ログインID,パスワード,学年,役割<br>
                             <small class="text-muted">※ 表示名、ログインID、パスワードは必須項目です</small><br>
+                            <small class="text-muted">※ 学年は任意項目です（例：1年生、中学2年生、高校3年生）</small><br>
                             <small class="text-muted">※ 役割は「user」（生徒）または「admin」（管理者）を入力してください</small><br>
                             <small class="text-muted">※ パスワードは手動で入力してください（例：So-12345）</small>
                         </div>
@@ -218,6 +237,24 @@
                     <div class="mb-3">
                         <label for="edit-full-name" class="form-label">表示名（氏名） <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="edit-full-name" name="full_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-grade" class="form-label">学年</label>
+                        <select class="form-select" id="edit-grade" name="grade">
+                            <option value="">選択してください</option>
+                            <option value="1年生">1年生</option>
+                            <option value="2年生">2年生</option>
+                            <option value="3年生">3年生</option>
+                            <option value="4年生">4年生</option>
+                            <option value="5年生">5年生</option>
+                            <option value="6年生">6年生</option>
+                            <option value="中学1年生">中学1年生</option>
+                            <option value="中学2年生">中学2年生</option>
+                            <option value="中学3年生">中学3年生</option>
+                            <option value="高校1年生">高校1年生</option>
+                            <option value="高校2年生">高校2年生</option>
+                            <option value="高校3年生">高校3年生</option>
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label for="edit-password" class="form-label">新しいパスワード</label>
@@ -262,6 +299,7 @@ function addUser() {
         username: document.getElementById('username').value.trim(),
         password: document.getElementById('password').value,
         confirm_password: document.getElementById('confirm_password').value,
+        grade: document.getElementById('grade').value,
         role: document.getElementById('role').value
     };
     
@@ -280,6 +318,7 @@ function addUser() {
     submitData.append('full_name', formData.full_name);
     submitData.append('username', formData.username);
     submitData.append('password', formData.password);
+    submitData.append('grade', formData.grade);
     submitData.append('role', formData.role);
     
     fetch('/admin/users/add', {
@@ -320,11 +359,11 @@ function uploadCsvUsers() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.error) {
-            alert('エラー: ' + data.error);
-        } else {
-            alert('CSVアップロードが完了しました。' + data.message);
+        if (data.success) {
+            alert('CSVアップロードが完了しました。\n' + data.message);
             location.reload();
+        } else {
+            alert('エラー: ' + (data.error || 'アップロードに失敗しました'));
         }
     })
     .catch(error => {
@@ -346,6 +385,7 @@ function editUser(userId) {
             
             document.getElementById('edit-username').value = data.username || '';
             document.getElementById('edit-full-name').value = data.full_name || '';
+            document.getElementById('edit-grade').value = data.grade || '';
             document.getElementById('edit-password').value = '';
             document.getElementById('edit-is-admin').checked = data.is_admin || false;
             
@@ -367,6 +407,7 @@ function saveUserEdit() {
     const formData = {
         username: document.getElementById('edit-username').value.trim(),
         full_name: document.getElementById('edit-full-name').value.trim(),
+        grade: document.getElementById('edit-grade').value,
         password: document.getElementById('edit-password').value,
         is_admin: document.getElementById('edit-is-admin').checked
     };

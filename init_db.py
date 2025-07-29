@@ -30,6 +30,7 @@ def init_database():
             password_hash TEXT NOT NULL,
             is_admin BOOLEAN DEFAULT FALSE,
             is_active BOOLEAN DEFAULT TRUE,
+            grade TEXT,
             last_login TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""",

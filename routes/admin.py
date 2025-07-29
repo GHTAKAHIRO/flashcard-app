@@ -60,7 +60,7 @@ def admin_users():
             with get_db_cursor(conn) as cur:
                 # 実際のデータベースからユーザーを取得
                 cur.execute('''
-                    SELECT id, username, is_admin, full_name, created_at, last_login
+                    SELECT id, username, is_admin, full_name, grade, last_login
                     FROM users 
                     ORDER BY created_at DESC
                 ''')
@@ -73,7 +73,7 @@ def admin_users():
                         'username': user_data[1],
                         'is_admin': bool(user_data[2]),
                         'full_name': user_data[3],
-                        'created_at': user_data[4],
+                        'grade': user_data[4],
                         'last_login': user_data[5]
                     })
                 
@@ -91,6 +91,7 @@ def admin_add_user():
     full_name = request.form.get('full_name')
     username = request.form.get('username')
     password = request.form.get('password')
+    grade = request.form.get('grade', '')
     role = request.form.get('role', 'user')
     
     if not all([full_name, username, password]):
@@ -113,9 +114,9 @@ def admin_add_user():
                 is_admin = (role == 'admin')
                 
                 cur.execute(f'''
-                    INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
-                    VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                ''', (username, hashed_password, is_admin, full_name))
+                    INSERT INTO users (username, email, password_hash, is_admin, full_name, grade, created_at)
+                    VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                ''', (username, hashed_password, is_admin, full_name, grade))
                 
                 conn.commit()
                 flash('ユーザーが正常に追加されました', 'success')
@@ -162,6 +163,7 @@ def admin_upload_users_csv():
                         full_name = row.get('表示名（氏名）', row.get('full_name', '')).strip()
                         username = row.get('ログインID', row.get('username', '')).strip()
                         password = row.get('パスワード', row.get('password', '')).strip()
+                        grade = row.get('学年', row.get('grade', '')).strip()
                         role = row.get('役割', row.get('role', 'user')).strip()
                         
                         if not all([full_name, username, password]):
@@ -182,9 +184,9 @@ def admin_upload_users_csv():
                         is_admin = (role.lower() in ['admin', '管理者'])
                         
                         cur.execute(f'''
-                            INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
-                            VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                        ''', (username, hashed_password, is_admin, full_name))
+                            INSERT INTO users (username, email, password_hash, is_admin, full_name, grade, created_at)
+                            VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                        ''', (username, hashed_password, is_admin, full_name, grade))
                         
                         success_count += 1
                         
@@ -195,15 +197,26 @@ def admin_upload_users_csv():
                 conn.commit()
         
         if success_count > 0:
-            flash(f'{success_count}人のユーザーが正常に追加されました', 'success')
+            message = f'{success_count}人のユーザーが正常に追加されました'
+        else:
+            message = 'ユーザーの追加に失敗しました'
+            
         if error_count > 0:
-            flash(f'{error_count}件のエラーが発生しました', 'warning')
+            message += f'（{error_count}件のエラーが発生）'
+            
+        return jsonify({
+            'success': success_count > 0,
+            'message': message,
+            'success_count': success_count,
+            'error_count': error_count
+        })
             
     except Exception as e:
         current_app.logger.error(f"CSVアップロードエラー: {e}")
-        flash('CSVファイルの処理に失敗しました', 'error')
-    
-    return redirect(url_for('admin.admin_users'))
+        return jsonify({
+            'success': False,
+            'error': 'CSVファイルの処理に失敗しました'
+        }), 500
 
 @admin_bp.route('/admin/users/csv_template')
 @login_required
@@ -214,9 +227,9 @@ def admin_users_csv_template():
     # CSVテンプレートを作成（BOM付きUTF-8で文字化けを防ぐ）
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['表示名（氏名）', 'ログインID', 'パスワード', '役割'])
-    writer.writerow(['田中太郎', 'tanaka001', 'So-12345', 'user'])
-    writer.writerow(['佐藤花子', 'sato002', 'So-67890', 'user'])
+    writer.writerow(['表示名（氏名）', 'ログインID', 'パスワード', '学年', '役割'])
+    writer.writerow(['田中太郎', 'tanaka001', 'So-12345', '1年生', 'user'])
+    writer.writerow(['佐藤花子', 'sato002', 'So-67890', '中学2年生', 'user'])
     
     # BOM付きUTF-8でエンコード
     csv_content = output.getvalue()
@@ -243,7 +256,7 @@ def admin_get_user(user_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
-                    SELECT id, username, email, is_admin, full_name
+                    SELECT id, username, email, is_admin, full_name, grade
                     FROM users 
                     WHERE id = ?
                 ''', (user_id,))
@@ -257,7 +270,8 @@ def admin_get_user(user_id):
                     'username': user_data[1],
                     'email': user_data[2],
                     'is_admin': bool(user_data[3]),
-                    'full_name': user_data[4]
+                    'full_name': user_data[4],
+                    'grade': user_data[5]
                 }
                 
                 return jsonify(user)
@@ -274,6 +288,7 @@ def admin_update_user(user_id):
         data = request.get_json()
         username = data.get('username', '').strip()
         full_name = data.get('full_name', '').strip()
+        grade = data.get('grade', '').strip()
         password = data.get('password', '').strip()
         is_admin = data.get('is_admin', False)
         
@@ -301,16 +316,16 @@ def admin_update_user(user_id):
                     hashed_password = generate_password_hash(password)
                     cur.execute(f'''
                         UPDATE users 
-                        SET username = {placeholder}, full_name = {placeholder}, password_hash = {placeholder}, is_admin = {placeholder}
+                        SET username = {placeholder}, full_name = {placeholder}, grade = {placeholder}, password_hash = {placeholder}, is_admin = {placeholder}
                         WHERE id = {placeholder}
-                    ''', (username, full_name, hashed_password, is_admin, user_id))
+                    ''', (username, full_name, grade, hashed_password, is_admin, user_id))
                 else:
                     # パスワードは更新しない
                     cur.execute(f'''
                         UPDATE users 
-                        SET username = {placeholder}, full_name = {placeholder}, is_admin = {placeholder}
+                        SET username = {placeholder}, full_name = {placeholder}, grade = {placeholder}, is_admin = {placeholder}
                         WHERE id = {placeholder}
-                    ''', (username, full_name, is_admin, user_id))
+                    ''', (username, full_name, grade, is_admin, user_id))
                 
                 conn.commit()
                 return jsonify({'message': 'ユーザーを更新しました'})
