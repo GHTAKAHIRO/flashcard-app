@@ -24,7 +24,6 @@ def init_database():
         # ユーザーテーブル
         """CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_number TEXT UNIQUE NOT NULL,
             username TEXT NOT NULL,
             full_name TEXT,
             email TEXT,
