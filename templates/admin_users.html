@@ -138,12 +138,12 @@
             <div class="modal-body">
                 <form id="addUserForm">
                     <div class="mb-3">
-                        <label for="username" class="form-label">ユーザー名 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="username" name="username" required>
+                        <label for="full_name" class="form-label">表示名（氏名） <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="email" class="form-label">メールアドレス <span class="text-danger">*</span></label>
-                        <input type="email" class="form-control" id="email" name="email" required>
+                        <label for="username" class="form-label">ログインID <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="username" name="username" required>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">パスワード <span class="text-danger">*</span></label>
@@ -185,9 +185,9 @@
                         <input type="file" class="form-control" id="csv-user-file" name="csv_file" accept=".csv" required>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            CSV形式: ユーザー名,メールアドレス,パスワード,権限,氏名<br>
-                            <small class="text-muted">※ ユーザー名、メールアドレス、パスワードは必須項目です</small><br>
-                            <small class="text-muted">※ 権限は「user」または「admin」を入力してください</small><br>
+                            CSV形式: 表示名（氏名）,ログインID,パスワード,役割<br>
+                            <small class="text-muted">※ 表示名、ログインID、パスワードは必須項目です</small><br>
+                            <small class="text-muted">※ 役割は「user」または「admin」を入力してください</small><br>
                             <small class="text-muted">※ パスワードは手動で入力してください（例：So-12345）</small>
                         </div>
                     </div>
@@ -263,15 +263,15 @@ function showAddUserModal() {
 
 function addUser() {
     const formData = {
+        full_name: document.getElementById('full_name').value.trim(),
         username: document.getElementById('username').value.trim(),
-        email: document.getElementById('email').value.trim(),
         password: document.getElementById('password').value,
         confirm_password: document.getElementById('confirm_password').value,
         role: document.getElementById('role').value
     };
     
-    if (!formData.username || !formData.email || !formData.password) {
-        alert('ユーザー名・メールアドレス・パスワードは必須です');
+    if (!formData.full_name || !formData.username || !formData.password) {
+        alert('表示名・ログインID・パスワードは必須です');
         return;
     }
     
@@ -282,8 +282,8 @@ function addUser() {
     
     // フォームデータをFormDataに変換
     const submitData = new FormData();
+    submitData.append('full_name', formData.full_name);
     submitData.append('username', formData.username);
-    submitData.append('email', formData.email);
     submitData.append('password', formData.password);
     submitData.append('role', formData.role);
     

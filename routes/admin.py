@@ -89,12 +89,12 @@ def admin_users():
 @login_required
 def admin_add_user():
     """ユーザー追加"""
+    full_name = request.form.get('full_name')
     username = request.form.get('username')
-    email = request.form.get('email')
     password = request.form.get('password')
     role = request.form.get('role', 'user')
     
-    if not all([username, email, password]):
+    if not all([full_name, username, password]):
         flash('すべてのフィールドを入力してください', 'error')
         return redirect(url_for('admin.admin_users'))
     
@@ -103,9 +103,9 @@ def admin_add_user():
             with get_db_cursor(conn) as cur:
                 # ユーザーが既に存在するかチェック
                 placeholder = get_placeholder()
-                cur.execute(f'SELECT id FROM users WHERE username = {placeholder} OR email = {placeholder}', (username, email))
+                cur.execute(f'SELECT id FROM users WHERE username = {placeholder}', (username,))
                 if cur.fetchone():
-                    flash('ユーザー名またはメールアドレスが既に使用されています', 'error')
+                    flash('ログインIDが既に使用されています', 'error')
                     return redirect(url_for('admin.admin_users'))
                 
                 # 新しいユーザーを追加
@@ -115,8 +115,8 @@ def admin_add_user():
                 
                 cur.execute(f'''
                     INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                ''', (username, email, hashed_password, is_admin, username))
+                    VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                ''', (username, hashed_password, is_admin, full_name))
                 
                 conn.commit()
                 flash('ユーザーが正常に追加されました', 'success')
@@ -159,20 +159,19 @@ def admin_upload_users_csv():
             with get_db_cursor(conn) as cur:
                 for row in csv_reader:
                     try:
-                        # 日本語ヘッダーと英語ヘッダーの両方に対応
-                        username = row.get('ユーザー名', row.get('username', '')).strip()
-                        email = row.get('メールアドレス', row.get('email', '')).strip()
+                        # 新しいヘッダー構造に対応
+                        full_name = row.get('表示名（氏名）', row.get('full_name', '')).strip()
+                        username = row.get('ログインID', row.get('username', '')).strip()
                         password = row.get('パスワード', row.get('password', '')).strip()
-                        role = row.get('権限', row.get('role', 'user')).strip()
-                        full_name = row.get('氏名', row.get('full_name', username)).strip()
+                        role = row.get('役割', row.get('role', 'user')).strip()
                         
-                        if not all([username, email, password]):
+                        if not all([full_name, username, password]):
                             error_count += 1
                             continue
                         
                         # 重複チェック
                         placeholder = get_placeholder()
-                        cur.execute(f'SELECT id FROM users WHERE username = {placeholder} OR email = {placeholder}', (username, email))
+                        cur.execute(f'SELECT id FROM users WHERE username = {placeholder}', (username,))
                         if cur.fetchone():
                             error_count += 1
                             continue
@@ -185,8 +184,8 @@ def admin_upload_users_csv():
                         
                         cur.execute(f'''
                             INSERT INTO users (username, email, password_hash, is_admin, full_name, created_at)
-                            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                        ''', (username, email, hashed_password, is_admin, full_name))
+                            VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                        ''', (username, hashed_password, is_admin, full_name))
                         
                         success_count += 1
                         
@@ -214,20 +213,22 @@ def admin_users_csv_template():
     from flask import send_file
     
     # CSVテンプレートを作成（BOM付きUTF-8で文字化けを防ぐ）
-    output = io.BytesIO()
-    # BOMを追加
-    output.write(b'\xef\xbb\xbf')
-    # UTF-8でエンコード
-    writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
-    writer.writerow(['ユーザー名', 'メールアドレス', 'パスワード', '権限', '氏名'])
-    writer.writerow(['user1', 'user1@example.com', 'So-12345', 'user', '田中太郎'])
-    writer.writerow(['user2', 'user2@example.com', 'So-67890', 'user', '佐藤花子'])
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['表示名（氏名）', 'ログインID', 'パスワード', '役割'])
+    writer.writerow(['田中太郎', 'tanaka001', 'So-12345', 'user'])
+    writer.writerow(['佐藤花子', 'sato002', 'So-67890', 'user'])
     
-    output.seek(0)
+    # BOM付きUTF-8でエンコード
+    csv_content = output.getvalue()
+    output_bytes = io.BytesIO()
+    output_bytes.write(b'\xef\xbb\xbf')  # BOM
+    output_bytes.write(csv_content.encode('utf-8'))
+    output_bytes.seek(0)
     
     from flask import Response
     return Response(
-        output.getvalue(),
+        output_bytes.getvalue(),
         mimetype='text/csv; charset=utf-8',
         headers={
             'Content-Disposition': 'attachment; filename=users_template.csv',
@@ -913,11 +914,8 @@ def download_units_csv(textbook_id):
                 units_data = cur.fetchall()
                 
                 # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
-                output = io.BytesIO()
-                # BOMを追加
-                output.write(b'\xef\xbb\xbf')
-                # UTF-8でエンコード
-                writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
+                output = io.StringIO()
+                writer = csv.writer(output)
                 writer.writerow(['単元名', '章番号', '説明'])
                 
                 for unit_data in units_data:
@@ -927,11 +925,16 @@ def download_units_csv(textbook_id):
                         unit_data[2] or ''
                     ])
                 
-                output.seek(0)
+                # BOM付きUTF-8でエンコード
+                csv_content = output.getvalue()
+                output_bytes = io.BytesIO()
+                output_bytes.write(b'\xef\xbb\xbf')  # BOM
+                output_bytes.write(csv_content.encode('utf-8'))
+                output_bytes.seek(0)
                 
                 from flask import Response
                 return Response(
-                    output.getvalue(),
+                    output_bytes.getvalue(),
                     mimetype='text/csv; charset=utf-8',
                     headers={
                         'Content-Disposition': f'attachment; filename=units_{textbook_id}.csv',
@@ -982,11 +985,8 @@ def download_unit_questions_csv(unit_id):
                 questions_data = cur.fetchall()
                 
                 # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
-                output = io.BytesIO()
-                # BOMを追加
-                output.write(b'\xef\xbb\xbf')
-                # UTF-8でエンコード
-                writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
+                output = io.StringIO()
+                writer = csv.writer(output)
                 writer.writerow(['問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '問題番号', '画像ファイル名'])
                 
                 for question_data in questions_data:
@@ -1001,11 +1001,16 @@ def download_unit_questions_csv(unit_id):
                         question_data[6] or ''  # 画像ファイル名
                     ])
                 
-                output.seek(0)
+                # BOM付きUTF-8でエンコード
+                csv_content = output.getvalue()
+                output_bytes = io.BytesIO()
+                output_bytes.write(b'\xef\xbb\xbf')  # BOM
+                output_bytes.write(csv_content.encode('utf-8'))
+                output_bytes.seek(0)
                 
                 from flask import Response
                 return Response(
-                    output.getvalue(),
+                    output_bytes.getvalue(),
                     mimetype='text/csv; charset=utf-8',
                     headers={
                         'Content-Disposition': f'attachment; filename=questions_unit_{unit_id}.csv',
@@ -1456,11 +1461,8 @@ def input_studies_download_csv_template():
         import io
         
         # CSVデータを作成（BOM付きUTF-8で文字化けを防ぐ）
-        output = io.BytesIO()
-        # BOMを追加
-        output.write(b'\xef\xbb\xbf')
-        # UTF-8でエンコード
-        writer = csv.writer(io.TextIOWrapper(output, encoding='utf-8'))
+        output = io.StringIO()
+        writer = csv.writer(output)
         
         # ヘッダー行
         writer.writerow(['問題文', '正解', '許容回答', '解答欄の補足', '解説', '難易度', '問題番号', '画像ファイル名'])
@@ -1469,11 +1471,16 @@ def input_studies_download_csv_template():
         writer.writerow(['日本の首都は？', '東京', '東京都,Tokyo', '', '日本の首都は東京です', 'normal', '1', ''])
         writer.writerow(['日本で最も高い山は？', '富士山', '富士山,ふじさん', '山', '富士山は日本一高い山です', 'intermediate', '2', ''])
         
-        output.seek(0)
+        # BOM付きUTF-8でエンコード
+        csv_content = output.getvalue()
+        output_bytes = io.BytesIO()
+        output_bytes.write(b'\xef\xbb\xbf')  # BOM
+        output_bytes.write(csv_content.encode('utf-8'))
+        output_bytes.seek(0)
         
         from flask import Response
         return Response(
-            output.getvalue(),
+            output_bytes.getvalue(),
             mimetype='text/csv; charset=utf-8',
             headers={
                 'Content-Disposition': 'attachment; filename=input_studies_questions_template.csv',
