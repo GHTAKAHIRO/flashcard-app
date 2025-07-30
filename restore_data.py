@@ -22,6 +22,23 @@ def restore_initial_data():
     cursor = conn.cursor()
     
     try:
+        # 既存のユーザー数を確認
+        cursor.execute('SELECT COUNT(*) FROM users')
+        existing_user_count = cursor.fetchone()[0]
+        print(f"👥 既存のユーザー数: {existing_user_count}")
+        
+        # 既存のユーザーがいる場合は警告
+        if existing_user_count > 1:  # admin以外のユーザーがいる場合
+            print("⚠️  警告: 既存のユーザーデータが存在します")
+            print("   この操作は既存のユーザーデータに影響を与える可能性があります")
+            
+            # 既存のユーザー一覧を表示
+            cursor.execute('SELECT id, username, is_admin, created_at FROM users ORDER BY created_at DESC')
+            existing_users = cursor.fetchall()
+            print("📊 既存のユーザー:")
+            for user in existing_users:
+                print(f"   ID: {user[0]}, ユーザー名: {user[1]}, 管理者: {user[2]}, 作成日: {user[3]}")
+        
         # 管理者ユーザーの確認と作成
         cursor.execute('SELECT id FROM users WHERE username = ?', ('admin',))
         if not cursor.fetchone():
@@ -100,7 +117,11 @@ def restore_initial_data():
         cursor.execute('SELECT COUNT(*) FROM input_questions')
         question_count = cursor.fetchone()[0]
         
+        cursor.execute('SELECT COUNT(*) FROM users')
+        final_user_count = cursor.fetchone()[0]
+        
         print(f"📊 現在のデータ統計:")
+        print(f"   ユーザー数: {final_user_count}")
         print(f"   教材数: {textbook_count}")
         print(f"   単元数: {unit_count}")
         print(f"   問題数: {question_count}")

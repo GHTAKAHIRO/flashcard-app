@@ -65,9 +65,14 @@ def register():
                 with get_db_cursor(conn) as cur:
                     placeholder = get_placeholder()
                     cur.execute(f"INSERT INTO users (username, password_hash, full_name) VALUES ({placeholder}, {placeholder}, {placeholder})", (username, password, username))
+                    user_id = cur.lastrowid
                     conn.commit()
+                    
+                    current_app.logger.info(f"ユーザー登録成功: user_id={user_id}, username={username}")
+                    
             return redirect(url_for('auth.login'))
         except Exception as e:
+            current_app.logger.error(f"ユーザー登録エラー: {e}")
             flash(f"登録エラー: {e}")
 
     return render_template('register.html')

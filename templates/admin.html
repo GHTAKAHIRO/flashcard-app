@@ -85,8 +85,13 @@
                 </h5>
                 <p class="card-text">データベースのバックアップや復元を行います。</p>
                 <form method="POST" action="{{ url_for('admin.restore_data') }}" style="display: inline;">
-                    <button type="submit" class="btn btn-warning" onclick="return confirm('初期データを復元しますか？')">
+                    <button type="submit" class="btn btn-warning" onclick="return confirmRestoreData()">
                         <i class="fas fa-upload me-1"></i>初期データ復元
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.check_integrity') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-info">
+                        <i class="fas fa-check-circle me-1"></i>整合性チェック
                     </button>
                 </form>
                 <button class="btn btn-outline-warning" onclick="alert('この機能は開発中です')">
@@ -112,4 +117,10 @@
         </div>
     </div>
 </div>
+
+<script>
+function confirmRestoreData() {
+    return confirm('⚠️ 警告: 初期データを復元しますか？\n\nこの操作は既存のユーザーデータに影響を与える可能性があります。\n本当に実行しますか？');
+}
+</script>
 {% endblock %} 

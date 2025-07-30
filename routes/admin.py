@@ -66,6 +66,21 @@ def restore_data():
     
     return redirect(url_for('admin.admin'))
 
+@admin_bp.route('/admin/check_integrity', methods=['POST'])
+@login_required
+@admin_required
+def check_integrity():
+    """データベース整合性チェック"""
+    try:
+        from check_db_integrity import check_database_integrity
+        check_database_integrity()
+        flash('データベース整合性チェックが完了しました', 'success')
+    except Exception as e:
+        current_app.logger.error(f"整合性チェックエラー: {e}")
+        flash('整合性チェックに失敗しました', 'error')
+    
+    return redirect(url_for('admin.admin'))
+
 @admin_bp.route('/admin/users')
 @login_required
 @admin_required
@@ -385,9 +400,26 @@ def admin_delete_user(user_id):
                 if user_id == current_user.id:
                     return jsonify({'error': '自分自身を削除することはできません'}), 400
                 
+                # 関連するデータを先に削除
+                # 学習ログを削除
+                cur.execute(f'DELETE FROM study_log WHERE user_id = {placeholder}', (user_id,))
+                study_log_deleted = cur.rowcount
+                
+                # チャンク進捗を削除
+                cur.execute(f'DELETE FROM chunk_progress WHERE user_id = {placeholder}', (user_id,))
+                chunk_progress_deleted = cur.rowcount
+                
+                # ユーザー設定を削除
+                cur.execute(f'DELETE FROM user_settings WHERE user_id = {placeholder}', (user_id,))
+                user_settings_deleted = cur.rowcount
+                
                 # ユーザーを削除
                 cur.execute(f'DELETE FROM users WHERE id = {placeholder}', (user_id,))
+                user_deleted = cur.rowcount
+                
                 conn.commit()
+                
+                current_app.logger.info(f"ユーザー削除完了: user_id={user_id}, study_log={study_log_deleted}, chunk_progress={chunk_progress_deleted}, user_settings={user_settings_deleted}, user={user_deleted}")
                 
                 return jsonify({'message': 'ユーザーを削除しました'})
                 

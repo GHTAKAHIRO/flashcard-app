@@ -513,7 +513,7 @@ function toggleUserStatus(userId, isActive) {
 }
 
 function deleteUser(userId) {
-    if (!confirm('このユーザーを削除しますか？この操作は元に戻せません。')) {
+    if (!confirm('⚠️ 警告: このユーザーを削除しますか？\n\nこの操作は元に戻せません。\nユーザーの学習履歴もすべて削除されます。\n本当に実行しますか？')) {
         return;
     }
     

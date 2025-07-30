@@ -18,8 +18,13 @@ def get_db_connection():
         db_path = os.path.abspath(os.getenv('DB_PATH', 'flashcards.db'))
         conn = None
         try:
-            conn = sqlite3.connect(db_path)
+            conn = sqlite3.connect(db_path, timeout=30.0)  # タイムアウトを30秒に設定
             conn.row_factory = sqlite3.Row  # 辞書形式でアクセス可能にする
+            # WALモードを有効にして同時アクセスを改善
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA cache_size=10000")
+            conn.execute("PRAGMA temp_store=MEMORY")
             yield conn
         except Exception as e:
             if conn:
@@ -31,7 +36,10 @@ def get_db_connection():
             raise
         finally:
             if conn:
-                conn.close()
+                try:
+                    conn.close()
+                except:
+                    pass
     else:
         # PostgreSQL接続
         DB_HOST = current_app.config.get('DB_HOST')
