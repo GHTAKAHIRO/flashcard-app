@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}教材管理 - 暗記アプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold">
+        <i class="fas fa-graduation-cap me-2"></i>教材管理
+    </h2>
+    <p class="text-muted">統一された教材・単元・問題を管理できます</p>
+</div>
+
+<!-- 新規教材作成ボタン -->
+<div class="mb-4">
+    <a href="{{ url_for('admin.create_textbook') }}" class="btn btn-success">
+        <i class="fas fa-plus me-1"></i>新規教材作成
+    </a>
+</div>
+
+<!-- 教材一覧 -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>教材一覧
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if textbooks %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>教材名</th>
+                        <th>科目</th>
+                        <th>学年</th>
+                        <th>学習形式</th>
+                        <th>単元数</th>
+                        <th>問題数</th>
+                        <th>状態</th>
+                        <th>作成日</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for textbook in textbooks %}
+                    <tr>
+                        <td>
+                            <strong>{{ textbook.name }}</strong>
+                            {% if textbook.publisher %}
+                                <br><small class="text-muted">{{ textbook.publisher }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ textbook.subject }}</span>
+                        </td>
+                        <td>{{ textbook.grade or '-' }}</td>
+                        <td>
+                            {% if textbook.study_type == 'input' %}
+                                <span class="badge bg-info">入力問題</span>
+                            {% elif textbook.study_type == 'choice' %}
+                                <span class="badge bg-warning">選択問題</span>
+                            {% else %}
+                                <span class="badge bg-success">両方</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ textbook.unit_count }}</td>
+                        <td>{{ textbook.question_count }}</td>
+                        <td>
+                            {% if textbook.is_active %}
+                                <span class="badge bg-success">有効</span>
+                            {% else %}
+                                <span class="badge bg-secondary">無効</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ textbook.created_at.strftime('%Y/%m/%d') if textbook.created_at else '-' }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('admin.view_textbook', textbook_id=textbook.id) }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> 詳細
+                                </a>
+                                <a href="{{ url_for('admin.create_unit', textbook_id=textbook.id) }}" 
+                                   class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-plus"></i> 単元追加
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-book fa-3x text-muted mb-3"></i>
+            <p class="text-muted">まだ教材がありません</p>
+            <a href="{{ url_for('admin.create_textbook') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>最初の教材を作成
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 統計情報 -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-book fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">{{ textbooks|length }}</h5>
+                <p class="card-text">登録教材数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-list fa-2x text-success mb-2"></i>
+                <h5 class="card-title">{{ textbooks|sum(attribute='unit_count') }}</h5>
+                <p class="card-text">総単元数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-question-circle fa-2x text-info mb-2"></i>
+                <h5 class="card-title">{{ textbooks|sum(attribute='question_count') }}</h5>
+                <p class="card-text">総問題数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-users fa-2x text-warning mb-2"></i>
+                <h5 class="card-title">0</h5>
+                <p class="card-text">学習中生徒数</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}教材作成 - 暗記アプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold">
+        <i class="fas fa-plus me-2"></i>教材作成
+    </h2>
+    <p class="text-muted">新しい教材を作成して学習コンテンツを管理できます</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cog me-2"></i>教材情報
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="textbookForm">
+                    <!-- 教材名 -->
+                    <div class="mb-3">
+                        <label for="name" class="form-label">教材名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                        <div class="form-text">例: 数学Ⅰ、英語基礎、物理入門</div>
+                    </div>
+
+                    <!-- 科目 -->
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">科目 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="subject" name="subject" required>
+                            <option value="">科目を選択してください</option>
+                            <option value="math">数学</option>
+                            <option value="english">英語</option>
+                            <option value="japanese">国語</option>
+                            <option value="science">理科</option>
+                            <option value="social">社会</option>
+                            <option value="other">その他</option>
+                        </select>
+                    </div>
+
+                    <!-- 学年 -->
+                    <div class="mb-3">
+                        <label for="grade" class="form-label">学年</label>
+                        <select class="form-select" id="grade" name="grade">
+                            <option value="">学年を選択してください</option>
+                            <option value="elementary1">小学1年生</option>
+                            <option value="elementary2">小学2年生</option>
+                            <option value="elementary3">小学3年生</option>
+                            <option value="elementary4">小学4年生</option>
+                            <option value="elementary5">小学5年生</option>
+                            <option value="elementary6">小学6年生</option>
+                            <option value="junior1">中学1年生</option>
+                            <option value="junior2">中学2年生</option>
+                            <option value="junior3">中学3年生</option>
+                            <option value="senior1">高校1年生</option>
+                            <option value="senior2">高校2年生</option>
+                            <option value="senior3">高校3年生</option>
+                            <option value="university">大学生</option>
+                            <option value="adult">一般</option>
+                        </select>
+                    </div>
+
+                    <!-- 出版社 -->
+                    <div class="mb-3">
+                        <label for="publisher" class="form-label">出版社</label>
+                        <input type="text" class="form-control" id="publisher" name="publisher">
+                        <div class="form-text">例: 東京書籍、数研出版、三省堂</div>
+                    </div>
+
+                    <!-- 学習形式 -->
+                    <div class="mb-3">
+                        <label for="study_type" class="form-label">学習形式</label>
+                        <select class="form-select" id="study_type" name="study_type">
+                            <option value="both">入力問題・選択問題両方</option>
+                            <option value="input">入力問題のみ</option>
+                            <option value="choice">選択問題のみ</option>
+                        </select>
+                        <div class="form-text">生徒が学習時に選択できる形式を指定します</div>
+                    </div>
+
+                    <!-- 説明 -->
+                    <div class="mb-3">
+                        <label for="description" class="form-label">説明</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                        <div class="form-text">教材の内容や特徴を説明してください</div>
+                    </div>
+
+                    <!-- 送信ボタン -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.manage_textbooks') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>戻る
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i>教材を作成
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>作成の流れ
+                </h5>
+            </div>
+            <div class="card-body">
+                <ol class="list-unstyled">
+                    <li class="mb-3">
+                        <div class="d-flex">
+                            <span class="badge bg-primary me-2">1</span>
+                            <div>
+                                <strong>教材作成</strong><br>
+                                <small class="text-muted">基本情報を入力して教材を作成</small>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="mb-3">
+                        <div class="d-flex">
+                            <span class="badge bg-success me-2">2</span>
+                            <div>
+                                <strong>単元追加</strong><br>
+                                <small class="text-muted">教材に単元を追加</small>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="mb-3">
+                        <div class="d-flex">
+                            <span class="badge bg-info me-2">3</span>
+                            <div>
+                                <strong>問題作成</strong><br>
+                                <small class="text-muted">各単元に問題を追加</small>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="mb-3">
+                        <div class="d-flex">
+                            <span class="badge bg-warning me-2">4</span>
+                            <div>
+                                <strong>生徒に割り当て</strong><br>
+                                <small class="text-muted">作成した教材を生徒に割り当て</small>
+                            </div>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 科目に応じて学年の選択肢を調整
+document.getElementById('subject').addEventListener('change', function() {
+    const subject = this.value;
+    const gradeSelect = document.getElementById('grade');
+    
+    // 科目に応じて適切な学年を選択
+    if (subject === 'math' || subject === 'english' || subject === 'japanese') {
+        // 全学年対応
+        gradeSelect.value = '';
+    } else if (subject === 'science') {
+        // 理科は中学以上
+        gradeSelect.value = '';
+    } else if (subject === 'social') {
+        // 社会は小学3年生以上
+        gradeSelect.value = '';
+    }
+});
+</script>
+{% endblock %} 

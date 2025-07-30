@@ -189,7 +189,7 @@ def init_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             textbook_id INTEGER NOT NULL,
-            assignment_type TEXT NOT NULL,  -- 'input' or 'choice'
+            study_type TEXT DEFAULT 'both',  -- 'input', 'choice', 'both'
             units TEXT,  -- JSON形式で選択された単元ID
             chunks TEXT,  -- JSON形式で選択されたチャンク情報
             is_active BOOLEAN DEFAULT TRUE,
@@ -197,6 +197,7 @@ def init_database():
             assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             expires_at TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (textbook_id) REFERENCES textbooks (id),
             FOREIGN KEY (assigned_by) REFERENCES users (id)
         )""",
         
@@ -210,6 +211,87 @@ def init_database():
             difficulty_level TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (assignment_id) REFERENCES textbook_assignments (id)
+        )""",
+        
+        # 統一された教材テーブル
+        """CREATE TABLE IF NOT EXISTS textbooks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            grade TEXT,
+            publisher TEXT,
+            description TEXT,
+            study_type TEXT DEFAULT 'both',  -- 'input', 'choice', 'both'
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        
+        # 統一された単元テーブル
+        """CREATE TABLE IF NOT EXISTS units (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            textbook_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            chapter_number INTEGER,
+            description TEXT,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (textbook_id) REFERENCES textbooks (id)
+        )""",
+        
+        # 統一された問題テーブル
+        """CREATE TABLE IF NOT EXISTS questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            unit_id INTEGER NOT NULL,
+            question_text TEXT NOT NULL,
+            correct_answer TEXT NOT NULL,
+            choices TEXT,  -- JSON形式で選択肢を保存
+            acceptable_answers TEXT,  -- JSON形式で複数正解を保存
+            answer_suffix TEXT,
+            explanation TEXT,
+            difficulty_level TEXT,
+            image_name TEXT,
+            image_url TEXT,
+            image_title TEXT,
+            question_number INTEGER,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (unit_id) REFERENCES units (id)
+        )""",
+        
+        # 学習セッションテーブル
+        """CREATE TABLE IF NOT EXISTS study_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            textbook_id INTEGER NOT NULL,
+            unit_id INTEGER,
+            study_type TEXT NOT NULL,  -- 'input' or 'choice'
+            progress REAL DEFAULT 0.0,  -- 0.0 to 1.0
+            completed BOOLEAN DEFAULT FALSE,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (textbook_id) REFERENCES textbooks (id),
+            FOREIGN KEY (unit_id) REFERENCES units (id)
+        )""",
+        
+        # 統一された学習ログテーブル
+        """CREATE TABLE IF NOT EXISTS study_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            question_id INTEGER NOT NULL,
+            user_answer TEXT,
+            correct_answer TEXT,
+            is_correct BOOLEAN NOT NULL,
+            study_type TEXT NOT NULL,  -- 'input' or 'choice'
+            response_time INTEGER,  -- ミリ秒
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES study_sessions (id),
+            FOREIGN KEY (question_id) REFERENCES questions (id)
         )"""
     ]
     

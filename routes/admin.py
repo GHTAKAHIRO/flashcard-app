@@ -2171,3 +2171,256 @@ def get_textbook_units(textbook_id, assignment_type):
     except Exception as e:
         current_app.logger.error(f"単元取得エラー: {e}")
         return jsonify({'error': '単元の取得に失敗しました'}), 500
+
+# 統一された教材管理機能
+@admin_bp.route('/admin/textbooks')
+@login_required
+@admin_required
+def manage_textbooks():
+    """統一された教材管理画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材一覧を取得
+                cur.execute('''
+                    SELECT t.*, 
+                           COUNT(DISTINCT u.id) as unit_count,
+                           COUNT(DISTINCT q.id) as question_count
+                    FROM textbooks t
+                    LEFT JOIN units u ON t.id = u.textbook_id AND u.is_active = TRUE
+                    LEFT JOIN questions q ON u.id = q.unit_id AND q.is_active = TRUE
+                    GROUP BY t.id
+                    ORDER BY t.created_at DESC
+                ''')
+                textbooks = cur.fetchall()
+                
+                return render_template('admin_textbooks.html', textbooks=textbooks)
+                
+    except Exception as e:
+        current_app.logger.error(f"教材管理画面エラー: {e}")
+        flash('教材管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.admin'))
+
+@admin_bp.route('/admin/textbooks/create')
+@login_required
+@admin_required
+def create_textbook():
+    """教材作成画面"""
+    return render_template('create_textbook.html')
+
+@admin_bp.route('/admin/textbooks/create', methods=['POST'])
+@login_required
+@admin_required
+def create_textbook_post():
+    """教材作成処理"""
+    try:
+        name = request.form.get('name')
+        subject = request.form.get('subject')
+        grade = request.form.get('grade', '')
+        publisher = request.form.get('publisher', '')
+        description = request.form.get('description', '')
+        study_type = request.form.get('study_type', 'both')
+        
+        if not all([name, subject]):
+            flash('教材名と科目は必須です', 'error')
+            return redirect(url_for('admin.create_textbook'))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    INSERT INTO textbooks (name, subject, grade, publisher, description, study_type)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (name, subject, grade, publisher, description, study_type))
+                conn.commit()
+                flash('教材が作成されました', 'success')
+                
+    except Exception as e:
+        current_app.logger.error(f"教材作成エラー: {e}")
+        flash('教材の作成に失敗しました', 'error')
+    
+    return redirect(url_for('admin.manage_textbooks'))
+
+@admin_bp.route('/admin/textbooks/<int:textbook_id>')
+@login_required
+@admin_required
+def view_textbook(textbook_id):
+    """教材詳細画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 教材情報を取得
+                cur.execute('SELECT * FROM textbooks WHERE id = ?', (textbook_id,))
+                textbook = cur.fetchone()
+                
+                if not textbook:
+                    flash('教材が見つかりません', 'error')
+                    return redirect(url_for('admin.manage_textbooks'))
+                
+                # 単元一覧を取得
+                cur.execute('''
+                    SELECT u.*, COUNT(q.id) as question_count
+                    FROM units u
+                    LEFT JOIN questions q ON u.id = q.unit_id AND q.is_active = TRUE
+                    WHERE u.textbook_id = ? AND u.is_active = TRUE
+                    GROUP BY u.id
+                    ORDER BY u.chapter_number, u.name
+                ''', (textbook_id,))
+                units = cur.fetchall()
+                
+                return render_template('view_textbook.html', textbook=textbook, units=units)
+                
+    except Exception as e:
+        current_app.logger.error(f"教材詳細画面エラー: {e}")
+        flash('教材詳細画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.manage_textbooks'))
+
+@admin_bp.route('/admin/textbooks/<int:textbook_id>/units/create')
+@login_required
+@admin_required
+def create_unit(textbook_id):
+    """単元作成画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('SELECT * FROM textbooks WHERE id = ?', (textbook_id,))
+                textbook = cur.fetchone()
+                
+                if not textbook:
+                    flash('教材が見つかりません', 'error')
+                    return redirect(url_for('admin.manage_textbooks'))
+                
+                return render_template('create_unit.html', textbook=textbook)
+                
+    except Exception as e:
+        current_app.logger.error(f"単元作成画面エラー: {e}")
+        flash('単元作成画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.view_textbook', textbook_id=textbook_id))
+
+@admin_bp.route('/admin/textbooks/<int:textbook_id>/units/create', methods=['POST'])
+@login_required
+@admin_required
+def create_unit_post(textbook_id):
+    """単元作成処理"""
+    try:
+        name = request.form.get('name')
+        chapter_number = request.form.get('chapter_number', '')
+        description = request.form.get('description', '')
+        
+        if not name:
+            flash('単元名は必須です', 'error')
+            return redirect(url_for('admin.create_unit', textbook_id=textbook_id))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    INSERT INTO units (textbook_id, name, chapter_number, description)
+                    VALUES (?, ?, ?, ?)
+                ''', (textbook_id, name, chapter_number, description))
+                conn.commit()
+                flash('単元が作成されました', 'success')
+                
+    except Exception as e:
+        current_app.logger.error(f"単元作成エラー: {e}")
+        flash('単元の作成に失敗しました', 'error')
+    
+    return redirect(url_for('admin.view_textbook', textbook_id=textbook_id))
+
+@admin_bp.route('/admin/units/<int:unit_id>/questions')
+@login_required
+@admin_required
+def manage_questions(unit_id):
+    """問題管理画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 単元情報を取得
+                cur.execute('''
+                    SELECT u.*, t.name as textbook_name, t.subject
+                    FROM units u
+                    JOIN textbooks t ON u.textbook_id = t.id
+                    WHERE u.id = ?
+                ''', (unit_id,))
+                unit = cur.fetchone()
+                
+                if not unit:
+                    flash('単元が見つかりません', 'error')
+                    return redirect(url_for('admin.manage_textbooks'))
+                
+                # 問題一覧を取得
+                cur.execute('''
+                    SELECT * FROM questions 
+                    WHERE unit_id = ? AND is_active = TRUE
+                    ORDER BY question_number, id
+                ''', (unit_id,))
+                questions = cur.fetchall()
+                
+                return render_template('manage_questions.html', unit=unit, questions=questions)
+                
+    except Exception as e:
+        current_app.logger.error(f"問題管理画面エラー: {e}")
+        flash('問題管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.manage_textbooks'))
+
+@admin_bp.route('/admin/units/<int:unit_id>/questions/create')
+@login_required
+@admin_required
+def create_question(unit_id):
+    """問題作成画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    SELECT u.*, t.name as textbook_name, t.study_type
+                    FROM units u
+                    JOIN textbooks t ON u.textbook_id = t.id
+                    WHERE u.id = ?
+                ''', (unit_id,))
+                unit = cur.fetchone()
+                
+                if not unit:
+                    flash('単元が見つかりません', 'error')
+                    return redirect(url_for('admin.manage_textbooks'))
+                
+                return render_template('create_question.html', unit=unit)
+                
+    except Exception as e:
+        current_app.logger.error(f"問題作成画面エラー: {e}")
+        flash('問題作成画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.manage_questions', unit_id=unit_id))
+
+@admin_bp.route('/admin/units/<int:unit_id>/questions/create', methods=['POST'])
+@login_required
+@admin_required
+def create_question_post(unit_id):
+    """問題作成処理"""
+    try:
+        question_text = request.form.get('question_text')
+        correct_answer = request.form.get('correct_answer')
+        choices = request.form.get('choices', '')
+        acceptable_answers = request.form.get('acceptable_answers', '')
+        answer_suffix = request.form.get('answer_suffix', '')
+        explanation = request.form.get('explanation', '')
+        difficulty_level = request.form.get('difficulty_level', '')
+        question_number = request.form.get('question_number', '')
+        
+        if not all([question_text, correct_answer]):
+            flash('問題文と正解は必須です', 'error')
+            return redirect(url_for('admin.create_question', unit_id=unit_id))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    INSERT INTO questions (unit_id, question_text, correct_answer, choices, 
+                                         acceptable_answers, answer_suffix, explanation, 
+                                         difficulty_level, question_number)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (unit_id, question_text, correct_answer, choices, acceptable_answers,
+                     answer_suffix, explanation, difficulty_level, question_number))
+                conn.commit()
+                flash('問題が作成されました', 'success')
+                
+    except Exception as e:
+        current_app.logger.error(f"問題作成エラー: {e}")
+        flash('問題の作成に失敗しました', 'error')
+    
+    return redirect(url_for('admin.manage_questions', unit_id=unit_id))
