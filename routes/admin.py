@@ -5,8 +5,31 @@ from functools import wraps
 import csv
 import io
 import json
+from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
+
+def parse_datetime(datetime_str):
+    """文字列の日時をdatetimeオブジェクトに変換"""
+    if not datetime_str:
+        return None
+    try:
+        # SQLiteの日時形式を解析
+        if isinstance(datetime_str, str):
+            # 複数の形式に対応
+            formats = [
+                '%Y-%m-%d %H:%M:%S',
+                '%Y-%m-%d %H:%M:%S.%f',
+                '%Y-%m-%d'
+            ]
+            for fmt in formats:
+                try:
+                    return datetime.strptime(datetime_str, fmt)
+                except ValueError:
+                    continue
+        return datetime_str
+    except Exception:
+        return None
 
 def admin_required(f):
     """管理者権限が必要なデコレータ"""
@@ -1962,6 +1985,14 @@ def textbook_assignments():
                 ''')
                 assignments = cur.fetchall()
                 
+                # 日時データを適切に処理
+                processed_assignments = []
+                for assignment in assignments:
+                    assignment_dict = dict(assignment)
+                    assignment_dict['assigned_at'] = parse_datetime(assignment['assigned_at'])
+                    assignment_dict['expires_at'] = parse_datetime(assignment['expires_at'])
+                    processed_assignments.append(assignment_dict)
+                
                 # ユーザー一覧を取得
                 cur.execute('SELECT id, username, full_name, grade FROM users WHERE is_admin = FALSE ORDER BY username')
                 users = cur.fetchall()
@@ -1974,7 +2005,7 @@ def textbook_assignments():
                 choice_textbooks = cur.fetchall()
                 
                 return render_template('admin_textbook_assignments.html',
-                                     assignments=assignments,
+                                     assignments=processed_assignments,
                                      users=users,
                                      input_textbooks=input_textbooks,
                                      choice_textbooks=choice_textbooks)

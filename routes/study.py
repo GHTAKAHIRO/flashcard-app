@@ -10,6 +10,28 @@ from datetime import datetime
 
 study_bp = Blueprint('study', __name__)
 
+def parse_datetime(datetime_str):
+    """文字列の日時をdatetimeオブジェクトに変換"""
+    if not datetime_str:
+        return None
+    try:
+        # SQLiteの日時形式を解析
+        if isinstance(datetime_str, str):
+            # 複数の形式に対応
+            formats = [
+                '%Y-%m-%d %H:%M:%S',
+                '%Y-%m-%d %H:%M:%S.%f',
+                '%Y-%m-%d'
+            ]
+            for fmt in formats:
+                try:
+                    return datetime.strptime(datetime_str, fmt)
+                except ValueError:
+                    continue
+        return datetime_str
+    except Exception:
+        return None
+
 @study_bp.route('/dashboard')
 @login_required
 def dashboard():
@@ -40,7 +62,12 @@ def dashboard():
                 assignments = cur.fetchall()
                 
                 # 各割り当ての詳細情報を取得
+                processed_assignments = []
                 for assignment in assignments:
+                    assignment_dict = dict(assignment)
+                    assignment_dict['assigned_at'] = parse_datetime(assignment['assigned_at'])
+                    assignment_dict['expires_at'] = parse_datetime(assignment['expires_at'])
+                    
                     if assignment['units']:
                         try:
                             unit_ids = json.loads(assignment['units'])
@@ -58,13 +85,17 @@ def dashboard():
                                     WHERE id IN ({})
                                     ORDER BY unit_number, name
                                 '''.format(','.join(['?' for _ in unit_ids])), unit_ids)
-                            assignment['unit_details'] = cur.fetchall()
+                            assignment_dict['unit_details'] = cur.fetchall()
                         except json.JSONDecodeError:
-                            assignment['unit_details'] = []
+                            assignment_dict['unit_details'] = []
                     else:
-                        assignment['unit_details'] = []
+                        assignment_dict['unit_details'] = []
+                    
+                    processed_assignments.append(assignment_dict)
                 
-                return render_template('dashboard.html', assignments=assignments)
+                return render_template('dashboard.html', 
+                                     assignments=processed_assignments,
+                                     now=datetime.now())
                 
     except Exception as e:
         current_app.logger.error(f"ダッシュボードエラー: {e}")
