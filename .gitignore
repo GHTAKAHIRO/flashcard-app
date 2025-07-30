@@ -132,7 +132,7 @@ dmypy.json
 *.db
 *.sqlite
 *.sqlite3
-flashcards.db
+# flashcards.db  # 開発用データベースは管理する
 
 # Environment variables
 .env
