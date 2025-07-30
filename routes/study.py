@@ -6,14 +6,113 @@ from utils.study_utils import (
     get_study_cards_fast, get_chunk_practice_cards, create_fallback_stage_info
 )
 import json
+from datetime import datetime
 
 study_bp = Blueprint('study', __name__)
 
 @study_bp.route('/dashboard')
 @login_required
 def dashboard():
-    """ダッシュボード画面 - 管理画面にリダイレクト"""
-    return redirect(url_for('admin.admin'))
+    """生徒のダッシュボード - 割り当てられた教材を表示"""
+    try:
+        user_id = str(current_user.id)
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 割り当てられた教材を取得
+                cur.execute('''
+                    SELECT ta.id, ta.textbook_id, ta.assignment_type, ta.units, ta.chunks,
+                           ta.assigned_at, ta.expires_at,
+                           CASE 
+                               WHEN ta.assignment_type = 'input' THEN it.name
+                               WHEN ta.assignment_type = 'choice' THEN ct.source
+                           END as textbook_name,
+                           CASE 
+                               WHEN ta.assignment_type = 'input' THEN it.subject
+                               WHEN ta.assignment_type = 'choice' THEN '選択問題'
+                           END as subject
+                    FROM textbook_assignments ta
+                    LEFT JOIN input_textbooks it ON ta.textbook_id = it.id AND ta.assignment_type = 'input'
+                    LEFT JOIN choice_textbooks ct ON ta.textbook_id = ct.id AND ta.assignment_type = 'choice'
+                    WHERE ta.user_id = ? AND ta.is_active = TRUE
+                    ORDER BY ta.assigned_at DESC
+                ''', (user_id,))
+                assignments = cur.fetchall()
+                
+                # 各割り当ての詳細情報を取得
+                for assignment in assignments:
+                    if assignment['units']:
+                        try:
+                            unit_ids = json.loads(assignment['units'])
+                            if assignment['assignment_type'] == 'input':
+                                cur.execute('''
+                                    SELECT id, name, chapter_number, description 
+                                    FROM input_units 
+                                    WHERE id IN ({})
+                                    ORDER BY chapter_number, name
+                                '''.format(','.join(['?' for _ in unit_ids])), unit_ids)
+                            else:
+                                cur.execute('''
+                                    SELECT id, name, unit_number 
+                                    FROM choice_units 
+                                    WHERE id IN ({})
+                                    ORDER BY unit_number, name
+                                '''.format(','.join(['?' for _ in unit_ids])), unit_ids)
+                            assignment['unit_details'] = cur.fetchall()
+                        except json.JSONDecodeError:
+                            assignment['unit_details'] = []
+                    else:
+                        assignment['unit_details'] = []
+                
+                return render_template('dashboard.html', assignments=assignments)
+                
+    except Exception as e:
+        current_app.logger.error(f"ダッシュボードエラー: {e}")
+        flash('ダッシュボードの読み込みに失敗しました', 'error')
+        return redirect(url_for('home'))
+
+@study_bp.route('/start_assignment/<int:assignment_id>')
+@login_required
+def start_assignment(assignment_id):
+    """割り当てられた教材の学習開始"""
+    try:
+        user_id = str(current_user.id)
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 割り当て情報を取得
+                cur.execute('''
+                    SELECT ta.*, 
+                           CASE 
+                               WHEN ta.assignment_type = 'input' THEN it.name
+                               WHEN ta.assignment_type = 'choice' THEN ct.source
+                           END as textbook_name
+                    FROM textbook_assignments ta
+                    LEFT JOIN input_textbooks it ON ta.textbook_id = it.id AND ta.assignment_type = 'input'
+                    LEFT JOIN choice_textbooks ct ON ta.textbook_id = ct.id AND ta.assignment_type = 'choice'
+                    WHERE ta.id = ? AND ta.user_id = ? AND ta.is_active = TRUE
+                ''', (assignment_id, user_id))
+                assignment = cur.fetchone()
+                
+                if not assignment:
+                    flash('割り当てられた教材が見つかりません', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # 期限チェック
+                if assignment['expires_at'] and assignment['expires_at'] < datetime.now():
+                    flash('この教材の学習期限が過ぎています', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # 学習タイプに応じてリダイレクト
+                if assignment['assignment_type'] == 'input':
+                    return redirect(url_for('input_studies.quiz', textbook_id=assignment['textbook_id']))
+                else:
+                    return redirect(url_for('choice_studies.choice_studies_home', source=assignment['textbook_name']))
+                
+    except Exception as e:
+        current_app.logger.error(f"学習開始エラー: {e}")
+        flash('学習の開始に失敗しました', 'error')
+        return redirect(url_for('study.dashboard'))
 
 @study_bp.route('/set_page_range_and_prepare/<source>', methods=['POST'])
 @login_required

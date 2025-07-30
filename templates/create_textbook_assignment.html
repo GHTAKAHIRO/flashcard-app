@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}教材割り当て作成 - 暗記アプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold">
+        <i class="fas fa-plus me-2"></i>教材割り当て作成
+    </h2>
+    <p class="text-muted">生徒に教材を割り当てて学習を管理できます</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cog me-2"></i>割り当て設定
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="assignmentForm">
+                    <!-- 生徒選択 -->
+                    <div class="mb-3">
+                        <label for="user_id" class="form-label">生徒を選択</label>
+                        <select class="form-select" id="user_id" name="user_id" required>
+                            <option value="">生徒を選択してください</option>
+                            {% for user in users %}
+                            <option value="{{ user.id }}">
+                                {{ user.full_name or user.username }} ({{ user.username }})
+                                {% if user.grade %}- {{ user.grade }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- 教材タイプ選択 -->
+                    <div class="mb-3">
+                        <label for="assignment_type" class="form-label">教材タイプ</label>
+                        <select class="form-select" id="assignment_type" name="assignment_type" required>
+                            <option value="">教材タイプを選択してください</option>
+                            <option value="input">入力問題</option>
+                            <option value="choice">選択問題</option>
+                        </select>
+                    </div>
+
+                    <!-- 教材選択 -->
+                    <div class="mb-3">
+                        <label for="textbook_id" class="form-label">教材を選択</label>
+                        <select class="form-select" id="textbook_id" name="textbook_id" required>
+                            <option value="">教材タイプを先に選択してください</option>
+                        </select>
+                    </div>
+
+                    <!-- 単元選択 -->
+                    <div class="mb-3" id="units_section" style="display: none;">
+                        <label class="form-label">学習する単元を選択</label>
+                        <div id="units_container">
+                            <!-- 単元チェックボックスがここに動的に追加されます -->
+                        </div>
+                    </div>
+
+                    <!-- チャンク設定 -->
+                    <div class="mb-3" id="chunks_section" style="display: none;">
+                        <label for="chunks" class="form-label">チャンク設定</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="use_chunks" name="use_chunks">
+                            <label class="form-check-label" for="use_chunks">
+                                チャンク分割を使用する
+                            </label>
+                        </div>
+                        <div id="chunk_settings" style="display: none;">
+                            <div class="row mt-2">
+                                <div class="col-md-6">
+                                    <label for="chunk_size" class="form-label">1チャンクあたりの問題数</label>
+                                    <input type="number" class="form-control" id="chunk_size" name="chunk_size" min="1" max="50" value="10">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 期限設定 -->
+                    <div class="mb-3">
+                        <label for="expires_at" class="form-label">学習期限（オプション）</label>
+                        <input type="date" class="form-control" id="expires_at" name="expires_at">
+                        <div class="form-text">期限を設定しない場合は空欄にしてください</div>
+                    </div>
+
+                    <!-- 送信ボタン -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.textbook_assignments') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>戻る
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i>割り当てを作成
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>設定の説明
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>教材タイプ</h6>
+                <ul class="list-unstyled">
+                    <li><strong>入力問題:</strong> テキスト入力で答える形式</li>
+                    <li><strong>選択問題:</strong> 選択肢から選ぶ形式</li>
+                </ul>
+                
+                <h6>単元選択</h6>
+                <p class="small">学習させたい単元をチェックしてください。複数選択可能です。</p>
+                
+                <h6>チャンク分割</h6>
+                <p class="small">問題を小さなグループに分けて学習を進めます。学習効率を向上させます。</p>
+                
+                <h6>学習期限</h6>
+                <p class="small">期限を設定すると、その日以降は学習できなくなります。</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 教材タイプが変更されたときの処理
+document.getElementById('assignment_type').addEventListener('change', function() {
+    const assignmentType = this.value;
+    const textbookSelect = document.getElementById('textbook_id');
+    const unitsSection = document.getElementById('units_section');
+    const chunksSection = document.getElementById('chunks_section');
+    
+    // 教材選択肢をクリア
+    textbookSelect.innerHTML = '<option value="">教材を選択してください</option>';
+    unitsSection.style.display = 'none';
+    chunksSection.style.display = 'none';
+    
+    if (assignmentType === 'input') {
+        // 入力問題の教材を追加
+        {% for textbook in input_textbooks %}
+        const option = document.createElement('option');
+        option.value = '{{ textbook.id }}';
+        option.textContent = '{{ textbook.name }} ({{ textbook.subject }})';
+        textbookSelect.appendChild(option);
+        {% endfor %}
+    } else if (assignmentType === 'choice') {
+        // 選択問題の教材を追加
+        {% for textbook in choice_textbooks %}
+        const option = document.createElement('option');
+        option.value = '{{ textbook.id }}';
+        option.textContent = '{{ textbook.source }} - {{ textbook.chapter_name }}';
+        textbookSelect.appendChild(option);
+        {% endfor %}
+    }
+});
+
+// 教材が選択されたときの処理
+document.getElementById('textbook_id').addEventListener('change', function() {
+    const textbookId = this.value;
+    const assignmentType = document.getElementById('assignment_type').value;
+    const unitsSection = document.getElementById('units_section');
+    const chunksSection = document.getElementById('chunks_section');
+    
+    if (textbookId && assignmentType) {
+        // 単元一覧を取得
+        fetch(`/admin/textbook_assignments/get_units/${textbookId}/${assignmentType}`)
+            .then(response => response.json())
+            .then(units => {
+                const container = document.getElementById('units_container');
+                container.innerHTML = '';
+                
+                if (units.length > 0) {
+                    units.forEach(unit => {
+                        const div = document.createElement('div');
+                        div.className = 'form-check';
+                        div.innerHTML = `
+                            <input class="form-check-input" type="checkbox" name="units" value="${unit.id}" id="unit_${unit.id}">
+                            <label class="form-check-label" for="unit_${unit.id}">
+                                ${unit.name || unit.chapter_name}
+                                ${unit.chapter_number ? ` (第${unit.chapter_number}章)` : ''}
+                                ${unit.unit_number ? ` (第${unit.unit_number}単元)` : ''}
+                            </label>
+                        `;
+                        container.appendChild(div);
+                    });
+                    unitsSection.style.display = 'block';
+                    chunksSection.style.display = 'block';
+                } else {
+                    unitsSection.style.display = 'none';
+                    chunksSection.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('単元の取得に失敗しました');
+            });
+    }
+});
+
+// チャンク使用チェックボックスの処理
+document.getElementById('use_chunks').addEventListener('change', function() {
+    const chunkSettings = document.getElementById('chunk_settings');
+    chunkSettings.style.display = this.checked ? 'block' : 'none';
+});
+
+// フォーム送信時の処理
+document.getElementById('assignmentForm').addEventListener('submit', function(e) {
+    const selectedUnits = document.querySelectorAll('input[name="units"]:checked');
+    if (selectedUnits.length === 0) {
+        e.preventDefault();
+        alert('少なくとも1つの単元を選択してください');
+        return false;
+    }
+});
+</script>
+{% endblock %} 

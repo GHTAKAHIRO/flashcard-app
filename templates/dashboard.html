@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}マイダッシュボード - 暗記アプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold">
+        <i class="fas fa-tachometer-alt me-2"></i>マイダッシュボード
+    </h2>
+    <p class="text-muted">割り当てられた教材で学習を進めましょう</p>
+</div>
+
+{% if assignments %}
+<!-- 割り当てられた教材一覧 -->
+<div class="row g-4">
+    {% for assignment in assignments %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        {% if assignment.assignment_type == 'input' %}
+                            <i class="fas fa-edit text-primary me-2"></i>
+                        {% else %}
+                            <i class="fas fa-list text-info me-2"></i>
+                        {% endif %}
+                        {{ assignment.textbook_name }}
+                    </h5>
+                    <span class="badge {% if assignment.assignment_type == 'input' %}bg-primary{% else %}bg-info{% endif %}">
+                        {% if assignment.assignment_type == 'input' %}入力問題{% else %}選択問題{% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="card-text">
+                    <strong>科目:</strong> {{ assignment.subject }}<br>
+                    <strong>割り当て日:</strong> {{ assignment.assigned_at.strftime('%Y/%m/%d') if assignment.assigned_at else '不明' }}
+                </p>
+                
+                {% if assignment.expires_at %}
+                <div class="alert alert-warning py-2 mb-3">
+                    <small>
+                        <i class="fas fa-clock me-1"></i>
+                        学習期限: {{ assignment.expires_at.strftime('%Y/%m/%d') }}
+                        {% if assignment.expires_at < now %}
+                            <span class="badge bg-danger ms-2">期限切れ</span>
+                        {% endif %}
+                    </small>
+                </div>
+                {% endif %}
+                
+                {% if assignment.unit_details %}
+                <div class="mb-3">
+                    <strong>学習単元:</strong>
+                    <ul class="list-unstyled mt-2">
+                        {% for unit in assignment.unit_details %}
+                        <li class="mb-1">
+                            <i class="fas fa-check-circle text-success me-1"></i>
+                            {{ unit.name or unit.chapter_name }}
+                            {% if unit.chapter_number %}(第{{ unit.chapter_number }}章){% endif %}
+                            {% if unit.unit_number %}(第{{ unit.unit_number }}単元){% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if assignment.chunks %}
+                <div class="mb-3">
+                    <strong>チャンク設定:</strong>
+                    <p class="text-muted small mb-0">{{ assignment.chunks }}</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                {% if assignment.expires_at and assignment.expires_at < now %}
+                    <button class="btn btn-secondary w-100" disabled>
+                        <i class="fas fa-lock me-1"></i>学習期限切れ
+                    </button>
+                {% else %}
+                    <a href="{{ url_for('study.start_assignment', assignment_id=assignment.id) }}" 
+                       class="btn btn-success w-100">
+                        <i class="fas fa-play me-1"></i>学習開始
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 学習進捗サマリー -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>学習進捗サマリー
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h3 class="text-primary">{{ assignments|length }}</h3>
+                            <p class="text-muted mb-0">割り当て教材数</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h3 class="text-success">0</h3>
+                            <p class="text-muted mb-0">完了教材数</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h3 class="text-info">0</h3>
+                            <p class="text-muted mb-0">学習中教材数</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <h3 class="text-warning">0</h3>
+                        <p class="text-muted mb-0">未開始教材数</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- 教材が割り当てられていない場合 -->
+<div class="text-center py-5">
+    <i class="fas fa-book fa-4x text-muted mb-4"></i>
+    <h4 class="text-muted mb-3">まだ教材が割り当てられていません</h4>
+    <p class="text-muted mb-4">
+        管理者が教材を割り当てるまでお待ちください。<br>
+        割り当てられると、ここに教材が表示されます。
+    </p>
+    <div class="d-flex justify-content-center gap-3">
+        <a href="{{ url_for('home') }}" class="btn btn-primary">
+            <i class="fas fa-home me-1"></i>ホームに戻る
+        </a>
+        <button class="btn btn-outline-secondary" onclick="location.reload()">
+            <i class="fas fa-sync-alt me-1"></i>更新
+        </button>
+    </div>
+</div>
+{% endif %}
+
+<!-- 学習のヒント -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>学習のヒント
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-clock fa-2x text-primary mb-2"></i>
+                            <h6>定期的に学習</h6>
+                            <p class="small text-muted">毎日少しずつでも継続することが大切です</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-redo fa-2x text-success mb-2"></i>
+                            <h6>復習を大切に</h6>
+                            <p class="small text-muted">間隔を空けて復習することで記憶が定着します</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-target fa-2x text-info mb-2"></i>
+                            <h6>目標を設定</h6>
+                            <p class="small text-muted">小さな目標を立てて達成感を味わいましょう</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

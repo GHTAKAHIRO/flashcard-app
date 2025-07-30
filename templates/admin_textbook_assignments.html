@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}教材割り当て管理 - 暗記アプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold">
+        <i class="fas fa-book me-2"></i>教材割り当て管理
+    </h2>
+    <p class="text-muted">生徒に教材を割り当てて学習を管理できます</p>
+</div>
+
+<!-- 新規割り当てボタン -->
+<div class="mb-4">
+    <a href="{{ url_for('admin.create_textbook_assignment') }}" class="btn btn-success">
+        <i class="fas fa-plus me-1"></i>新規教材割り当て
+    </a>
+</div>
+
+<!-- 割り当て一覧 -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>教材割り当て一覧
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if assignments %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>生徒名</th>
+                        <th>教材名</th>
+                        <th>タイプ</th>
+                        <th>状態</th>
+                        <th>割り当て日</th>
+                        <th>期限</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for assignment in assignments %}
+                    <tr>
+                        <td>
+                            <strong>{{ assignment.full_name or assignment.username }}</strong>
+                            <br><small class="text-muted">{{ assignment.username }}</small>
+                        </td>
+                        <td>{{ assignment.textbook_name }}</td>
+                        <td>
+                            {% if assignment.assignment_type == 'input' %}
+                                <span class="badge bg-primary">入力問題</span>
+                            {% else %}
+                                <span class="badge bg-info">選択問題</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if assignment.is_active %}
+                                <span class="badge bg-success">有効</span>
+                            {% else %}
+                                <span class="badge bg-secondary">無効</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ assignment.assigned_at.strftime('%Y/%m/%d %H:%M') if assignment.assigned_at else '-' }}</td>
+                        <td>
+                            {% if assignment.expires_at %}
+                                {{ assignment.expires_at.strftime('%Y/%m/%d') }}
+                            {% else %}
+                                <span class="text-muted">期限なし</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('admin.toggle_textbook_assignment', assignment_id=assignment.id) }}" 
+                                   class="btn btn-sm btn-outline-primary"
+                                   onclick="return confirm('割り当ての状態を変更しますか？')">
+                                    {% if assignment.is_active %}
+                                        <i class="fas fa-pause"></i> 無効化
+                                    {% else %}
+                                        <i class="fas fa-play"></i> 有効化
+                                    {% endif %}
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger" 
+                                        onclick="deleteAssignment({{ assignment.id }})">
+                                    <i class="fas fa-trash"></i> 削除
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-book fa-3x text-muted mb-3"></i>
+            <p class="text-muted">まだ教材割り当てがありません</p>
+            <a href="{{ url_for('admin.create_textbook_assignment') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>最初の割り当てを作成
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function deleteAssignment(assignmentId) {
+    if (confirm('この教材割り当てを削除しますか？\nこの操作は取り消せません。')) {
+        fetch(`/admin/textbook_assignments/${assignmentId}/delete`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('削除に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('削除に失敗しました');
+        });
+    }
+}
+</script>
+{% endblock %} 

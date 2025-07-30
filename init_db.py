@@ -182,6 +182,34 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (question_id) REFERENCES choice_questions (id)
+        )""",
+        
+        # 教材割り当てテーブル
+        """CREATE TABLE IF NOT EXISTS textbook_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            textbook_id INTEGER NOT NULL,
+            assignment_type TEXT NOT NULL,  -- 'input' or 'choice'
+            units TEXT,  -- JSON形式で選択された単元ID
+            chunks TEXT,  -- JSON形式で選択されたチャンク情報
+            is_active BOOLEAN DEFAULT TRUE,
+            assigned_by INTEGER NOT NULL,  -- 割り当てた管理者のID
+            assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (assigned_by) REFERENCES users (id)
+        )""",
+        
+        # 教材割り当て詳細テーブル
+        """CREATE TABLE IF NOT EXISTS assignment_details (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            assignment_id INTEGER NOT NULL,
+            unit_id INTEGER,
+            chunk_start INTEGER,
+            chunk_end INTEGER,
+            difficulty_level TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (assignment_id) REFERENCES textbook_assignments (id)
         )"""
     ]
     

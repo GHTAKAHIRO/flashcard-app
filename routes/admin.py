@@ -4,6 +4,7 @@ from utils.db import get_db_connection, get_db_cursor, get_placeholder
 from functools import wraps
 import csv
 import io
+import json
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -1934,3 +1935,208 @@ def input_studies_update_image_path(textbook_id, unit_id):
     except Exception as e:
         current_app.logger.error(f"画像パス一括更新エラー: {e}")
         return jsonify({'error': '画像パスの一括更新に失敗しました'}), 500 
+
+# 教材割り当て機能
+@admin_bp.route('/admin/textbook_assignments')
+@login_required
+@admin_required
+def textbook_assignments():
+    """教材割り当て管理画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 割り当て一覧を取得
+                cur.execute('''
+                    SELECT ta.id, ta.user_id, ta.textbook_id, ta.assignment_type, 
+                           ta.is_active, ta.assigned_at, ta.expires_at,
+                           u.username, u.full_name,
+                           CASE 
+                               WHEN ta.assignment_type = 'input' THEN it.name
+                               WHEN ta.assignment_type = 'choice' THEN ct.source
+                           END as textbook_name
+                    FROM textbook_assignments ta
+                    JOIN users u ON ta.user_id = u.id
+                    LEFT JOIN input_textbooks it ON ta.textbook_id = it.id AND ta.assignment_type = 'input'
+                    LEFT JOIN choice_textbooks ct ON ta.textbook_id = ct.id AND ta.assignment_type = 'choice'
+                    ORDER BY ta.assigned_at DESC
+                ''')
+                assignments = cur.fetchall()
+                
+                # ユーザー一覧を取得
+                cur.execute('SELECT id, username, full_name, grade FROM users WHERE is_admin = FALSE ORDER BY username')
+                users = cur.fetchall()
+                
+                # 教材一覧を取得
+                cur.execute('SELECT id, name, subject FROM input_textbooks ORDER BY name')
+                input_textbooks = cur.fetchall()
+                
+                cur.execute('SELECT id, source, chapter_name FROM choice_textbooks ORDER BY source')
+                choice_textbooks = cur.fetchall()
+                
+                return render_template('admin_textbook_assignments.html',
+                                     assignments=assignments,
+                                     users=users,
+                                     input_textbooks=input_textbooks,
+                                     choice_textbooks=choice_textbooks)
+                
+    except Exception as e:
+        current_app.logger.error(f"教材割り当て管理画面エラー: {e}")
+        flash('教材割り当て管理画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.admin'))
+
+@admin_bp.route('/admin/textbook_assignments/create')
+@login_required
+@admin_required
+def create_textbook_assignment():
+    """教材割り当て作成画面"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # ユーザー一覧を取得
+                cur.execute('SELECT id, username, full_name, grade FROM users WHERE is_admin = FALSE ORDER BY username')
+                users = cur.fetchall()
+                
+                # 教材一覧を取得
+                cur.execute('SELECT id, name, subject FROM input_textbooks ORDER BY name')
+                input_textbooks = cur.fetchall()
+                
+                cur.execute('SELECT id, source, chapter_name FROM choice_textbooks ORDER BY source')
+                choice_textbooks = cur.fetchall()
+                
+                return render_template('create_textbook_assignment.html',
+                                     users=users,
+                                     input_textbooks=input_textbooks,
+                                     choice_textbooks=choice_textbooks)
+                
+    except Exception as e:
+        current_app.logger.error(f"教材割り当て作成画面エラー: {e}")
+        flash('教材割り当て作成画面の読み込みに失敗しました', 'error')
+        return redirect(url_for('admin.textbook_assignments'))
+
+@admin_bp.route('/admin/textbook_assignments/create', methods=['POST'])
+@login_required
+@admin_required
+def create_textbook_assignment_post():
+    """教材割り当て作成処理"""
+    try:
+        user_id = request.form.get('user_id')
+        textbook_id = request.form.get('textbook_id')
+        assignment_type = request.form.get('assignment_type')
+        units = request.form.getlist('units')
+        chunks = request.form.get('chunks')
+        expires_at = request.form.get('expires_at')
+        
+        if not all([user_id, textbook_id, assignment_type]):
+            flash('必要な情報が不足しています', 'error')
+            return redirect(url_for('admin.create_textbook_assignment'))
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 既存の割り当てを無効化
+                cur.execute('''
+                    UPDATE textbook_assignments 
+                    SET is_active = FALSE 
+                    WHERE user_id = ? AND textbook_id = ? AND assignment_type = ?
+                ''', (user_id, textbook_id, assignment_type))
+                
+                # 新しい割り当てを作成
+                cur.execute('''
+                    INSERT INTO textbook_assignments 
+                    (user_id, textbook_id, assignment_type, units, chunks, assigned_by, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (user_id, textbook_id, assignment_type, 
+                     json.dumps(units) if units else None,
+                     chunks, current_user.id, expires_at))
+                
+                assignment_id = cur.lastrowid
+                
+                # 詳細情報を保存
+                if units:
+                    for unit_id in units:
+                        cur.execute('''
+                            INSERT INTO assignment_details 
+                            (assignment_id, unit_id)
+                            VALUES (?, ?)
+                        ''', (assignment_id, unit_id))
+                
+                conn.commit()
+                flash('教材割り当てが完了しました', 'success')
+                
+    except Exception as e:
+        current_app.logger.error(f"教材割り当て作成エラー: {e}")
+        flash('教材割り当ての作成に失敗しました', 'error')
+    
+    return redirect(url_for('admin.textbook_assignments'))
+
+@admin_bp.route('/admin/textbook_assignments/<int:assignment_id>/toggle')
+@login_required
+@admin_required
+def toggle_textbook_assignment(assignment_id):
+    """教材割り当ての有効/無効切り替え"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    UPDATE textbook_assignments 
+                    SET is_active = NOT is_active 
+                    WHERE id = ?
+                ''', (assignment_id,))
+                conn.commit()
+                flash('教材割り当ての状態を更新しました', 'success')
+                
+    except Exception as e:
+        current_app.logger.error(f"教材割り当て状態更新エラー: {e}")
+        flash('教材割り当ての状態更新に失敗しました', 'error')
+    
+    return redirect(url_for('admin.textbook_assignments'))
+
+@admin_bp.route('/admin/textbook_assignments/<int:assignment_id>/delete', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_textbook_assignment(assignment_id):
+    """教材割り当ての削除"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 詳細情報を削除
+                cur.execute('DELETE FROM assignment_details WHERE assignment_id = ?', (assignment_id,))
+                # 割り当てを削除
+                cur.execute('DELETE FROM textbook_assignments WHERE id = ?', (assignment_id,))
+                conn.commit()
+                flash('教材割り当てを削除しました', 'success')
+                
+    except Exception as e:
+        current_app.logger.error(f"教材割り当て削除エラー: {e}")
+        flash('教材割り当ての削除に失敗しました', 'error')
+    
+    return jsonify({'success': True})
+
+@admin_bp.route('/admin/textbook_assignments/get_units/<int:textbook_id>/<assignment_type>')
+@login_required
+@admin_required
+def get_textbook_units(textbook_id, assignment_type):
+    """教材の単元一覧を取得（AJAX用）"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                if assignment_type == 'input':
+                    cur.execute('''
+                        SELECT id, name, chapter_number, description 
+                        FROM input_units 
+                        WHERE textbook_id = ? 
+                        ORDER BY chapter_number, name
+                    ''', (textbook_id,))
+                else:  # choice
+                    cur.execute('''
+                        SELECT id, name, unit_number 
+                        FROM choice_units 
+                        WHERE textbook_id = ? 
+                        ORDER BY unit_number, name
+                    ''', (textbook_id,))
+                
+                units = cur.fetchall()
+                return jsonify([dict(unit) for unit in units])
+                
+    except Exception as e:
+        current_app.logger.error(f"単元取得エラー: {e}")
+        return jsonify({'error': '単元の取得に失敗しました'}), 500
