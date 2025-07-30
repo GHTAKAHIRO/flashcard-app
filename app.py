@@ -116,6 +116,14 @@ def to_kanji_circle(value):
 app.jinja_env.filters['to_kanji_circle'] = to_kanji_circle
 # --- カスタムフィルタここまで ---
 
+# Jinja2フィルターを追加
+@app.template_filter('int_to_letter')
+def int_to_letter(value):
+    """数字を文字（A, B, C, D...）に変換"""
+    if isinstance(value, int) and 1 <= value <= 26:
+        return chr(64 + value)  # A=65, B=66, ...
+    return str(value)
+
 # 🚀 非同期ログ処理システム
 log_queue = queue.Queue(maxsize=1000)
 log_worker_active = True

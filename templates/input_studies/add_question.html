@@ -51,6 +51,22 @@
                         <input type="hidden" name="unit_id" value="">
                     {% endif %}
                     
+                    <!-- 問題タイプ選択 -->
+                    <div class="mb-3">
+                        <label for="question_type" class="form-label">
+                            <i class="fas fa-cog me-1"></i>問題タイプ <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="question_type" name="question_type" required onchange="toggleQuestionType()">
+                            <option value="">問題タイプを選択してください</option>
+                            <option value="input">入力問題</option>
+                            <option value="choice">選択問題</option>
+                        </select>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            入力問題: キーボードで答えを入力 / 選択問題: 選択肢から答えを選ぶ
+                        </div>
+                    </div>
+                    
                     <div class="mb-3">
                         <label for="question_number" class="form-label">
                             <i class="fas fa-hashtag me-1"></i>問題番号
@@ -69,10 +85,90 @@
                                   placeholder="例: 日本の首都はどこですか？" required></textarea>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="correct_answer" class="form-label">正解 <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="correct_answer" name="correct_answer" 
-                               placeholder="例: 東京" required>
+                    <!-- 入力問題用フィールド -->
+                    <div id="input_fields" style="display: none;">
+                        <div class="mb-3">
+                            <label for="correct_answer" class="form-label">正解 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="correct_answer" name="correct_answer" 
+                                   placeholder="例: 東京">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="acceptable_answers" class="form-label">許容回答</label>
+                            <input type="text" class="form-control" id="acceptable_answers" name="acceptable_answers" 
+                                   placeholder="例: 東京都, Tokyo（カンマ区切りで複数入力可能）">
+                            <div class="form-text">正解以外でも正解として扱いたい回答があれば入力してください</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="answer_suffix" class="form-label">解答欄の後補足</label>
+                            <input type="text" class="form-control" id="answer_suffix" name="answer_suffix" 
+                                   placeholder="例: 大陸（「オーストラリア大陸」の場合）、年（「1868年」の場合）"
+                                   oninput="updatePreview()">
+                            <div class="form-text">解答欄に予め表示したい補足情報があれば入力してください</div>
+                            <div id="preview-section" class="mt-2" style="display: none;">
+                                <div class="alert alert-info">
+                                    <small>
+                                        <strong>プレビュー:</strong> 問題文の下に「答えの後に「<span id="preview-suffix"></span>」が付きます」と表示されます
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 選択問題用フィールド -->
+                    <div id="choice_fields" style="display: none;">
+                        <div class="mb-3">
+                            <label for="correct_answer_choice" class="form-label">正解 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="correct_answer_choice" name="correct_answer_choice" 
+                                   placeholder="例: 東京">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">選択肢 <span class="text-danger">*</span></label>
+                            <div id="choices_container">
+                                <div class="choice-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">A</span>
+                                        <input type="text" class="form-control" name="choice_a" placeholder="選択肢A" required>
+                                        <button type="button" class="btn btn-outline-danger" onclick="removeChoice(this)" style="display: none;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="choice-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">B</span>
+                                        <input type="text" class="form-control" name="choice_b" placeholder="選択肢B" required>
+                                        <button type="button" class="btn btn-outline-danger" onclick="removeChoice(this)" style="display: none;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="choice-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">C</span>
+                                        <input type="text" class="form-control" name="choice_c" placeholder="選択肢C" required>
+                                        <button type="button" class="btn btn-outline-danger" onclick="removeChoice(this)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="choice-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">D</span>
+                                        <input type="text" class="form-control" name="choice_d" placeholder="選択肢D" required>
+                                        <button type="button" class="btn btn-outline-danger" onclick="removeChoice(this)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addChoice()">
+                                <i class="fas fa-plus me-1"></i>選択肢を追加
+                            </button>
+                            <div class="form-text">最低2つ、最大6つの選択肢を設定してください</div>
+                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -83,28 +179,6 @@
                             <option value="intermediate">中級</option>
                             <option value="advanced">上級</option>
                         </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="acceptable_answers" class="form-label">許容回答</label>
-                        <input type="text" class="form-control" id="acceptable_answers" name="acceptable_answers" 
-                               placeholder="例: 東京都, Tokyo（カンマ区切りで複数入力可能）">
-                        <div class="form-text">正解以外でも正解として扱いたい回答があれば入力してください</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="answer_suffix" class="form-label">解答欄の後補足</label>
-                        <input type="text" class="form-control" id="answer_suffix" name="answer_suffix" 
-                               placeholder="例: 大陸（「オーストラリア大陸」の場合）、年（「1868年」の場合）"
-                               oninput="updatePreview()">
-                        <div class="form-text">解答欄に予め表示したい補足情報があれば入力してください</div>
-                        <div id="preview-section" class="mt-2" style="display: none;">
-                            <div class="alert alert-info">
-                                <small>
-                                    <strong>プレビュー:</strong> 問題文の下に「答えの後に「<span id="preview-suffix"></span>」が付きます」と表示されます
-                                </small>
-                            </div>
-                        </div>
                     </div>
                     
                     <div class="mb-3">
@@ -140,12 +214,125 @@
                 </form>
             </div>
         </div>
-        
-
     </div>
 </div>
 
 <script>
+// 問題タイプの切り替え
+function toggleQuestionType() {
+    const questionType = document.getElementById('question_type').value;
+    const inputFields = document.getElementById('input_fields');
+    const choiceFields = document.getElementById('choice_fields');
+    
+    if (questionType === 'input') {
+        inputFields.style.display = 'block';
+        choiceFields.style.display = 'none';
+        // 入力問題用のフィールドを必須にする
+        document.getElementById('correct_answer').required = true;
+        document.getElementById('correct_answer_choice').required = false;
+    } else if (questionType === 'choice') {
+        inputFields.style.display = 'none';
+        choiceFields.style.display = 'block';
+        // 選択問題用のフィールドを必須にする
+        document.getElementById('correct_answer').required = false;
+        document.getElementById('correct_answer_choice').required = true;
+    } else {
+        inputFields.style.display = 'none';
+        choiceFields.style.display = 'none';
+        document.getElementById('correct_answer').required = false;
+        document.getElementById('correct_answer_choice').required = false;
+    }
+}
+
+// 選択肢の追加
+function addChoice() {
+    const container = document.getElementById('choices_container');
+    const choiceItems = container.querySelectorAll('.choice-item');
+    
+    if (choiceItems.length >= 6) {
+        alert('選択肢は最大6つまでです');
+        return;
+    }
+    
+    const choiceLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const newIndex = choiceItems.length;
+    const newChoice = document.createElement('div');
+    newChoice.className = 'choice-item mb-2';
+    newChoice.innerHTML = `
+        <div class="input-group">
+            <span class="input-group-text">${choiceLetters[newIndex]}</span>
+            <input type="text" class="form-control" name="choice_${choiceLetters[newIndex].toLowerCase()}" placeholder="選択肢${choiceLetters[newIndex]}" required>
+            <button type="button" class="btn btn-outline-danger" onclick="removeChoice(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    container.appendChild(newChoice);
+    updateChoiceButtons();
+}
+
+// 選択肢の削除
+function removeChoice(button) {
+    const choiceItem = button.closest('.choice-item');
+    const container = document.getElementById('choices_container');
+    const choiceItems = container.querySelectorAll('.choice-item');
+    
+    if (choiceItems.length <= 2) {
+        alert('選択肢は最低2つ必要です');
+        return;
+    }
+    
+    choiceItem.remove();
+    updateChoiceButtons();
+    reorderChoices();
+}
+
+// 選択肢ボタンの表示/非表示を更新
+function updateChoiceButtons() {
+    const container = document.getElementById('choices_container');
+    const choiceItems = container.querySelectorAll('.choice-item');
+    const removeButtons = container.querySelectorAll('.btn-outline-danger');
+    
+    choiceItems.forEach((item, index) => {
+        const removeButton = item.querySelector('.btn-outline-danger');
+        if (choiceItems.length <= 2) {
+            removeButton.style.display = 'none';
+        } else {
+            removeButton.style.display = 'inline-block';
+        }
+    });
+}
+
+// 選択肢の順序を再整理
+function reorderChoices() {
+    const container = document.getElementById('choices_container');
+    const choiceItems = container.querySelectorAll('.choice-item');
+    const choiceLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    
+    choiceItems.forEach((item, index) => {
+        const letterSpan = item.querySelector('.input-group-text');
+        const input = item.querySelector('input');
+        letterSpan.textContent = choiceLetters[index];
+        input.name = `choice_${choiceLetters[index].toLowerCase()}`;
+        input.placeholder = `選択肢${choiceLetters[index]}`;
+    });
+}
+
+// プレビュー更新
+function updatePreview() {
+    const suffix = document.getElementById('answer_suffix').value;
+    const previewSection = document.getElementById('preview-section');
+    const previewSuffix = document.getElementById('preview-suffix');
+    
+    if (suffix) {
+        previewSuffix.textContent = suffix;
+        previewSection.style.display = 'block';
+    } else {
+        previewSection.style.display = 'none';
+    }
+}
+
 // ページ読み込み時の処理
 document.addEventListener('DOMContentLoaded', function() {
     {% if textbook_info and unit_info %}

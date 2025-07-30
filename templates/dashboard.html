@@ -19,15 +19,11 @@
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        {% if assignment.assignment_type == 'input' %}
-                            <i class="fas fa-edit text-primary me-2"></i>
-                        {% else %}
-                            <i class="fas fa-list text-info me-2"></i>
-                        {% endif %}
+                        <i class="fas fa-book text-primary me-2"></i>
                         {{ assignment.textbook_name }}
                     </h5>
-                    <span class="badge {% if assignment.assignment_type == 'input' %}bg-primary{% else %}bg-info{% endif %}">
-                        {% if assignment.assignment_type == 'input' %}入力問題{% else %}選択問題{% endif %}
+                    <span class="badge bg-secondary">
+                        教材
                     </span>
                 </div>
             </div>
@@ -78,10 +74,12 @@
                         <i class="fas fa-lock me-1"></i>学習期限切れ
                     </button>
                 {% else %}
-                    <a href="{{ url_for('study.start_assignment', assignment_id=assignment.id) }}" 
-                       class="btn btn-success w-100">
-                        <i class="fas fa-play me-1"></i>学習開始
-                    </a>
+                                            <div class="d-grid gap-2">
+                            <a href="{{ url_for('study.start_assignment', assignment_id=assignment.id) }}" 
+                               class="btn btn-success">
+                                <i class="fas fa-play me-1"></i>学習開始
+                            </a>
+                        </div>
                 {% endif %}
             </div>
         </div>
@@ -185,4 +183,6 @@
         </div>
     </div>
 </div>
+
+
 {% endblock %} 

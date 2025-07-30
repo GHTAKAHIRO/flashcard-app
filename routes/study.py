@@ -113,11 +113,74 @@ def start_assignment(assignment_id):
             with get_db_cursor(conn) as cur:
                 # 割り当て情報を取得
                 cur.execute('''
+                    SELECT ta.*, t.name as textbook_name, t.subject
+                    FROM textbook_assignments ta
+                    JOIN textbooks t ON ta.textbook_id = t.id
+                    WHERE ta.id = ? AND ta.user_id = ? AND ta.is_active = TRUE
+                ''', (assignment_id, user_id))
+                assignment = cur.fetchone()
+                
+                if not assignment:
+                    flash('割り当てられた教材が見つかりません', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # 期限チェック
+                if assignment['expires_at'] and assignment['expires_at'] < datetime.now():
+                    flash('この教材の学習期限が過ぎています', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # 教材の問題を取得して、問題タイプを判定
+                cur.execute('''
+                    SELECT q.choices, COUNT(*) as total_questions
+                    FROM questions q
+                    JOIN units u ON q.unit_id = u.id
+                    WHERE u.textbook_id = ? AND q.is_active = TRUE
+                    GROUP BY q.choices IS NOT NULL
+                ''', (assignment['textbook_id'],))
+                question_types = cur.fetchall()
+                
+                if not question_types:
+                    flash('この教材には問題がありません', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # 問題タイプを判定（選択問題が1つでもあれば選択問題として扱う）
+                has_choice_questions = any(qt['choices'] is not None for qt in question_types)
+                
+                # 学習セッションを作成
+                session_id = create_or_get_study_session(user_id, assignment['textbook_id'], 
+                                                       'choice' if has_choice_questions else 'input')
+                
+                # 問題タイプに応じてリダイレクト
+                if has_choice_questions:
+                    return redirect(url_for('study.start_choice_study', session_id=session_id))
+                else:
+                    return redirect(url_for('study.start_input_study', session_id=session_id))
+                
+    except Exception as e:
+        current_app.logger.error(f"学習開始エラー: {e}")
+        flash('学習の開始に失敗しました', 'error')
+        return redirect(url_for('study.dashboard'))
+
+@study_bp.route('/start_assignment_with_type/<int:assignment_id>/<study_type>')
+@login_required
+def start_assignment_with_type(assignment_id, study_type):
+    """指定された学習形式で割り当てられた教材の学習開始"""
+    try:
+        user_id = str(current_user.id)
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 割り当て情報を取得
+                cur.execute('''
                     SELECT ta.*, 
                            CASE 
                                WHEN ta.assignment_type = 'input' THEN it.name
                                WHEN ta.assignment_type = 'choice' THEN ct.source
-                           END as textbook_name
+                           END as textbook_name,
+                           CASE 
+                               WHEN ta.assignment_type = 'input' THEN it.subject
+                               WHEN ta.assignment_type = 'choice' THEN '選択問題'
+                           END as subject
                     FROM textbook_assignments ta
                     LEFT JOIN input_textbooks it ON ta.textbook_id = it.id AND ta.assignment_type = 'input'
                     LEFT JOIN choice_textbooks ct ON ta.textbook_id = ct.id AND ta.assignment_type = 'choice'
@@ -134,15 +197,404 @@ def start_assignment(assignment_id):
                     flash('この教材の学習期限が過ぎています', 'error')
                     return redirect(url_for('study.dashboard'))
                 
+                # 学習セッションを作成または取得
+                session_id = create_or_get_study_session(user_id, assignment['textbook_id'], study_type)
+                
                 # 学習タイプに応じてリダイレクト
-                if assignment['assignment_type'] == 'input':
-                    return redirect(url_for('input_studies.quiz', textbook_id=assignment['textbook_id']))
+                if study_type == 'input':
+                    return redirect(url_for('study.start_input_study', session_id=session_id))
+                elif study_type == 'choice':
+                    return redirect(url_for('study.start_choice_study', session_id=session_id))
                 else:
-                    return redirect(url_for('choice_studies.choice_studies_home', source=assignment['textbook_name']))
+                    flash('無効な学習形式です', 'error')
+                    return redirect(url_for('study.dashboard'))
                 
     except Exception as e:
         current_app.logger.error(f"学習開始エラー: {e}")
-        flash('学習の開始に失敗しました', 'error')
+        flash('学習開始中にエラーが発生しました', 'error')
+        return redirect(url_for('study.dashboard'))
+
+def create_or_get_study_session(user_id, textbook_id, study_type):
+    """学習セッションを作成または取得"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 既存のアクティブなセッションをチェック
+                cur.execute('''
+                    SELECT id FROM study_sessions 
+                    WHERE user_id = ? AND textbook_id = ? AND study_type = ? AND completed = FALSE
+                ''', (user_id, textbook_id, study_type))
+                existing_session = cur.fetchone()
+                
+                if existing_session:
+                    return existing_session['id']
+                
+                # 新しいセッションを作成
+                cur.execute('''
+                    INSERT INTO study_sessions (user_id, textbook_id, study_type, progress, completed)
+                    VALUES (?, ?, ?, 0.0, FALSE)
+                ''', (user_id, textbook_id, study_type))
+                
+                conn.commit()
+                return cur.lastrowid
+                
+    except Exception as e:
+        current_app.logger.error(f"セッション作成エラー: {e}")
+        return None
+
+@study_bp.route('/start_input_study/<int:session_id>')
+@login_required
+def start_input_study(session_id):
+    """入力問題学習開始"""
+    try:
+        user_id = str(current_user.id)
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # セッション情報を取得
+                cur.execute('''
+                    SELECT ss.*, t.name as textbook_name, t.subject
+                    FROM study_sessions ss
+                    JOIN textbooks t ON ss.textbook_id = t.id
+                    WHERE ss.id = ? AND ss.user_id = ? AND ss.study_type = 'input'
+                ''', (session_id, user_id))
+                session_info = cur.fetchone()
+                
+                if not session_info:
+                    flash('学習セッションが見つかりません', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # 問題を取得
+                cur.execute('''
+                    SELECT q.*, u.name as unit_name
+                    FROM questions q
+                    JOIN units u ON q.unit_id = u.id
+                    WHERE u.textbook_id = ? AND q.is_active = TRUE
+                    ORDER BY u.chapter_number, q.question_number
+                ''', (session_info['textbook_id'],))
+                questions = cur.fetchall()
+                
+                if not questions:
+                    flash('問題が見つかりません', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # セッション情報をセッションに保存
+                session['input_study_session'] = {
+                    'session_id': session_id,
+                    'textbook_name': session_info['textbook_name'],
+                    'subject': session_info['subject'],
+                    'questions': [
+                        {
+                            'id': q['id'],
+                            'question': q['question_text'],
+                            'correct_answer': q['correct_answer'],
+                            'acceptable_answers': q['acceptable_answers'],
+                            'answer_suffix': q['answer_suffix'],
+                            'explanation': q['explanation'],
+                            'image_url': q['image_url'],
+                            'unit_name': q['unit_name']
+                        }
+                        for q in questions
+                    ],
+                    'current_index': 0,
+                    'total_questions': len(questions),
+                    'correct_count': 0,
+                    'start_time': datetime.now().isoformat()
+                }
+                
+                return redirect(url_for('study.input_study_question'))
+                
+    except Exception as e:
+        current_app.logger.error(f"入力問題学習開始エラー: {e}")
+        flash('学習開始中にエラーが発生しました', 'error')
+        return redirect(url_for('study.dashboard'))
+
+@study_bp.route('/start_choice_study/<int:session_id>')
+@login_required
+def start_choice_study(session_id):
+    """選択問題学習開始"""
+    try:
+        user_id = str(current_user.id)
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # セッション情報を取得
+                cur.execute('''
+                    SELECT ss.*, t.name as textbook_name, t.subject
+                    FROM study_sessions ss
+                    JOIN textbooks t ON ss.textbook_id = t.id
+                    WHERE ss.id = ? AND ss.user_id = ? AND ss.study_type = 'choice'
+                ''', (session_id, user_id))
+                session_info = cur.fetchone()
+                
+                if not session_info:
+                    flash('学習セッションが見つかりません', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # 問題を取得
+                cur.execute('''
+                    SELECT q.*, u.name as unit_name
+                    FROM questions q
+                    JOIN units u ON q.unit_id = u.id
+                    WHERE u.textbook_id = ? AND q.is_active = TRUE AND q.choices IS NOT NULL
+                    ORDER BY u.chapter_number, q.question_number
+                ''', (session_info['textbook_id'],))
+                questions = cur.fetchall()
+                
+                if not questions:
+                    flash('選択問題が見つかりません', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # セッション情報をセッションに保存
+                session['choice_study_session'] = {
+                    'session_id': session_id,
+                    'textbook_name': session_info['textbook_name'],
+                    'subject': session_info['subject'],
+                    'questions': [
+                        {
+                            'id': q['id'],
+                            'question': q['question_text'],
+                            'correct_answer': q['correct_answer'],
+                            'choices': q['choices'],
+                            'explanation': q['explanation'],
+                            'unit_name': q['unit_name']
+                        }
+                        for q in questions
+                    ],
+                    'current_index': 0,
+                    'total_questions': len(questions),
+                    'correct_count': 0,
+                    'start_time': datetime.now().isoformat()
+                }
+                
+                return redirect(url_for('study.choice_study_question'))
+                
+    except Exception as e:
+        current_app.logger.error(f"選択問題学習開始エラー: {e}")
+        flash('学習開始中にエラーが発生しました', 'error')
+        return redirect(url_for('study.dashboard'))
+
+@study_bp.route('/input_study_question')
+@login_required
+def input_study_question():
+    """入力問題学習画面"""
+    try:
+        session_data = session.get('input_study_session')
+        if not session_data:
+            flash('学習セッションが見つかりません', 'error')
+            return redirect(url_for('study.dashboard'))
+        
+        current_index = session_data['current_index']
+        questions = session_data['questions']
+        
+        if current_index >= len(questions):
+            # 学習完了
+            return redirect(url_for('study.complete_study', session_id=session_data['session_id']))
+        
+        current_question = questions[current_index]
+        
+        return render_template('study/input_question.html',
+                             question=current_question,
+                             current_index=current_index + 1,
+                             total_questions=len(questions),
+                             textbook_name=session_data['textbook_name'],
+                             subject=session_data['subject'])
+        
+    except Exception as e:
+        current_app.logger.error(f"入力問題学習画面エラー: {e}")
+        flash('エラーが発生しました', 'error')
+        return redirect(url_for('study.dashboard'))
+
+@study_bp.route('/choice_study_question')
+@login_required
+def choice_study_question():
+    """選択問題学習画面"""
+    try:
+        session_data = session.get('choice_study_session')
+        if not session_data:
+            flash('学習セッションが見つかりません', 'error')
+            return redirect(url_for('study.dashboard'))
+        
+        current_index = session_data['current_index']
+        questions = session_data['questions']
+        
+        if current_index >= len(questions):
+            # 学習完了
+            return redirect(url_for('study.complete_study', session_id=session_data['session_id']))
+        
+        current_question = questions[current_index]
+        
+        # 選択肢をJSONからパース
+        import json
+        choices = json.loads(current_question['choices']) if current_question['choices'] else []
+        
+        return render_template('study/choice_question.html',
+                             question=current_question,
+                             choices=choices,
+                             current_index=current_index + 1,
+                             total_questions=len(questions),
+                             textbook_name=session_data['textbook_name'],
+                             subject=session_data['subject'])
+        
+    except Exception as e:
+        current_app.logger.error(f"選択問題学習画面エラー: {e}")
+        flash('エラーが発生しました', 'error')
+        return redirect(url_for('study.dashboard'))
+
+@study_bp.route('/submit_answer', methods=['POST'])
+@login_required
+def submit_answer():
+    """回答を提出して次の問題に進む"""
+    try:
+        data = request.get_json()
+        answer = data.get('answer', '').strip()
+        question_id = data.get('question_id')
+        study_type = data.get('study_type')
+        
+        if study_type == 'input':
+            session_data = session.get('input_study_session')
+            if not session_data:
+                return jsonify({'error': 'セッションが見つかりません'}), 400
+            
+            current_question = session_data['questions'][session_data['current_index']]
+            
+            # 正解判定
+            is_correct = check_input_answer(answer, current_question['correct_answer'], current_question['acceptable_answers'])
+            
+            # 学習ログを記録
+            log_study_result(session_data['session_id'], question_id, answer, 
+                           current_question['correct_answer'], is_correct, 'input')
+            
+            # セッションを更新
+            if is_correct:
+                session_data['correct_count'] += 1
+            session_data['current_index'] += 1
+            session['input_study_session'] = session_data
+            
+            return jsonify({
+                'is_correct': is_correct,
+                'correct_answer': current_question['correct_answer'],
+                'explanation': current_question['explanation'],
+                'is_complete': session_data['current_index'] >= len(session_data['questions'])
+            })
+            
+        elif study_type == 'choice':
+            session_data = session.get('choice_study_session')
+            if not session_data:
+                return jsonify({'error': 'セッションが見つかりません'}), 400
+            
+            current_question = session_data['questions'][session_data['current_index']]
+            
+            # 正解判定
+            is_correct = answer == current_question['correct_answer']
+            
+            # 学習ログを記録
+            log_study_result(session_data['session_id'], question_id, answer, 
+                           current_question['correct_answer'], is_correct, 'choice')
+            
+            # セッションを更新
+            if is_correct:
+                session_data['correct_count'] += 1
+            session_data['current_index'] += 1
+            session['choice_study_session'] = session_data
+            
+            return jsonify({
+                'is_correct': is_correct,
+                'correct_answer': current_question['correct_answer'],
+                'explanation': current_question['explanation'],
+                'is_complete': session_data['current_index'] >= len(session_data['questions'])
+            })
+        
+        else:
+            return jsonify({'error': '無効な学習形式です'}), 400
+            
+    except Exception as e:
+        current_app.logger.error(f"回答提出エラー: {e}")
+        return jsonify({'error': 'エラーが発生しました'}), 500
+
+def check_input_answer(user_answer, correct_answer, acceptable_answers):
+    """入力問題の正解判定"""
+    if user_answer.lower() == correct_answer.lower():
+        return True
+    
+    if acceptable_answers:
+        import json
+        try:
+            acceptable_list = json.loads(acceptable_answers)
+            for acceptable in acceptable_list:
+                if user_answer.lower() == acceptable.lower():
+                    return True
+        except:
+            pass
+    
+    return False
+
+def log_study_result(session_id, question_id, user_answer, correct_answer, is_correct, study_type):
+    """学習結果をログに記録"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                cur.execute('''
+                    INSERT INTO study_logs (session_id, question_id, user_answer, correct_answer, is_correct, study_type)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (session_id, question_id, user_answer, correct_answer, is_correct, study_type))
+                conn.commit()
+    except Exception as e:
+        current_app.logger.error(f"学習ログ記録エラー: {e}")
+
+@study_bp.route('/complete_study/<int:session_id>')
+@login_required
+def complete_study(session_id):
+    """学習完了画面"""
+    try:
+        user_id = str(current_user.id)
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # セッション情報を取得
+                cur.execute('''
+                    SELECT ss.*, t.name as textbook_name, t.subject
+                    FROM study_sessions ss
+                    JOIN textbooks t ON ss.textbook_id = t.id
+                    WHERE ss.id = ? AND ss.user_id = ?
+                ''', (session_id, user_id))
+                session_info = cur.fetchone()
+                
+                if not session_info:
+                    flash('学習セッションが見つかりません', 'error')
+                    return redirect(url_for('study.dashboard'))
+                
+                # 学習結果を取得
+                cur.execute('''
+                    SELECT COUNT(*) as total_questions,
+                           COUNT(CASE WHEN is_correct THEN 1 END) as correct_answers
+                    FROM study_logs
+                    WHERE session_id = ?
+                ''', (session_id,))
+                result = cur.fetchone()
+                
+                # セッションを完了に更新
+                cur.execute('''
+                    UPDATE study_sessions 
+                    SET completed = TRUE, completed_at = CURRENT_TIMESTAMP, progress = 1.0
+                    WHERE id = ?
+                ''', (session_id,))
+                conn.commit()
+                
+                # セッション情報をクリア
+                session.pop('input_study_session', None)
+                session.pop('choice_study_session', None)
+                
+                return render_template('study/complete.html',
+                                     textbook_name=session_info['textbook_name'],
+                                     subject=session_info['subject'],
+                                     study_type=session_info['study_type'],
+                                     total_questions=result['total_questions'],
+                                     correct_answers=result['correct_answers'])
+                
+    except Exception as e:
+        current_app.logger.error(f"学習完了画面エラー: {e}")
+        flash('エラーが発生しました', 'error')
         return redirect(url_for('study.dashboard'))
 
 @study_bp.route('/set_page_range_and_prepare/<source>', methods=['POST'])

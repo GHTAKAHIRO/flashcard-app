@@ -328,9 +328,9 @@ def init_database():
         
         admin_password_hash = generate_password_hash('admin123')
         cursor.execute('''
-            INSERT OR IGNORE INTO users (student_number, username, email, password_hash, is_admin, is_active)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', ('admin', 'admin', 'admin@example.com', admin_password_hash, True, True))
+            INSERT OR IGNORE INTO users (username, email, password_hash, is_admin, is_active)
+            VALUES (?, ?, ?, ?, ?)
+        ''', ('admin', 'admin@example.com', admin_password_hash, True, True))
         
         conn.commit()
         print("✅ デフォルト管理者ユーザー作成完了")

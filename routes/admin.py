@@ -462,7 +462,7 @@ def input_studies_admin_questions():
                 # 問題一覧を取得
                 placeholder = get_placeholder()
                 cur.execute(f'''
-                    SELECT q.id, q.question, q.correct_answer, q.explanation, 
+                    SELECT q.id, q.question, q.correct_answer, q.choices, q.explanation, 
                            q.subject, q.difficulty_level, q.created_at,
                            t.name as textbook_name, u.name as unit_name
                     FROM input_questions q
@@ -474,16 +474,21 @@ def input_studies_admin_questions():
                 
                 questions = []
                 for q_data in questions_data:
+                    # 問題タイプを判定
+                    question_type = '選択問題' if q_data[3] else '入力問題'
+                    
                     questions.append({
                         'id': q_data[0],
                         'question_text': q_data[1],  # questionカラムをquestion_textとして扱う
                         'answer_text': q_data[2],    # correct_answerカラムをanswer_textとして扱う
-                        'explanation': q_data[3],
-                        'subject': q_data[4],
-                        'difficulty': q_data[5],     # difficulty_levelカラムをdifficultyとして扱う
-                        'created_at': q_data[6],
-                        'textbook_name': q_data[7] or '未設定',
-                        'unit_name': q_data[8] or '未設定'
+                        'choices': q_data[3],        # choicesカラム
+                        'question_type': question_type,
+                        'explanation': q_data[4],
+                        'subject': q_data[5],
+                        'difficulty': q_data[6],     # difficulty_levelカラムをdifficultyとして扱う
+                        'created_at': q_data[7],
+                        'textbook_name': q_data[8] or '未設定',
+                        'unit_name': q_data[9] or '未設定'
                     })
                 
                 return render_template('input_studies/admin_questions.html', questions=questions)
@@ -556,27 +561,71 @@ def input_studies_add_question():
 def input_studies_add_question_post():
     """社会科問題追加処理"""
     try:
-        question_text = request.form.get('question_text', '').strip()
-        answer_text = request.form.get('answer_text', '').strip()
+        # フォームデータを取得
+        question_type = request.form.get('question_type', '').strip()
+        question_text = request.form.get('question', '').strip()
         explanation = request.form.get('explanation', '').strip()
         subject = request.form.get('subject', '').strip()
-        difficulty = request.form.get('difficulty', 'normal')
+        difficulty_level = request.form.get('difficulty_level', '').strip()
         textbook_id = request.form.get('textbook_id', type=int)
         unit_id = request.form.get('unit_id', type=int)
         question_number = request.form.get('question_number', type=int)
         image_path = request.form.get('image_path', '').strip()
         
         # バリデーション
+        if not question_type:
+            flash('問題タイプは必須です', 'error')
+            return redirect(url_for('admin.input_studies_add_question'))
+        
         if not question_text:
             flash('問題文は必須です', 'error')
             return redirect(url_for('admin.input_studies_add_question'))
         
-        if not answer_text:
-            flash('正解は必須です', 'error')
-            return redirect(url_for('admin.input_studies_add_question'))
-        
         if not subject:
             flash('科目は必須です', 'error')
+            return redirect(url_for('admin.input_studies_add_question'))
+        
+        # 問題タイプに応じたデータを取得
+        if question_type == 'input':
+            correct_answer = request.form.get('correct_answer', '').strip()
+            acceptable_answers = request.form.get('acceptable_answers', '').strip()
+            answer_suffix = request.form.get('answer_suffix', '').strip()
+            choices = None
+            
+            if not correct_answer:
+                flash('正解は必須です', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+                
+        elif question_type == 'choice':
+            correct_answer = request.form.get('correct_answer_choice', '').strip()
+            acceptable_answers = None
+            answer_suffix = None
+            
+            # 選択肢を取得
+            choices = []
+            choice_letters = ['a', 'b', 'c', 'd', 'e', 'f']
+            for letter in choice_letters:
+                choice = request.form.get(f'choice_{letter}', '').strip()
+                if choice:
+                    choices.append(choice)
+            
+            if not correct_answer:
+                flash('正解は必須です', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+            
+            if len(choices) < 2:
+                flash('選択肢は最低2つ必要です', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+            
+            if correct_answer not in choices:
+                flash('正解は選択肢の中から選んでください', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+            
+            # 選択肢をJSON形式で保存
+            import json
+            choices = json.dumps(choices)
+        else:
+            flash('無効な問題タイプです', 'error')
             return redirect(url_for('admin.input_studies_add_question'))
         
         with get_db_connection() as conn:
@@ -613,9 +662,9 @@ def input_studies_add_question_post():
                 # 問題を追加
                 cur.execute(f'''
                     INSERT INTO input_questions 
-                    (question, correct_answer, explanation, subject, difficulty_level, textbook_id, unit_id, question_number, image_path, created_at)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                ''', (question_text, answer_text, explanation, subject, difficulty, textbook_id, unit_id, question_number, image_path))
+                    (question, correct_answer, acceptable_answers, answer_suffix, choices, explanation, subject, difficulty_level, textbook_id, unit_id, question_number, image_path, created_at)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                ''', (question_text, correct_answer, acceptable_answers, answer_suffix, choices, explanation, subject, difficulty_level, textbook_id, unit_id, question_number, image_path))
                 
                 conn.commit()
                 flash('問題を追加しました', 'success')

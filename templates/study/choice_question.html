@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}選択問題学習 - {{ textbook_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- ヘッダー -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-list text-info me-2"></i>{{ textbook_name }}
+                    </h2>
+                    <p class="text-muted mb-0">{{ subject }} - 選択問題学習</p>
+                </div>
+                <div class="text-end">
+                    <div class="progress-info">
+                        <span class="badge bg-info">{{ current_index }} / {{ total_questions }}</span>
+                    </div>
+                    <div class="progress mt-2" style="width: 100px;">
+                        <div class="progress-bar bg-info" role="progressbar" 
+                             style="width: {{ (current_index / total_questions) * 100 }}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 問題カード -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h4 class="fw-bold">{{ question.question }}</h4>
+                    </div>
+                    
+                    <!-- 選択肢 -->
+                    <div class="choices-section">
+                        <form id="choiceForm">
+                            <div class="row g-3">
+                                {% for choice in choices %}
+                                <div class="col-md-6">
+                                    <div class="choice-card" onclick="selectChoice('{{ choice }}')">
+                                        <input type="radio" name="choice" value="{{ choice }}" id="choice{{ loop.index }}" class="choice-radio">
+                                        <label for="choice{{ loop.index }}" class="choice-label">
+                                            <span class="choice-letter">{{ loop.index | int_to_letter }}</span>
+                                            <span class="choice-text">{{ choice }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="text-center mt-4">
+                                <button type="submit" class="btn btn-info btn-lg" id="submitButton" disabled>
+                                    <i class="fas fa-check me-2"></i>回答する
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 結果表示エリア -->
+            <div id="resultArea" style="display: none;">
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <div id="resultContent"></div>
+                        <div class="text-center mt-3">
+                            <button id="nextButton" class="btn btn-success btn-lg" style="display: none;">
+                                <i class="fas fa-arrow-right me-2"></i>次の問題
+                            </button>
+                            <a id="completeButton" href="#" class="btn btn-success btn-lg" style="display: none;">
+                                <i class="fas fa-trophy me-2"></i>学習完了
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ナビゲーション -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{{ url_for('study.dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>ダッシュボードに戻る
+                </a>
+                <div class="text-muted">
+                    <small>
+                        <i class="fas fa-info-circle me-1"></i>
+                        選択肢から答えを選んでください
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var selectedChoice = null;
+
+function selectChoice(choice) {
+    selectedChoice = choice;
+    
+    // すべての選択肢の選択状態をリセット
+    document.querySelectorAll('.choice-card').forEach(function(card) {
+        card.classList.remove('selected');
+    });
+    
+    // 選択された選択肢をハイライト
+    event.currentTarget.classList.add('selected');
+    
+    // ラジオボタンを選択
+    document.querySelector('input[value="' + choice + '"]').checked = true;
+    
+    // 回答ボタンを有効化
+    document.getElementById('submitButton').disabled = false;
+}
+
+document.getElementById('choiceForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (!selectedChoice) {
+        alert('選択肢を選んでください');
+        return;
+    }
+    
+    // 回答ボタンを無効化
+    var submitButton = document.getElementById('submitButton');
+    submitButton.disabled = true;
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>送信中...';
+    
+    // 回答を送信
+    fetch('/study/submit_answer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            answer: selectedChoice,
+            question_id: {{ question.id }},
+            study_type: 'choice'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        // 結果を表示
+        showResult(data);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('エラーが発生しました');
+    })
+    .finally(() => {
+        // ボタンを復元
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<i class="fas fa-check me-2"></i>回答する';
+    });
+});
+
+function showResult(data) {
+    var resultArea = document.getElementById('resultArea');
+    var resultContent = document.getElementById('resultContent');
+    var nextButton = document.getElementById('nextButton');
+    var completeButton = document.getElementById('completeButton');
+    
+    // 選択肢の表示状態を更新
+    document.querySelectorAll('.choice-card').forEach(function(card) {
+        card.style.pointerEvents = 'none';
+        var choiceValue = card.querySelector('input').value;
+        
+        if (choiceValue === data.correct_answer) {
+            card.classList.add('correct');
+        } else if (choiceValue === selectedChoice && !data.is_correct) {
+            card.classList.add('incorrect');
+        }
+    });
+    
+    // 結果内容を設定
+    var resultHtml = '';
+    if (data.is_correct) {
+        resultHtml = `
+            <div class="text-center">
+                <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                <h4 class="text-success">正解です！</h4>
+                <p class="text-muted">素晴らしいです！</p>
+            </div>
+        `;
+    } else {
+        resultHtml = `
+            <div class="text-center">
+                <i class="fas fa-times-circle text-danger fa-3x mb-3"></i>
+                <h4 class="text-danger">不正解です</h4>
+                <p class="text-muted">正解: <strong>${data.correct_answer}</strong></p>
+            </div>
+        `;
+    }
+    
+    if (data.explanation) {
+        resultHtml += `
+            <div class="mt-3">
+                <h6>解説:</h6>
+                <p class="text-muted">${data.explanation}</p>
+            </div>
+        `;
+    }
+    
+    resultContent.innerHTML = resultHtml;
+    
+    // ボタンを表示
+    if (data.is_complete) {
+        completeButton.style.display = 'inline-block';
+        completeButton.href = '/study/complete_study/{{ session.get("choice_study_session", {}).get("session_id", 0) }}';
+    } else {
+        nextButton.style.display = 'inline-block';
+    }
+    
+    resultArea.style.display = 'block';
+}
+
+document.getElementById('nextButton').addEventListener('click', function() {
+    window.location.reload();
+});
+</script>
+
+<style>
+.progress {
+    height: 8px;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+.choices-section {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.choice-card {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.choice-card:hover {
+    border-color: #0dcaf0;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.choice-card.selected {
+    border-color: #0dcaf0;
+    background-color: #f0f9ff;
+}
+
+.choice-card.correct {
+    border-color: #198754;
+    background-color: #f0fff4;
+}
+
+.choice-card.incorrect {
+    border-color: #dc3545;
+    background-color: #fff5f5;
+}
+
+.choice-radio {
+    display: none;
+}
+
+.choice-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin: 0;
+}
+
+.choice-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    color: #6c757d;
+    font-weight: bold;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.choice-card.selected .choice-letter {
+    background-color: #0dcaf0;
+    color: white;
+}
+
+.choice-card.correct .choice-letter {
+    background-color: #198754;
+    color: white;
+}
+
+.choice-card.incorrect .choice-letter {
+    background-color: #dc3545;
+    color: white;
+}
+
+.choice-text {
+    flex: 1;
+    font-size: 16px;
+}
+
+#resultArea {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+{% endblock %} 
