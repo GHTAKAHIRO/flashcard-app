@@ -2522,3 +2522,85 @@ def create_question_post(unit_id):
         flash('問題の作成に失敗しました', 'error')
     
     return redirect(url_for('admin.manage_questions', unit_id=unit_id))
+
+@admin_bp.route('/admin/reset_password', methods=['POST'])
+@login_required
+@admin_required
+def reset_admin_password():
+    """管理者パスワードをリセット"""
+    try:
+        from werkzeug.security import generate_password_hash
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 管理者ユーザーのパスワードをリセット
+                new_password = 'admin'
+                new_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+                
+                current_app.logger.info(f"管理者パスワードリセット開始")
+                current_app.logger.info(f"新しいパスワード: {new_password}")
+                current_app.logger.info(f"新しいハッシュ: {new_hash[:50]}...")
+                
+                cur.execute('UPDATE users SET password_hash = ? WHERE username = ?', (new_hash, 'admin'))
+                conn.commit()
+                
+                current_app.logger.info(f"管理者パスワードリセット完了")
+                flash('管理者パスワードをリセットしました: admin', 'success')
+                
+    except Exception as e:
+        current_app.logger.error(f"パスワードリセットエラー: {e}")
+        flash('パスワードリセットに失敗しました', 'error')
+    
+    return redirect(url_for('admin.admin'))
+
+@admin_bp.route('/admin/debug_db', methods=['POST'])
+@login_required
+@admin_required
+def debug_database():
+    """データベースの状態をデバッグ"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # ユーザー数を確認
+                cur.execute('SELECT COUNT(*) FROM users')
+                user_count = cur.fetchone()[0]
+                
+                # 最新のユーザーを取得
+                cur.execute('''
+                    SELECT id, username, full_name, is_admin, created_at 
+                    FROM users 
+                    ORDER BY created_at DESC 
+                    LIMIT 5
+                ''')
+                recent_users = cur.fetchall()
+                
+                # データベースの状態を確認
+                cur.execute("PRAGMA journal_mode")
+                journal_mode = cur.fetchone()[0]
+                
+                cur.execute("PRAGMA synchronous")
+                synchronous = cur.fetchone()[0]
+                
+                debug_info = {
+                    'user_count': user_count,
+                    'recent_users': [
+                        {
+                            'id': user[0],
+                            'username': user[1],
+                            'full_name': user[2],
+                            'is_admin': user[3],
+                            'created_at': user[4]
+                        } for user in recent_users
+                    ],
+                    'journal_mode': journal_mode,
+                    'synchronous': synchronous
+                }
+                
+                current_app.logger.info(f"データベースデバッグ情報: {debug_info}")
+                flash(f'ユーザー数: {user_count}, ジャーナルモード: {journal_mode}', 'info')
+                
+    except Exception as e:
+        current_app.logger.error(f"データベースデバッグエラー: {e}")
+        flash('データベースデバッグに失敗しました', 'error')
+    
+    return redirect(url_for('admin.admin'))

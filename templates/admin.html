@@ -94,6 +94,16 @@
                         <i class="fas fa-check-circle me-1"></i>整合性チェック
                     </button>
                 </form>
+                <form method="POST" action="{{ url_for('admin.reset_admin_password') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-danger" onclick="return confirmResetPassword()">
+                        <i class="fas fa-key me-1"></i>管理者パスワードリセット
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.debug_db') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="fas fa-bug me-1"></i>データベースデバッグ
+                    </button>
+                </form>
                 <button class="btn btn-outline-warning" onclick="alert('この機能は開発中です')">
                     <i class="fas fa-download me-1"></i>バックアップ
                 </button>
@@ -149,6 +159,10 @@
 <script>
 function confirmRestoreData() {
     return confirm('⚠️ 警告: 初期データを復元しますか？\n\nこの操作は既存のユーザーデータに影響を与える可能性があります。\n本当に実行しますか？');
+}
+
+function confirmResetPassword() {
+    return confirm('⚠️ 警告: 管理者パスワードをリセットしますか？\n\n新しいパスワード: admin\n\n本当に実行しますか？');
 }
 </script>
 {% endblock %} 
