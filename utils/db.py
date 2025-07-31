@@ -25,6 +25,8 @@ def get_db_connection():
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=10000")
             conn.execute("PRAGMA temp_store=MEMORY")
+            # 外部キー制約を有効にする
+            conn.execute("PRAGMA foreign_keys=ON")
             yield conn
         except Exception as e:
             if conn:

@@ -169,16 +169,26 @@ def admin_add_user():
                 hashed_password = generate_password_hash(password)
                 is_admin = (role == 'admin')
                 
+                # デバッグ用のログ出力
+                current_app.logger.info(f"ユーザー追加開始: username={username}, full_name={full_name}, is_admin={is_admin}")
+                
                 cur.execute(f'''
                     INSERT INTO users (username, email, password_hash, is_admin, full_name, grade, created_at)
                     VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
                 ''', (username, hashed_password, is_admin, full_name, grade))
                 
+                # 追加されたユーザーのIDを取得
+                user_id = cur.lastrowid
+                current_app.logger.info(f"ユーザー追加完了: user_id={user_id}")
+                
                 conn.commit()
+                current_app.logger.info(f"データベースコミット完了: user_id={user_id}")
                 flash('ユーザーが正常に追加されました', 'success')
                 
     except Exception as e:
         current_app.logger.error(f"ユーザー追加エラー: {e}")
+        import traceback
+        current_app.logger.error(f"詳細エラー: {traceback.format_exc()}")
         flash('ユーザーの追加に失敗しました', 'error')
     
     return redirect(url_for('admin.admin_users'))
