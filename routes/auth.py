@@ -71,21 +71,62 @@ def login():
 def register():
     if request.method == 'POST':
         username = request.form['username']
-        password = generate_password_hash(request.form['password'])
+        password = request.form['password']
+        full_name = request.form.get('full_name', username)  # full_nameフィールドがあれば使用、なければusername
 
         try:
             with get_db_connection() as conn:
                 with get_db_cursor(conn) as cur:
+                    # ユーザー名の重複チェック
                     placeholder = get_placeholder()
-                    cur.execute(f"INSERT INTO users (username, password_hash, full_name) VALUES ({placeholder}, {placeholder}, {placeholder})", (username, password, username))
+                    cur.execute(f"SELECT id FROM users WHERE username = {placeholder}", (username,))
+                    if cur.fetchone():
+                        flash('このユーザー名は既に使用されています', 'error')
+                        return render_template('register.html')
+                    
+                    # パスワードハッシュ生成
+                    hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+                    
+                    # ユーザー登録前の確認
+                    cur.execute("SELECT COUNT(*) FROM users")
+                    user_count_before = cur.fetchone()[0]
+                    current_app.logger.info(f"登録前のユーザー数: {user_count_before}")
+                    
+                    # ユーザー登録
+                    cur.execute(f"""
+                        INSERT INTO users (username, email, password_hash, is_admin, full_name, grade, created_at)
+                        VALUES ({placeholder}, NULL, {placeholder}, ?, {placeholder}, ?, CURRENT_TIMESTAMP)
+                    """, (username, hashed_password, False, full_name, '一般'))
+                    
                     user_id = cur.lastrowid
+                    current_app.logger.info(f"ユーザー登録実行: user_id={user_id}, username={username}")
+                    
+                    # コミット前の確認
+                    cur.execute(f"SELECT COUNT(*) FROM users WHERE username = {placeholder}", (username,))
+                    count_before_commit = cur.fetchone()[0]
+                    current_app.logger.info(f"コミット前のユーザー数（該当ユーザー）: {count_before_commit}")
+                    
+                    # コミット
                     conn.commit()
+                    current_app.logger.info(f"ユーザー登録コミット完了: user_id={user_id}")
+                    
+                    # コミット後の確認
+                    cur.execute(f"SELECT COUNT(*) FROM users WHERE username = {placeholder}", (username,))
+                    count_after_commit = cur.fetchone()[0]
+                    current_app.logger.info(f"コミット後のユーザー数（該当ユーザー）: {count_after_commit}")
+                    
+                    cur.execute("SELECT COUNT(*) FROM users")
+                    user_count_after = cur.fetchone()[0]
+                    current_app.logger.info(f"コミット後の総ユーザー数: {user_count_after}")
                     
                     current_app.logger.info(f"ユーザー登録成功: user_id={user_id}, username={username}")
+                    flash('ユーザー登録が完了しました', 'success')
                     
             return redirect(url_for('auth.login'))
         except Exception as e:
             current_app.logger.error(f"ユーザー登録エラー: {e}")
+            import traceback
+            current_app.logger.error(f"詳細エラー: {traceback.format_exc()}")
             flash(f"登録エラー: {e}")
 
     return render_template('register.html')
