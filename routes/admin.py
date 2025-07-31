@@ -150,17 +150,25 @@ def admin_add_user():
     grade = request.form.get('grade', '')
     role = request.form.get('role', 'user')
     
+    current_app.logger.info(f"=== ユーザー追加処理開始 ===")
+    current_app.logger.info(f"受信データ: full_name={full_name}, username={username}, grade={grade}, role={role}")
+    
     if not all([full_name, username, password]):
+        current_app.logger.warning("必須フィールドが不足しています")
         flash('すべてのフィールドを入力してください', 'error')
         return redirect(url_for('admin.admin_users'))
     
     try:
+        current_app.logger.info("データベース接続開始")
         with get_db_connection() as conn:
+            current_app.logger.info("データベース接続成功")
             with get_db_cursor(conn) as cur:
                 # ユーザーが既に存在するかチェック
                 placeholder = get_placeholder()
+                current_app.logger.info(f"既存ユーザーチェック: username={username}")
                 cur.execute(f'SELECT id FROM users WHERE username = {placeholder}', (username,))
                 if cur.fetchone():
+                    current_app.logger.warning(f"ユーザーが既に存在: username={username}")
                     flash('ログインIDが既に使用されています', 'error')
                     return redirect(url_for('admin.admin_users'))
                 
@@ -171,25 +179,56 @@ def admin_add_user():
                 
                 # デバッグ用のログ出力
                 current_app.logger.info(f"ユーザー追加開始: username={username}, full_name={full_name}, is_admin={is_admin}")
+                current_app.logger.info(f"パスワードハッシュ: {hashed_password[:50]}...")
                 
-                cur.execute(f'''
+                # INSERT文を実行
+                insert_sql = f'''
                     INSERT INTO users (username, email, password_hash, is_admin, full_name, grade, created_at)
                     VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                ''', (username, hashed_password, is_admin, full_name, grade))
+                '''
+                current_app.logger.info(f"実行するSQL: {insert_sql}")
+                current_app.logger.info(f"パラメータ: username={username}, hashed_password={hashed_password[:20]}..., is_admin={is_admin}, full_name={full_name}, grade={grade}")
+                
+                cur.execute(insert_sql, (username, hashed_password, is_admin, full_name, grade))
                 
                 # 追加されたユーザーのIDを取得
                 user_id = cur.lastrowid
                 current_app.logger.info(f"ユーザー追加完了: user_id={user_id}")
                 
+                # コミット前の確認
+                current_app.logger.info("コミット前の確認")
+                cur.execute('SELECT COUNT(*) FROM users WHERE username = ?', (username,))
+                count_before_commit = cur.fetchone()[0]
+                current_app.logger.info(f"コミット前のユーザー数: {count_before_commit}")
+                
+                # コミット
+                current_app.logger.info("データベースコミット開始")
                 conn.commit()
                 current_app.logger.info(f"データベースコミット完了: user_id={user_id}")
+                
+                # コミット後の確認
+                current_app.logger.info("コミット後の確認")
+                cur.execute('SELECT COUNT(*) FROM users WHERE username = ?', (username,))
+                count_after_commit = cur.fetchone()[0]
+                current_app.logger.info(f"コミット後のユーザー数: {count_after_commit}")
+                
+                # 追加されたユーザーの詳細確認
+                cur.execute('SELECT id, username, full_name, is_admin, created_at FROM users WHERE username = ?', (username,))
+                added_user = cur.fetchone()
+                if added_user:
+                    current_app.logger.info(f"追加されたユーザー確認: ID={added_user[0]}, ユーザー名={added_user[1]}, 表示名={added_user[2]}, 管理者={added_user[3]}, 作成日時={added_user[4]}")
+                else:
+                    current_app.logger.error("追加されたユーザーが見つかりません")
+                
                 flash('ユーザーが正常に追加されました', 'success')
+                current_app.logger.info("=== ユーザー追加処理完了 ===")
                 
     except Exception as e:
         current_app.logger.error(f"ユーザー追加エラー: {e}")
         import traceback
         current_app.logger.error(f"詳細エラー: {traceback.format_exc()}")
         flash('ユーザーの追加に失敗しました', 'error')
+        current_app.logger.info("=== ユーザー追加処理失敗 ===")
     
     return redirect(url_for('admin.admin_users'))
 
