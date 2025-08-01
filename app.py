@@ -36,6 +36,7 @@ from models.user import User
 from utils.db import get_db_connection, get_db_cursor
 
 # ========== 設定エリア ==========
+# ローカル開発用の環境変数ファイルを読み込み（本番環境では無視される）
 load_dotenv(dotenv_path='dbname.env')
 
 # 環境変数の確認とログ出力
@@ -560,8 +561,315 @@ def init_database():
                             )
                         ''')
                         
+                        # 学習ログテーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS study_log (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                card_id INTEGER NOT NULL,
+                                source TEXT NOT NULL,
+                                stage INTEGER NOT NULL,
+                                mode TEXT NOT NULL,
+                                result TEXT NOT NULL,
+                                page_range TEXT,
+                                difficulty TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # チャンク進捗テーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS chunk_progress (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                source TEXT NOT NULL,
+                                stage INTEGER NOT NULL,
+                                page_range TEXT NOT NULL,
+                                difficulty TEXT NOT NULL,
+                                chunk_number INTEGER NOT NULL,
+                                is_completed BOOLEAN DEFAULT FALSE,
+                                is_passed BOOLEAN DEFAULT FALSE,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 画像テーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS image (
+                                id SERIAL PRIMARY KEY,
+                                source TEXT NOT NULL,
+                                page_number INTEGER NOT NULL,
+                                level TEXT,
+                                image_path TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # ユーザー設定テーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS user_settings (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                source TEXT NOT NULL,
+                                page_range TEXT,
+                                difficulty TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 入力問題テーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS input_textbooks (
+                                id SERIAL PRIMARY KEY,
+                                name TEXT NOT NULL,
+                                subject TEXT NOT NULL,
+                                grade TEXT,
+                                publisher TEXT,
+                                description TEXT,
+                                wasabi_folder_path TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS input_units (
+                                id SERIAL PRIMARY KEY,
+                                textbook_id INTEGER NOT NULL,
+                                name TEXT NOT NULL,
+                                chapter_number INTEGER,
+                                description TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS input_questions (
+                                id SERIAL PRIMARY KEY,
+                                subject TEXT NOT NULL,
+                                textbook_id INTEGER NOT NULL,
+                                unit_id INTEGER,
+                                question TEXT NOT NULL,
+                                correct_answer TEXT NOT NULL,
+                                acceptable_answers TEXT,
+                                answer_suffix TEXT,
+                                explanation TEXT,
+                                difficulty_level TEXT,
+                                image_name TEXT,
+                                image_url TEXT,
+                                image_title TEXT,
+                                question_number INTEGER,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 入力問題学習ログテーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS input_study_log (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                question_id INTEGER NOT NULL,
+                                user_answer TEXT,
+                                is_correct BOOLEAN,
+                                subject TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 選択問題テーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS choice_textbooks (
+                                id SERIAL PRIMARY KEY,
+                                source TEXT NOT NULL,
+                                chapter_name TEXT NOT NULL,
+                                chapter_number INTEGER NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS choice_units (
+                                id SERIAL PRIMARY KEY,
+                                textbook_id INTEGER NOT NULL,
+                                name TEXT NOT NULL,
+                                unit_number INTEGER NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS choice_questions (
+                                id SERIAL PRIMARY KEY,
+                                unit_id INTEGER NOT NULL,
+                                question TEXT NOT NULL,
+                                correct_answer TEXT NOT NULL,
+                                choices TEXT NOT NULL,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS choice_study_log (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                question_id INTEGER NOT NULL,
+                                user_answer TEXT,
+                                correct_answer TEXT,
+                                is_correct BOOLEAN NOT NULL,
+                                answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 統一された教材テーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS textbooks (
+                                id SERIAL PRIMARY KEY,
+                                name TEXT NOT NULL,
+                                subject TEXT NOT NULL,
+                                grade TEXT,
+                                publisher TEXT,
+                                description TEXT,
+                                study_type TEXT DEFAULT 'both',
+                                is_active BOOLEAN DEFAULT TRUE,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS units (
+                                id SERIAL PRIMARY KEY,
+                                textbook_id INTEGER NOT NULL,
+                                name TEXT NOT NULL,
+                                unit_number INTEGER NOT NULL,
+                                description TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS questions (
+                                id SERIAL PRIMARY KEY,
+                                unit_id INTEGER NOT NULL,
+                                question TEXT NOT NULL,
+                                correct_answer TEXT NOT NULL,
+                                choices TEXT,
+                                acceptable_answers TEXT,
+                                answer_suffix TEXT,
+                                explanation TEXT,
+                                difficulty_level TEXT,
+                                image_name TEXT,
+                                image_url TEXT,
+                                image_title TEXT,
+                                question_number INTEGER,
+                                is_active BOOLEAN DEFAULT TRUE,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 学習セッションテーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS study_sessions (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                textbook_id INTEGER NOT NULL,
+                                unit_id INTEGER,
+                                study_type TEXT NOT NULL,
+                                progress REAL DEFAULT 0.0,
+                                completed BOOLEAN DEFAULT FALSE,
+                                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                completed_at TIMESTAMP,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 統一された学習ログテーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS study_logs (
+                                id SERIAL PRIMARY KEY,
+                                session_id INTEGER NOT NULL,
+                                question_id INTEGER NOT NULL,
+                                user_answer TEXT,
+                                correct_answer TEXT,
+                                is_correct BOOLEAN NOT NULL,
+                                study_type TEXT NOT NULL,
+                                response_time INTEGER,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 教材割り当てテーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS textbook_assignments (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                textbook_id INTEGER NOT NULL,
+                                study_type TEXT DEFAULT 'both',
+                                units TEXT,
+                                chunks TEXT,
+                                is_active BOOLEAN DEFAULT TRUE,
+                                assigned_by INTEGER NOT NULL,
+                                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                expires_at TIMESTAMP
+                            )
+                        ''')
+                        
+                        # 教材割り当て詳細テーブル
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS assignment_details (
+                                id SERIAL PRIMARY KEY,
+                                assignment_id INTEGER NOT NULL,
+                                unit_id INTEGER,
+                                chunk_start INTEGER,
+                                chunk_end INTEGER,
+                                difficulty_level TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
                         conn.commit()
                         print("✅ PostgreSQLテーブル作成完了")
+                        
+                        # インデックス作成
+                        indexes = [
+                            "CREATE INDEX IF NOT EXISTS idx_study_log_user_stage_mode ON study_log(user_id, stage, mode);",
+                            "CREATE INDEX IF NOT EXISTS idx_study_log_composite ON study_log(user_id, stage, mode, card_id, id DESC);",
+                            "CREATE INDEX IF NOT EXISTS idx_image_source_page ON image(source, page_number);",
+                            "CREATE INDEX IF NOT EXISTS idx_image_source_level ON image(source, level);",
+                            "CREATE INDEX IF NOT EXISTS idx_chunk_progress_user_source_stage ON chunk_progress(user_id, source, stage);",
+                            "CREATE INDEX IF NOT EXISTS idx_study_log_card_result ON study_log(card_id, result, id DESC);",
+                            "CREATE INDEX IF NOT EXISTS idx_user_settings_user_source ON user_settings(user_id, source);",
+                            "CREATE INDEX IF NOT EXISTS idx_questions_textbook_unit ON input_questions(textbook_id, unit_id);",
+                            "CREATE INDEX IF NOT EXISTS idx_choice_units_textbook ON choice_units(textbook_id, unit_number);",
+                            "CREATE INDEX IF NOT EXISTS idx_choice_questions_unit ON choice_questions(unit_id);",
+                            "CREATE INDEX IF NOT EXISTS idx_choice_study_log_user_question ON choice_study_log(user_id, question_id);",
+                            "CREATE INDEX IF NOT EXISTS idx_choice_study_log_user ON choice_study_log(user_id, answered_at);"
+                        ]
+                        
+                        for index_sql in indexes:
+                            cur.execute(index_sql)
+                        
+                        print("✅ PostgreSQLインデックス作成完了")
+                        
+                        # デフォルト管理者ユーザーを作成（パスワード: admin123）
+                        from werkzeug.security import generate_password_hash
+                        
+                        admin_password_hash = generate_password_hash('admin123')
+                        cur.execute('''
+                            INSERT INTO users (username, email, password_hash, is_admin, is_active)
+                            VALUES (%s, %s, %s, %s, %s)
+                            ON CONFLICT (username) DO NOTHING
+                        ''', ('admin', 'admin@example.com', admin_password_hash, True, True))
+                        
+                        conn.commit()
+                        print("✅ PostgreSQL管理者ユーザー作成完了")
+                        print("   ユーザー名: admin")
+                        print("   パスワード: admin123")
                     
         except Exception as e:
             print(f"❌ PostgreSQL初期化エラー: {e}")

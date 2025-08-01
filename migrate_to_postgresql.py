@@ -219,6 +219,54 @@ def migrate_to_postgresql():
         pg_conn.commit()
         print("✅ データ移行が完了しました")
         
+        # study_logテーブルの移行
+        print("📊 study_logデータを移行中...")
+        
+        # study_logテーブルの作成
+        pg_cursor.execute('''
+            CREATE TABLE IF NOT EXISTS study_log (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                card_id INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                stage INTEGER NOT NULL,
+                mode TEXT NOT NULL,
+                result TEXT NOT NULL,
+                page_range TEXT,
+                difficulty TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # study_logデータの移行
+        try:
+            sqlite_cursor.execute('SELECT * FROM study_log')
+            study_logs = sqlite_cursor.fetchall()
+            
+            for log in study_logs:
+                pg_cursor.execute('''
+                    INSERT INTO study_log (user_id, card_id, source, stage, mode, result, page_range, difficulty, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ''', (
+                    log['user_id'],
+                    log['card_id'],
+                    log['source'],
+                    log['stage'],
+                    log['mode'],
+                    log['result'],
+                    log['page_range'],
+                    log['difficulty'],
+                    log['created_at']
+                ))
+            
+            print(f"✅ {len(study_logs)}件のstudy_logデータを移行しました")
+        except Exception as e:
+            print(f"⚠️  study_logデータの移行でエラーが発生しました: {e}")
+        
+        # 変更をコミット
+        pg_conn.commit()
+        print("✅ データ移行が完了しました")
+        
         # 接続を閉じる
         sqlite_conn.close()
         pg_conn.close()
