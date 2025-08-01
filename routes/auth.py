@@ -33,10 +33,6 @@ def login():
             if user and check_password_hash(user[2], password):
                 login_user(User(user[0], user[1], user[2], user[3], user[4]))
                 current_app.logger.info(f"ログイン成功: user_id={user[0]}, username={user[1]}, is_admin={user[4]}")
-            elif user:
-                current_app.logger.warning(f"パスワードが一致しません: username={username}")
-                current_app.logger.info(f"入力されたパスワードの長さ: {len(password)}")
-                current_app.logger.info(f"パスワードハッシュの長さ: {len(user[2]) if user[2] else 0}")
                 
                 # 最終ログイン時刻を更新
                 with get_db_connection() as conn:
@@ -58,9 +54,14 @@ def login():
                 
                 current_app.logger.info("通常ユーザー: ホーム画面にリダイレクト")
                 return redirect(url_for('home'))
+            elif user:
+                current_app.logger.warning(f"パスワードが一致しません: username={username}")
+                current_app.logger.info(f"入力されたパスワードの長さ: {len(password)}")
+                current_app.logger.info(f"パスワードハッシュの長さ: {len(user[2]) if user[2] else 0}")
+                flash("パスワードが正しくありません。")
             else:
                 current_app.logger.warning(f"ログイン失敗: username={username}")
-                flash("ログインに失敗しました。")
+                flash("ユーザー名またはパスワードが正しくありません。")
         except Exception as e:
             current_app.logger.error(f"ログインエラー: {e}")
             flash("ログイン中にエラーが発生しました")
@@ -95,7 +96,7 @@ def register():
                     # ユーザー登録
                     cur.execute(f"""
                         INSERT INTO users (username, email, password_hash, is_admin, full_name, grade, created_at)
-                        VALUES ({placeholder}, NULL, {placeholder}, ?, {placeholder}, ?, CURRENT_TIMESTAMP)
+                        VALUES ({placeholder}, NULL, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
                     """, (username, hashed_password, False, full_name, '一般'))
                     
                     user_id = cur.lastrowid

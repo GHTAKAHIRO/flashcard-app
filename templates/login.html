@@ -44,7 +44,31 @@
                 <a href="{{ url_for('auth.register') }}" class="text-decoration-none">新規登録</a>
                 してください
             </p>
+            
+            <!-- 管理者パスワードリセット機能 -->
+            <div class="mt-3">
+                <form method="POST" action="{{ url_for('admin.reset_admin_password') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirmResetAdminPassword()">
+                        <i class="fas fa-key me-1"></i>管理者パスワードリセット
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.fix_database_issues') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-outline-warning btn-sm" onclick="return confirmFixDatabase()">
+                        <i class="fas fa-wrench me-1"></i>データベース修正
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+function confirmResetAdminPassword() {
+    return confirm('⚠️ 管理者パスワードをリセットしますか？\n\n新しいパスワード: admin\n\n本当に実行しますか？');
+}
+
+function confirmFixDatabase() {
+    return confirm('⚠️ データベースの問題を修正しますか？\n\nこの操作はデータベースの構造を修正します。\n本当に実行しますか？');
+}
+</script>
 {% endblock %} 

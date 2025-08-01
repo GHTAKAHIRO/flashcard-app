@@ -2604,3 +2604,57 @@ def debug_database():
         flash('データベースデバッグに失敗しました', 'error')
     
     return redirect(url_for('admin.admin'))
+
+@admin_bp.route('/admin/fix_database_issues', methods=['POST'])
+def fix_database_issues():
+    """データベースの問題を修正（ログイン不要）"""
+    try:
+        from werkzeug.security import generate_password_hash
+        
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                current_app.logger.info("データベース修正開始")
+                
+                # 1. 管理者パスワード修正
+                current_app.logger.info("管理者パスワード修正中...")
+                new_password = 'admin'
+                new_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+                
+                cur.execute('UPDATE users SET password_hash = ? WHERE username = ?', (new_hash, 'admin'))
+                current_app.logger.info("管理者パスワード更新完了")
+                
+                # 2. assignment_typeカラム修正
+                current_app.logger.info("assignment_typeカラム修正中...")
+                cur.execute("PRAGMA table_info(textbook_assignments)")
+                columns = cur.fetchall()
+                column_names = [col[1] for col in columns]
+                
+                if 'assignment_type' not in column_names:
+                    current_app.logger.info("assignment_typeカラムを追加中...")
+                    cur.execute("ALTER TABLE textbook_assignments ADD COLUMN assignment_type TEXT")
+                    
+                    if 'study_type' in column_names:
+                        cur.execute("UPDATE textbook_assignments SET assignment_type = study_type WHERE assignment_type IS NULL")
+                        current_app.logger.info("既存データをstudy_typeからコピーしました")
+                    
+                    current_app.logger.info("assignment_typeカラム追加完了")
+                else:
+                    current_app.logger.info("assignment_typeカラムは既に存在します")
+                
+                # 3. データベース状態確認
+                cur.execute("SELECT COUNT(*) FROM users")
+                user_count = cur.fetchone()[0]
+                current_app.logger.info(f"ユーザー数: {user_count}")
+                
+                conn.commit()
+                current_app.logger.info("データベース修正完了")
+                
+                flash('データベースの問題を修正しました。管理者パスワード: admin', 'success')
+                
+    except Exception as e:
+        current_app.logger.error(f"データベース修正エラー: {e}")
+        import traceback
+        current_app.logger.error(f"詳細エラー: {traceback.format_exc()}")
+        flash('データベース修正に失敗しました', 'error')
+    
+    return redirect(url_for('auth.login'))
