@@ -6,6 +6,8 @@ import csv
 import io
 import json
 from datetime import datetime
+import os
+from flask import send_file
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -2658,3 +2660,34 @@ def fix_database_issues():
         flash('データベース修正に失敗しました', 'error')
     
     return redirect(url_for('auth.login'))
+
+@admin_bp.route('/admin/download_database')
+@login_required
+@admin_required
+def download_database():
+    """データベースファイルをダウンロード"""
+    try:
+        # データベースファイルのパス
+        db_path = os.getenv('DB_PATH', 'flashcards.db')
+        
+        if os.path.exists(db_path):
+            # ファイルサイズを取得
+            file_size = os.path.getsize(db_path)
+            
+            # ダウンロード用のファイル名
+            filename = f"flashcards_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+            
+            return send_file(
+                db_path,
+                as_attachment=True,
+                download_name=filename,
+                mimetype='application/octet-stream'
+            )
+        else:
+            flash('データベースファイルが見つかりません', 'error')
+            return redirect(url_for('admin.admin'))
+            
+    except Exception as e:
+        current_app.logger.error(f"データベースダウンロードエラー: {e}")
+        flash('データベースのダウンロードに失敗しました', 'error')
+        return redirect(url_for('admin.admin'))
