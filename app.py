@@ -540,26 +540,28 @@ def init_database():
         # PostgreSQLの場合
         print(f"🔍 データベース設定: type=postgresql")
         try:
-            with get_db_connection() as conn:
-                with get_db_cursor(conn) as cur:
-                    # PostgreSQL用のテーブル作成
-                    cur.execute('''
-                        CREATE TABLE IF NOT EXISTS users (
-                            id SERIAL PRIMARY KEY,
-                            username VARCHAR(255) UNIQUE NOT NULL,
-                            full_name VARCHAR(255),
-                            email VARCHAR(255),
-                            password_hash TEXT NOT NULL,
-                            is_admin BOOLEAN DEFAULT FALSE,
-                            is_active BOOLEAN DEFAULT TRUE,
-                            grade VARCHAR(50) DEFAULT '一般',
-                            last_login TIMESTAMP,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        )
-                    ''')
-                    
-                    conn.commit()
-                    print("✅ PostgreSQLテーブル作成完了")
+            # アプリケーションコンテキスト内で実行
+            with app.app_context():
+                with get_db_connection() as conn:
+                    with get_db_cursor(conn) as cur:
+                        # PostgreSQL用のテーブル作成
+                        cur.execute('''
+                            CREATE TABLE IF NOT EXISTS users (
+                                id SERIAL PRIMARY KEY,
+                                username VARCHAR(255) UNIQUE NOT NULL,
+                                full_name VARCHAR(255),
+                                email VARCHAR(255),
+                                password_hash TEXT NOT NULL,
+                                is_admin BOOLEAN DEFAULT FALSE,
+                                is_active BOOLEAN DEFAULT TRUE,
+                                grade VARCHAR(50) DEFAULT '一般',
+                                last_login TIMESTAMP,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        
+                        conn.commit()
+                        print("✅ PostgreSQLテーブル作成完了")
                     
         except Exception as e:
             print(f"❌ PostgreSQL初期化エラー: {e}")
