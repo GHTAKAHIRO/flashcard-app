@@ -199,7 +199,11 @@ def admin_add_user():
                 
                 # コミット前の確認
                 current_app.logger.info("コミット前の確認")
-                cur.execute('SELECT COUNT(*) FROM users WHERE username = ?', (username,))
+                db_type = os.getenv('DB_TYPE', 'sqlite')
+                placeholder = '%s' if db_type == 'postgresql' else '?'
+                current_app.logger.info(f"使用するプレースホルダー: '{placeholder}'")
+                current_app.logger.info(f"環境変数 DB_TYPE: {db_type}")
+                cur.execute(f'SELECT COUNT(*) FROM users WHERE username = {placeholder}', (username,))
                 count_before_commit = cur.fetchone()[0]
                 current_app.logger.info(f"コミット前のユーザー数: {count_before_commit}")
                 
@@ -210,12 +214,12 @@ def admin_add_user():
                 
                 # コミット後の確認
                 current_app.logger.info("コミット後の確認")
-                cur.execute('SELECT COUNT(*) FROM users WHERE username = ?', (username,))
+                cur.execute(f'SELECT COUNT(*) FROM users WHERE username = {placeholder}', (username,))
                 count_after_commit = cur.fetchone()[0]
                 current_app.logger.info(f"コミット後のユーザー数: {count_after_commit}")
                 
                 # 追加されたユーザーの詳細確認
-                cur.execute('SELECT id, username, full_name, is_admin, created_at FROM users WHERE username = ?', (username,))
+                cur.execute(f'SELECT id, username, full_name, is_admin, created_at FROM users WHERE username = {placeholder}', (username,))
                 added_user = cur.fetchone()
                 if added_user:
                     current_app.logger.info(f"追加されたユーザー確認: ID={added_user[0]}, ユーザー名={added_user[1]}, 表示名={added_user[2]}, 管理者={added_user[3]}, 作成日時={added_user[4]}")
@@ -291,7 +295,8 @@ def admin_upload_users_csv():
                             continue
                         
                         # 重複チェック
-                        placeholder = get_placeholder()
+                        db_type = os.getenv('DB_TYPE', 'sqlite')
+                        placeholder = '%s' if db_type == 'postgresql' else '?'
                         cur.execute(f'SELECT id FROM users WHERE username = {placeholder}', (username,))
                         if cur.fetchone():
                             error_count += 1
@@ -377,10 +382,12 @@ def admin_get_user(user_id):
     try:
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
-                cur.execute('''
+                db_type = os.getenv('DB_TYPE', 'sqlite')
+                placeholder = '%s' if db_type == 'postgresql' else '?'
+                cur.execute(f'''
                     SELECT id, username, email, is_admin, full_name, grade
                     FROM users 
-                    WHERE id = ?
+                    WHERE id = {placeholder}
                 ''', (user_id,))
                 user_data = cur.fetchone()
                 
@@ -421,7 +428,8 @@ def admin_update_user(user_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # ユーザーが存在するかチェック
-                placeholder = get_placeholder()
+                db_type = os.getenv('DB_TYPE', 'sqlite')
+                placeholder = '%s' if db_type == 'postgresql' else '?'
                 cur.execute(f'SELECT id FROM users WHERE id = {placeholder}', (user_id,))
                 if not cur.fetchone():
                     return jsonify({'error': 'ユーザーが見つかりません'}), 404
@@ -466,7 +474,8 @@ def admin_delete_user(user_id):
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # ユーザーが存在するかチェック
-                placeholder = get_placeholder()
+                db_type = os.getenv('DB_TYPE', 'sqlite')
+                placeholder = '%s' if db_type == 'postgresql' else '?'
                 cur.execute(f'SELECT id FROM users WHERE id = {placeholder}', (user_id,))
                 if not cur.fetchone():
                     return jsonify({'error': 'ユーザーが見つかりません'}), 404
@@ -901,26 +910,31 @@ def input_studies_add_textbook_post():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 教材名の重複チェック
-                cur.execute('SELECT id FROM input_textbooks WHERE name = ?', (name,))
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM input_textbooks WHERE name = {placeholder}', (name,))
                 if cur.fetchone():
                     flash('この教材名は既に使用されています', 'error')
                     return redirect(url_for('admin.input_studies_add_textbook'))
                 
                 # 教材を追加
-                cur.execute('''
+                cur.execute(f'''
                     INSERT INTO input_textbooks (name, subject, grade, publisher, description, created_at)
-                    VALUES (?, ?, ?, ?, ?, datetime('now'))
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
                 ''', (name, subject, grade, publisher, description))
                 
                 # 追加された教材のIDを取得
-                textbook_id = cur.lastrowid
+                if os.getenv('DB_TYPE') == 'sqlite':
+                    textbook_id = cur.lastrowid
+                else:
+                    cur.execute('SELECT lastval()')
+                    textbook_id = cur.fetchone()[0]
                 current_app.logger.info(f"教材追加完了: ID={textbook_id}")
                 
                 conn.commit()
                 current_app.logger.info(f"データベースコミット完了: ID={textbook_id}")
                 
                 # 追加された教材を確認
-                cur.execute('SELECT id, name, subject FROM input_textbooks WHERE id = ?', (textbook_id,))
+                cur.execute(f'SELECT id, name, subject FROM input_textbooks WHERE id = {placeholder}', (textbook_id,))
                 added_textbook = cur.fetchone()
                 if added_textbook:
                     current_app.logger.info(f"追加確認: ID={added_textbook[0]}, name={added_textbook[1]}")
@@ -1072,13 +1086,14 @@ def input_studies_add_unit_post():
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 # 教材が存在するかチェック
-                cur.execute('SELECT id FROM input_textbooks WHERE id = ?', (textbook_id,))
+                placeholder = get_placeholder()
+                cur.execute(f'SELECT id FROM input_textbooks WHERE id = {placeholder}', (textbook_id,))
                 if not cur.fetchone():
                     flash('指定された教材が見つかりません', 'error')
                     return redirect(url_for('admin.input_studies_admin_unified'))
                 
                 # 単元名の重複チェック（同じ教材内で）
-                cur.execute('SELECT id FROM input_units WHERE name = ? AND textbook_id = ?', (name, textbook_id))
+                cur.execute(f'SELECT id FROM input_units WHERE name = {placeholder} AND textbook_id = {placeholder}', (name, textbook_id))
                 if cur.fetchone():
                     flash('この単元名は既に使用されています', 'error')
                     return redirect(url_for('admin.input_studies_add_unit', textbook_id=textbook_id))
@@ -1093,9 +1108,9 @@ def input_studies_add_unit_post():
                         return redirect(url_for('admin.input_studies_add_unit', textbook_id=textbook_id))
                 
                 # 単元を追加
-                cur.execute('''
+                cur.execute(f'''
                     INSERT INTO input_units (textbook_id, name, chapter_number, description)
-                    VALUES (?, ?, ?, ?)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
                 ''', (textbook_id, name, chapter_num, description))
                 
                 conn.commit()
@@ -2617,7 +2632,8 @@ def reset_admin_password():
                 current_app.logger.info(f"新しいパスワード: {new_password}")
                 current_app.logger.info(f"新しいハッシュ: {new_hash[:50]}...")
                 
-                cur.execute('UPDATE users SET password_hash = ? WHERE username = ?', (new_hash, 'admin'))
+                placeholder = get_placeholder()
+                cur.execute(f'UPDATE users SET password_hash = {placeholder} WHERE username = {placeholder}', (new_hash, 'admin'))
                 conn.commit()
                 
                 current_app.logger.info(f"管理者パスワードリセット完了")
@@ -2696,7 +2712,8 @@ def fix_database_issues():
                 new_password = 'admin'
                 new_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
                 
-                cur.execute('UPDATE users SET password_hash = ? WHERE username = ?', (new_hash, 'admin'))
+                placeholder = get_placeholder()
+                cur.execute(f'UPDATE users SET password_hash = {placeholder} WHERE username = {placeholder}', (new_hash, 'admin'))
                 current_app.logger.info("管理者パスワード更新完了")
                 
                 # 2. assignment_typeカラム修正
