@@ -9,10 +9,24 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: DB_TYPE
-        value: sqlite
-      - key: DB_PATH
-        value: /opt/render/project/src/flashcards.db
+        value: postgresql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
       - key: FLASK_ENV
         value: production
     healthCheckPath: /
-    autoDeploy: true 
+    autoDeploy: true
+
+databases:
+  - name: flashcard-db
+    databaseName: flashcard_app
+    user: flashcard_user
+    plan: professional 

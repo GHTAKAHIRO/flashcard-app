@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 import os
 import logging
 import math
-# PostgreSQL関連のインポートをコメントアウト（SQLite使用時）
-# import psycopg2
-# from psycopg2.extras import RealDictCursor
+# PostgreSQL関連のインポート
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 from functools import wraps
 import json
@@ -17,7 +17,7 @@ import hashlib
 import threading
 import time
 import queue
-# import psycopg2.pool
+import psycopg2.pool
 from contextlib import contextmanager
 import atexit
 from flask_wtf.csrf import CSRFProtect
@@ -572,6 +572,15 @@ if __name__ == '__main__':
     if not init_database():
         print("❌ データベース初期化に失敗しました")
         exit(1)
+    
+    # PostgreSQLの場合、データ移行を実行
+    if os.getenv('DB_TYPE') == 'postgresql':
+        try:
+            print("🔄 PostgreSQLデータベースへの移行を確認しています...")
+            from migrate_to_postgresql import migrate_to_postgresql
+            migrate_to_postgresql()
+        except Exception as e:
+            print(f"❌ データ移行エラー: {e}")
     
     # 初期データの復元
     try:
