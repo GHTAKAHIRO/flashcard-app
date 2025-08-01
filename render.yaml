@@ -11,15 +11,15 @@ services:
       - key: DB_TYPE
         value: postgresql
       - key: DB_HOST
-        sync: false
+        value: dpg-d263vjuuk2gs73bfe640-a.singapore-postgres.render.com
       - key: DB_PORT
-        sync: false
+        value: 5432
       - key: DB_NAME
-        sync: false
+        value: anki_db
       - key: DB_USER
-        sync: false
+        value: anki_user
       - key: DB_PASSWORD
-        sync: false
+        value: 0sUr3K1NauZBEW5tsu7NTKRFibzM7GoB
       - key: FLASK_ENV
         value: production
     healthCheckPath: /
@@ -27,6 +27,6 @@ services:
 
 databases:
   - name: flashcard-db
-    databaseName: flashcard_app
-    user: flashcard_user
+    databaseName: anki_db
+    user: anki_user
     plan: professional 
