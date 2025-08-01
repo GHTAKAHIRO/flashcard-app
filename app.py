@@ -493,6 +493,10 @@ def init_database():
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             title TEXT NOT NULL,
                             description TEXT,
+                            question_types TEXT DEFAULT '["input"]',
+                            subject TEXT DEFAULT '地理',
+                            grade TEXT DEFAULT '高校',
+                            publisher TEXT,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )
                     ''')
@@ -517,6 +521,8 @@ def init_database():
                             correct_answer TEXT NOT NULL,
                             explanation TEXT,
                             image_path TEXT,
+                            question_type TEXT DEFAULT 'input',
+                            question_data TEXT,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             FOREIGN KEY (unit_id) REFERENCES input_units (id)
                         )

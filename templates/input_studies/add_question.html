@@ -54,16 +54,20 @@
                     <!-- 問題タイプ選択 -->
                     <div class="mb-3">
                         <label for="question_type" class="form-label">
-                            <i class="fas fa-cog me-1"></i>問題タイプ <span class="text-danger">*</span>
+                            <i class="fas fa-cog me-1"></i>出題形式 <span class="text-danger">*</span>
                         </label>
                         <select class="form-select" id="question_type" name="question_type" required onchange="toggleQuestionType()">
-                            <option value="">問題タイプを選択してください</option>
+                            <option value="">出題形式を選択してください</option>
                             <option value="input">入力問題</option>
-                            <option value="choice">選択問題</option>
+                            <option value="choice">4択選択問題</option>
+                            <option value="multiple_choice">複数選択問題</option>
+                            <option value="ordering">並び替え問題</option>
+                            <option value="fill_blank">穴埋め問題</option>
+                            <option value="true_false">正誤問題</option>
                         </select>
                         <div class="form-text">
                             <i class="fas fa-info-circle me-1"></i>
-                            入力問題: キーボードで答えを入力 / 選択問題: 選択肢から答えを選ぶ
+                            各形式の特徴: 入力問題(文字入力) / 4択選択(1つ選択) / 複数選択(複数選択) / 並び替え(順序) / 穴埋め(文章) / 正誤(○×)
                         </div>
                     </div>
                     
@@ -171,6 +175,123 @@
                         </div>
                     </div>
                     
+                    <!-- 複数選択問題用フィールド -->
+                    <div id="multiple_choice_fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">正解（複数選択可） <span class="text-danger">*</span></label>
+                            <div id="multiple_choices_container">
+                                <div class="choice-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">A</span>
+                                        <input type="text" class="form-control" name="multiple_choice_a" placeholder="選択肢A">
+                                        <div class="input-group-text">
+                                            <input type="checkbox" name="correct_multiple_a" value="A">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="choice-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">B</span>
+                                        <input type="text" class="form-control" name="multiple_choice_b" placeholder="選択肢B">
+                                        <div class="input-group-text">
+                                            <input type="checkbox" name="correct_multiple_b" value="B">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="choice-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">C</span>
+                                        <input type="text" class="form-control" name="multiple_choice_c" placeholder="選択肢C">
+                                        <div class="input-group-text">
+                                            <input type="checkbox" name="correct_multiple_c" value="C">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="choice-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">D</span>
+                                        <input type="text" class="form-control" name="multiple_choice_d" placeholder="選択肢D">
+                                        <div class="input-group-text">
+                                            <input type="checkbox" name="correct_multiple_d" value="D">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-text">正解の選択肢にチェックを入れてください（複数選択可能）</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 並び替え問題用フィールド -->
+                    <div id="ordering_fields" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">並び替え項目 <span class="text-danger">*</span></label>
+                            <div id="ordering_items_container">
+                                <div class="ordering-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">1</span>
+                                        <input type="text" class="form-control" name="ordering_item_1" placeholder="並び替え項目1" required>
+                                        <span class="input-group-text">正解順序: 1</span>
+                                    </div>
+                                </div>
+                                <div class="ordering-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">2</span>
+                                        <input type="text" class="form-control" name="ordering_item_2" placeholder="並び替え項目2" required>
+                                        <span class="input-group-text">正解順序: 2</span>
+                                    </div>
+                                </div>
+                                <div class="ordering-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">3</span>
+                                        <input type="text" class="form-control" name="ordering_item_3" placeholder="並び替え項目3" required>
+                                        <span class="input-group-text">正解順序: 3</span>
+                                    </div>
+                                </div>
+                                <div class="ordering-item mb-2">
+                                    <div class="input-group">
+                                        <span class="input-group-text">4</span>
+                                        <input type="text" class="form-control" name="ordering_item_4" placeholder="並び替え項目4" required>
+                                        <span class="input-group-text">正解順序: 4</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-text">正しい順序で項目を入力してください</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 穴埋め問題用フィールド -->
+                    <div id="fill_blank_fields" style="display: none;">
+                        <div class="mb-3">
+                            <label for="fill_blank_text" class="form-label">穴埋め文章 <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="fill_blank_text" name="fill_blank_text" rows="4" 
+                                      placeholder="例: 日本の首都は（　）です。最も高い山は（　）です。"></textarea>
+                            <div class="form-text">穴埋め箇所は（　）で囲んでください</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="fill_blank_answers" class="form-label">穴埋めの答え <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="fill_blank_answers" name="fill_blank_answers" 
+                                   placeholder="例: 東京,富士山（カンマ区切りで順番に入力）">
+                            <div class="form-text">穴埋めの順番に合わせて答えを入力してください</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 正誤問題用フィールド -->
+                    <div id="true_false_fields" style="display: none;">
+                        <div class="mb-3">
+                            <label for="true_false_statement" class="form-label">正誤判定文 <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="true_false_statement" name="true_false_statement" rows="3" 
+                                      placeholder="例: 日本の首都は東京である"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="true_false_answer" class="form-label">正解 <span class="text-danger">*</span></label>
+                            <select class="form-select" id="true_false_answer" name="true_false_answer" required>
+                                <option value="">選択してください</option>
+                                <option value="true">正しい</option>
+                                <option value="false">間違い</option>
+                            </select>
+                        </div>
+                    </div>
+                    
                     <div class="mb-3">
                         <label for="difficulty_level" class="form-label">難易度</label>
                         <select class="form-select" id="difficulty_level" name="difficulty_level">
@@ -223,24 +344,41 @@ function toggleQuestionType() {
     const questionType = document.getElementById('question_type').value;
     const inputFields = document.getElementById('input_fields');
     const choiceFields = document.getElementById('choice_fields');
+    const multipleChoiceFields = document.getElementById('multiple_choice_fields');
+    const orderingFields = document.getElementById('ordering_fields');
+    const fillBlankFields = document.getElementById('fill_blank_fields');
+    const trueFalseFields = document.getElementById('true_false_fields');
     
-    if (questionType === 'input') {
-        inputFields.style.display = 'block';
-        choiceFields.style.display = 'none';
-        // 入力問題用のフィールドを必須にする
-        document.getElementById('correct_answer').required = true;
-        document.getElementById('correct_answer_choice').required = false;
-    } else if (questionType === 'choice') {
-        inputFields.style.display = 'none';
-        choiceFields.style.display = 'block';
-        // 選択問題用のフィールドを必須にする
-        document.getElementById('correct_answer').required = false;
-        document.getElementById('correct_answer_choice').required = true;
-    } else {
-        inputFields.style.display = 'none';
-        choiceFields.style.display = 'none';
-        document.getElementById('correct_answer').required = false;
-        document.getElementById('correct_answer_choice').required = false;
+    // すべてのフィールドを非表示にする
+    [inputFields, choiceFields, multipleChoiceFields, orderingFields, fillBlankFields, trueFalseFields].forEach(field => {
+        if (field) field.style.display = 'none';
+    });
+    
+    // 選択された問題形式に応じてフィールドを表示
+    switch (questionType) {
+        case 'input':
+            if (inputFields) inputFields.style.display = 'block';
+            document.getElementById('correct_answer').required = true;
+            break;
+        case 'choice':
+            if (choiceFields) choiceFields.style.display = 'block';
+            document.getElementById('correct_answer_choice').required = true;
+            break;
+        case 'multiple_choice':
+            if (multipleChoiceFields) multipleChoiceFields.style.display = 'block';
+            break;
+        case 'ordering':
+            if (orderingFields) orderingFields.style.display = 'block';
+            break;
+        case 'fill_blank':
+            if (fillBlankFields) fillBlankFields.style.display = 'block';
+            break;
+        case 'true_false':
+            if (trueFalseFields) trueFalseFields.style.display = 'block';
+            break;
+        default:
+            // 何も選択されていない場合
+            break;
     }
 }
 

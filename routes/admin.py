@@ -637,20 +637,25 @@ def input_studies_add_question_post():
             return redirect(url_for('admin.input_studies_add_question'))
         
         # 問題タイプに応じたデータを取得
+        import json
+        question_data = {}
+        
         if question_type == 'input':
             correct_answer = request.form.get('correct_answer', '').strip()
             acceptable_answers = request.form.get('acceptable_answers', '').strip()
             answer_suffix = request.form.get('answer_suffix', '').strip()
-            choices = None
             
             if not correct_answer:
                 flash('正解は必須です', 'error')
                 return redirect(url_for('admin.input_studies_add_question'))
+            
+            question_data = {
+                'acceptable_answers': acceptable_answers,
+                'answer_suffix': answer_suffix
+            }
                 
         elif question_type == 'choice':
             correct_answer = request.form.get('correct_answer_choice', '').strip()
-            acceptable_answers = None
-            answer_suffix = None
             
             # 選択肢を取得
             choices = []
@@ -672,9 +677,77 @@ def input_studies_add_question_post():
                 flash('正解は選択肢の中から選んでください', 'error')
                 return redirect(url_for('admin.input_studies_add_question'))
             
-            # 選択肢をJSON形式で保存
-            import json
-            choices = json.dumps(choices)
+            question_data = {'choices': choices}
+            
+        elif question_type == 'multiple_choice':
+            # 複数選択問題
+            choices = []
+            correct_answers = []
+            choice_letters = ['a', 'b', 'c', 'd']
+            
+            for letter in choice_letters:
+                choice = request.form.get(f'multiple_choice_{letter}', '').strip()
+                if choice:
+                    choices.append(choice)
+                    if request.form.get(f'correct_multiple_{letter}'):
+                        correct_answers.append(letter.upper())
+            
+            if len(choices) < 2:
+                flash('選択肢は最低2つ必要です', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+            
+            if len(correct_answers) == 0:
+                flash('正解を1つ以上選択してください', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+            
+            correct_answer = ','.join(correct_answers)
+            question_data = {'choices': choices, 'correct_answers': correct_answers}
+            
+        elif question_type == 'ordering':
+            # 並び替え問題
+            ordering_items = []
+            for i in range(1, 5):
+                item = request.form.get(f'ordering_item_{i}', '').strip()
+                if item:
+                    ordering_items.append(item)
+            
+            if len(ordering_items) < 2:
+                flash('並び替え項目は最低2つ必要です', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+            
+            correct_answer = ','.join(ordering_items)
+            question_data = {'items': ordering_items}
+            
+        elif question_type == 'fill_blank':
+            # 穴埋め問題
+            fill_blank_text = request.form.get('fill_blank_text', '').strip()
+            fill_blank_answers = request.form.get('fill_blank_answers', '').strip()
+            
+            if not fill_blank_text or not fill_blank_answers:
+                flash('穴埋め文章と答えは必須です', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+            
+            correct_answer = fill_blank_answers
+            question_data = {
+                'text': fill_blank_text,
+                'answers': fill_blank_answers.split(',')
+            }
+            
+        elif question_type == 'true_false':
+            # 正誤問題
+            true_false_statement = request.form.get('true_false_statement', '').strip()
+            true_false_answer = request.form.get('true_false_answer', '').strip()
+            
+            if not true_false_statement or not true_false_answer:
+                flash('正誤判定文と正解は必須です', 'error')
+                return redirect(url_for('admin.input_studies_add_question'))
+            
+            correct_answer = true_false_answer
+            question_data = {
+                'statement': true_false_statement,
+                'answer': true_false_answer
+            }
+            
         else:
             flash('無効な問題タイプです', 'error')
             return redirect(url_for('admin.input_studies_add_question'))
@@ -711,11 +784,12 @@ def input_studies_add_question_post():
                         question_number = cur.fetchone()[0]
                 
                 # 問題を追加
+                question_data_json = json.dumps(question_data) if question_data else None
                 cur.execute(f'''
                     INSERT INTO input_questions 
-                    (question, correct_answer, acceptable_answers, answer_suffix, choices, explanation, subject, difficulty_level, textbook_id, unit_id, question_number, image_path, created_at)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
-                ''', (question_text, correct_answer, acceptable_answers, answer_suffix, choices, explanation, subject, difficulty_level, textbook_id, unit_id, question_number, image_path))
+                    (question_text, correct_answer, explanation, subject, difficulty_level, textbook_id, unit_id, question_number, image_path, question_type, question_data, created_at)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                ''', (question_text, correct_answer, explanation, subject, difficulty_level, textbook_id, unit_id, question_number, image_path, question_type, question_data_json))
                 
                 conn.commit()
                 flash('問題を追加しました', 'success')
