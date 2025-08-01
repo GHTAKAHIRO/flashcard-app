@@ -439,37 +439,128 @@ def home():
         else:
             return render_template('index.html')
 
+# ========== データベース初期化 ==========
+def init_database():
+    """データベースの初期化とテーブル作成"""
+    db_type = os.getenv('DB_TYPE', 'sqlite')
+    
+    if db_type == 'sqlite':
+        db_path = os.getenv('DB_PATH', 'flashcards.db')
+        print(f"🔍 データベース設定: type=sqlite, path={db_path}")
+        
+        # データベースファイルの存在確認
+        if os.path.exists(db_path):
+            print("✅ SQLiteデータベースは既に存在します")
+        else:
+            print("📝 SQLiteデータベースを作成します")
+        
+        # データベース接続とテーブル作成
+        try:
+            with get_db_connection() as conn:
+                with get_db_cursor(conn) as cur:
+                    # テーブル作成
+                    cur.execute('''
+                        CREATE TABLE IF NOT EXISTS users (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username TEXT UNIQUE NOT NULL,
+                            full_name TEXT,
+                            email TEXT,
+                            password_hash TEXT NOT NULL,
+                            is_admin BOOLEAN DEFAULT FALSE,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            grade TEXT DEFAULT '一般',
+                            last_login TIMESTAMP,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    ''')
+                    
+                    # その他のテーブルも作成
+                    cur.execute('''
+                        CREATE TABLE IF NOT EXISTS input_textbooks (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            title TEXT NOT NULL,
+                            description TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    ''')
+                    
+                    cur.execute('''
+                        CREATE TABLE IF NOT EXISTS input_units (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            textbook_id INTEGER,
+                            title TEXT NOT NULL,
+                            description TEXT,
+                            unit_number INTEGER,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (textbook_id) REFERENCES input_textbooks (id)
+                        )
+                    ''')
+                    
+                    cur.execute('''
+                        CREATE TABLE IF NOT EXISTS input_questions (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            unit_id INTEGER,
+                            question_text TEXT NOT NULL,
+                            correct_answer TEXT NOT NULL,
+                            explanation TEXT,
+                            image_path TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (unit_id) REFERENCES input_units (id)
+                        )
+                    ''')
+                    
+                    conn.commit()
+                    print("✅ テーブル作成完了")
+                    
+        except Exception as e:
+            print(f"❌ データベース初期化エラー: {e}")
+            return False
+        
+        return True
+    else:
+        # PostgreSQLの場合
+        print(f"🔍 データベース設定: type=postgresql")
+        try:
+            with get_db_connection() as conn:
+                with get_db_cursor(conn) as cur:
+                    # PostgreSQL用のテーブル作成
+                    cur.execute('''
+                        CREATE TABLE IF NOT EXISTS users (
+                            id SERIAL PRIMARY KEY,
+                            username VARCHAR(255) UNIQUE NOT NULL,
+                            full_name VARCHAR(255),
+                            email VARCHAR(255),
+                            password_hash TEXT NOT NULL,
+                            is_admin BOOLEAN DEFAULT FALSE,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            grade VARCHAR(50) DEFAULT '一般',
+                            last_login TIMESTAMP,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    ''')
+                    
+                    conn.commit()
+                    print("✅ PostgreSQLテーブル作成完了")
+                    
+        except Exception as e:
+            print(f"❌ PostgreSQL初期化エラー: {e}")
+            return False
+        
+        return True
+
 if __name__ == '__main__':
     # データベース初期化
+    if not init_database():
+        print("❌ データベース初期化に失敗しました")
+        exit(1)
+    
+    # 初期データの復元
     try:
-        import sqlite3
-        import os
-        
-        db_path = os.getenv('DB_PATH', 'flashcards.db')
-        db_type = os.getenv('DB_TYPE', 'sqlite')
-        
-        print(f"🔍 データベース設定: type={db_type}, path={db_path}")
-        
-        if db_type == 'sqlite':
-            # SQLiteデータベースの初期化
-            if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
-                print("📁 SQLiteデータベースを初期化しています...")
-                
-                # init_db.pyを使用してデータベースを初期化
-                from init_db import init_database
-                init_database()
-                
-                print("✅ SQLiteデータベースの初期化が完了しました")
-            else:
-                print("✅ SQLiteデータベースは既に存在します")
-            
-            # 初期データの復元
-            print("🔄 初期データの復元を確認しています...")
-            from restore_data import restore_initial_data
-            restore_initial_data()
-        
+        print("🔄 初期データの復元を確認しています...")
+        from restore_data import restore_initial_data
+        restore_initial_data()
     except Exception as e:
-        print(f"❌ データベース初期化エラー: {e}")
+        print(f"❌ 初期データ復元エラー: {e}")
     
     # アプリケーションを起動
     port = int(os.environ.get('PORT', 10000))
