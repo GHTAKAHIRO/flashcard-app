@@ -2,24 +2,16 @@ services:
   - type: web
     name: flashcard-app
     env: python
-    plan: free
+    plan: professional
     buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: DB_TYPE
-        value: postgresql
-      - key: DB_HOST
-        value: flashcards.c98oe62ei7dh.ap-northeast-1.rds.amazonaws.com
-      - key: DB_PORT
-        value: 5432
-      - key: DB_NAME
-        value: dbname
-      - key: DB_USER
-        value: takahiro
-      - key: DB_PASSWORD
-        value: hirotan0908
+        value: sqlite
+      - key: DB_PATH
+        value: /opt/render/project/src/flashcards.db
       - key: FLASK_ENV
         value: production
     healthCheckPath: /
