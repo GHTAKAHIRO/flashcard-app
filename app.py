@@ -451,6 +451,19 @@ def init_database():
         # データベースファイルの存在確認
         if os.path.exists(db_path):
             print("✅ SQLiteデータベースは既に存在します")
+            
+            # 既存のデータを確認
+            try:
+                with get_db_connection() as conn:
+                    with get_db_cursor(conn) as cur:
+                        cur.execute('SELECT COUNT(*) FROM users')
+                        user_count = cur.fetchone()[0]
+                        print(f"👥 既存のユーザー数: {user_count}")
+                        
+                        if user_count > 1:
+                            print("⚠️  既存のユーザーデータが存在します - データを保持します")
+            except Exception as e:
+                print(f"⚠️  データベース確認エラー: {e}")
         else:
             print("📝 SQLiteデータベースを作成します")
         
@@ -458,7 +471,7 @@ def init_database():
         try:
             with get_db_connection() as conn:
                 with get_db_cursor(conn) as cur:
-                    # テーブル作成
+                    # テーブル作成（CREATE TABLE IF NOT EXISTSなので既存データは保持される）
                     cur.execute('''
                         CREATE TABLE IF NOT EXISTS users (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
