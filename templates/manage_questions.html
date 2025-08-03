@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}問題管理 - 暗記アプリ{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="fw-bold">
+        <i class="fas fa-question-circle me-2"></i>問題管理
+    </h2>
+    <p class="text-muted">{{ unit.textbook_name }} - {{ unit.name }}</p>
+</div>
+
+<!-- 新規問題作成ボタン -->
+<div class="mb-4">
+    <a href="{{ url_for('admin.create_question', unit_id=unit.id) }}" class="btn btn-success">
+        <i class="fas fa-plus me-1"></i>新規問題作成
+    </a>
+    <a href="{{ url_for('admin.view_textbook', textbook_id=unit.textbook_id) }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-1"></i>教材に戻る
+    </a>
+</div>
+
+<!-- 問題一覧 -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>問題一覧 ({{ questions|length }}問)
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if questions %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>番号</th>
+                        <th>出題形式</th>
+                        <th>問題文</th>
+                        <th>正解</th>
+                        <th>難易度</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for question in questions %}
+                    <tr>
+                        <td>
+                            {% if question.question_number %}
+                                {{ question.question_number }}
+                            {% else %}
+                                {{ loop.index }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if question.question_type == 'choice' %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-list me-1"></i>選択問題
+                                </span>
+                            {% else %}
+                                <span class="badge bg-info">
+                                    <i class="fas fa-keyboard me-1"></i>入力問題
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="question-text">
+                                {{ question.question_text[:50] }}{% if question.question_text|length > 50 %}...{% endif %}
+                            </div>
+                            {% if question.explanation %}
+                                <small class="text-muted d-block">
+                                    <i class="fas fa-info-circle me-1"></i>解説あり
+                                </small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ question.correct_answer }}</strong>
+                            {% if question.answer_suffix %}
+                                <small class="text-muted">{{ question.answer_suffix }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if question.difficulty_level == 'easy' %}
+                                <span class="badge bg-success">易しい</span>
+                            {% elif question.difficulty_level == 'medium' %}
+                                <span class="badge bg-warning">普通</span>
+                            {% elif question.difficulty_level == 'hard' %}
+                                <span class="badge bg-danger">難しい</span>
+                            {% else %}
+                                <span class="badge bg-secondary">未設定</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-primary" 
+                                        onclick="showQuestionDetail({{ question.id }})">
+                                    <i class="fas fa-eye"></i> 詳細
+                                </button>
+                                <a href="{{ url_for('admin.edit_question', question_id=question.id) }}" 
+                                   class="btn btn-sm btn-outline-warning">
+                                    <i class="fas fa-edit"></i> 編集
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                        onclick="deleteQuestion({{ question.id }})">
+                                    <i class="fas fa-trash"></i> 削除
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-question-circle fa-3x text-muted mb-3"></i>
+            <p class="text-muted">まだ問題がありません</p>
+            <a href="{{ url_for('admin.create_question', unit_id=unit.id) }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>最初の問題を作成
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 統計情報 -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-question-circle fa-2x text-primary mb-2"></i>
+                <h5 class="card-title">{{ questions|length }}</h5>
+                <p class="card-text">総問題数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-keyboard fa-2x text-info mb-2"></i>
+                <h5 class="card-title">{{ questions|selectattr('question_type', 'equalto', 'input')|list|length }}</h5>
+                <p class="card-text">入力問題</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-list fa-2x text-warning mb-2"></i>
+                <h5 class="card-title">{{ questions|selectattr('question_type', 'equalto', 'choice')|list|length }}</h5>
+                <p class="card-text">選択問題</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-info-circle fa-2x text-success mb-2"></i>
+                <h5 class="card-title">{{ questions|selectattr('explanation')|list|length }}</h5>
+                <p class="card-text">解説付き</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 問題詳細モーダル -->
+<div class="modal fade" id="questionDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">問題詳細</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="questionDetailContent">
+                <!-- 動的に内容が挿入されます -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showQuestionDetail(questionId) {
+    // 問題詳細を取得してモーダルに表示
+    fetch(`/admin/questions/${questionId}/detail`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('questionDetailContent').innerHTML = data.html;
+                new bootstrap.Modal(document.getElementById('questionDetailModal')).show();
+            } else {
+                alert('問題詳細の取得に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('エラーが発生しました');
+        });
+}
+
+function deleteQuestion(questionId) {
+    if (confirm('この問題を削除しますか？この操作は取り消せません。')) {
+        fetch(`/admin/questions/${questionId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('問題の削除に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('エラーが発生しました');
+        });
+    }
+}
+</script>
+{% endblock %} 

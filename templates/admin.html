@@ -53,25 +53,11 @@
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">
-                    <i class="fas fa-globe-asia me-2"></i>入力問題
+                    <i class="fas fa-graduation-cap me-2"></i>教材・問題管理
                 </h5>
-                <p class="card-text">入力問題の教材・問題管理を行います。</p>
-                <a href="{{ url_for('admin.input_studies_admin_unified') }}" class="btn btn-success">
-                    <i class="fas fa-cogs me-1"></i>管理画面
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="fas fa-language me-2"></i>選択問題
-                </h5>
-                <p class="card-text">選択問題の学習管理を行います。</p>
-                <a href="{{ url_for('choice_studies.choice_studies_admin') }}" class="btn btn-info">
-                    <i class="fas fa-cog me-1"></i>選択問題管理
+                <p class="card-text">統一された教材・単元・問題を管理します。入力問題と選択問題の両方に対応。</p>
+                <a href="{{ url_for('admin.manage_textbooks') }}" class="btn btn-success">
+                    <i class="fas fa-book-open me-1"></i>教材管理
                 </a>
             </div>
         </div>

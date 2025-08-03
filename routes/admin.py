@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 import os
 from flask import send_file
+import random
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -60,17 +61,16 @@ def admin():
                 cur.execute('SELECT COUNT(*) FROM study_log')
                 study_log_count = cur.fetchone()[0]
                 
-                cur.execute('SELECT COUNT(*) FROM input_questions')
+                cur.execute('SELECT COUNT(*) FROM questions WHERE is_active = TRUE')
                 question_count = cur.fetchone()[0]
                 
-                cur.execute('SELECT COUNT(*) FROM choice_units')
-                vocabulary_count = cur.fetchone()[0]
+                cur.execute('SELECT COUNT(*) FROM choice_questions')
+                choice_question_count = cur.fetchone()[0]
                 
                 return render_template('admin.html', 
                                      total_users=user_count,
                                      total_study_logs=study_log_count,
-                                     total_questions=question_count,
-                                     total_vocabulary_words=vocabulary_count)
+                                     total_questions=question_count + choice_question_count)
                 
     except Exception as e:
         current_app.logger.error(f"管理画面エラー: {e}")
@@ -2585,7 +2585,11 @@ def create_question_post(unit_id):
     try:
         question_text = request.form.get('question_text')
         correct_answer = request.form.get('correct_answer')
+        question_type = request.form.get('question_type', 'input')  # input または choice
+        choices_method = request.form.get('choices_method', 'manual')  # manual または auto
         choices = request.form.get('choices', '')
+        auto_choices_count = request.form.get('auto_choices_count', '4')
+        auto_choices_exclude = request.form.get('auto_choices_exclude', '')
         acceptable_answers = request.form.get('acceptable_answers', '')
         answer_suffix = request.form.get('answer_suffix', '')
         explanation = request.form.get('explanation', '')
@@ -2596,15 +2600,31 @@ def create_question_post(unit_id):
             flash('問題文と正解は必須です', 'error')
             return redirect(url_for('admin.create_question', unit_id=unit_id))
         
+        # 選択問題の場合、選択肢の処理
+        if question_type == 'choice':
+            if choices_method == 'manual':
+                if not choices:
+                    flash('選択問題の場合は選択肢を入力してください', 'error')
+                    return redirect(url_for('admin.create_question', unit_id=unit_id))
+            else:  # auto
+                # 自動抽出で選択肢を生成
+                choices = generate_choices_from_unit(unit_id, correct_answer, 
+                                                   int(auto_choices_count), auto_choices_exclude)
+                if not choices:
+                    flash('選択肢の自動生成に失敗しました。手動入力に切り替えてください。', 'error')
+                    return redirect(url_for('admin.create_question', unit_id=unit_id))
+                # 選択肢を改行区切りの文字列に変換
+                choices = '\n'.join(choices)
+        
         with get_db_connection() as conn:
             with get_db_cursor(conn) as cur:
                 cur.execute('''
                     INSERT INTO questions (unit_id, question_text, correct_answer, choices, 
                                          acceptable_answers, answer_suffix, explanation, 
-                                         difficulty_level, question_number)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                         difficulty_level, question_number, question_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (unit_id, question_text, correct_answer, choices, acceptable_answers,
-                     answer_suffix, explanation, difficulty_level, question_number))
+                     answer_suffix, explanation, difficulty_level, question_number, question_type))
                 conn.commit()
                 flash('問題が作成されました', 'success')
                 
@@ -2782,3 +2802,88 @@ def download_database():
         current_app.logger.error(f"データベースダウンロードエラー: {e}")
         flash('データベースのダウンロードに失敗しました', 'error')
         return redirect(url_for('admin.admin'))
+
+@admin_bp.route('/admin/units/<int:unit_id>/preview_choices', methods=['POST'])
+@login_required
+@admin_required
+def preview_choices(unit_id):
+    """選択肢のプレビュー機能"""
+    try:
+        data = request.get_json()
+        count = data.get('count', 4)
+        exclude = data.get('exclude', '')
+        correct_answer = data.get('correct_answer', '')
+        
+        if not correct_answer:
+            return jsonify({'success': False, 'error': '正解が指定されていません'})
+        
+        choices = generate_choices_from_unit(unit_id, correct_answer, count, exclude)
+        
+        if choices:
+            return jsonify({'success': True, 'choices': choices})
+        else:
+            return jsonify({'success': False, 'error': '選択肢を生成できませんでした'})
+            
+    except Exception as e:
+        current_app.logger.error(f"選択肢プレビューエラー: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+def generate_choices_from_unit(unit_id, correct_answer, count, exclude=''):
+    """同じ単元内の他の問題から選択肢を生成"""
+    try:
+        with get_db_connection() as conn:
+            with get_db_cursor(conn) as cur:
+                # 除外する問題番号を解析
+                exclude_numbers = []
+                if exclude:
+                    try:
+                        exclude_numbers = [int(x.strip()) for x in exclude.split(',') if x.strip().isdigit()]
+                    except ValueError:
+                        pass
+                
+                # 同じ単元内の他の問題の正解を取得
+                query = '''
+                    SELECT correct_answer, question_number 
+                    FROM questions 
+                    WHERE unit_id = ? AND is_active = TRUE AND correct_answer != ?
+                '''
+                params = [unit_id, correct_answer]
+                
+                if exclude_numbers:
+                    placeholders = ','.join(['?' for _ in exclude_numbers])
+                    query += f' AND question_number NOT IN ({placeholders})'
+                    params.extend(exclude_numbers)
+                
+                query += ' ORDER BY RANDOM() LIMIT ?'
+                params.append(count * 2)  # より多くの候補を取得
+                
+                cur.execute(query, params)
+                candidates = cur.fetchall()
+                
+                # 選択肢を生成
+                choices = [correct_answer]  # 正解を最初に追加
+                
+                # 他の問題の正解から選択肢を追加
+                for candidate in candidates:
+                    if len(choices) >= count:
+                        break
+                    candidate_answer = candidate[0]
+                    if candidate_answer not in choices:
+                        choices.append(candidate_answer)
+                
+                # 選択肢が足りない場合は、ダミーの選択肢を追加
+                while len(choices) < count:
+                    dummy_choice = f"選択肢{len(choices) + 1}"
+                    if dummy_choice not in choices:
+                        choices.append(dummy_choice)
+                
+                # 選択肢をシャッフル（正解は最初のまま）
+                other_choices = choices[1:]
+                random.shuffle(other_choices)
+                choices = [choices[0]] + other_choices
+                
+                return choices
+                
+    except Exception as e:
+        current_app.logger.error(f"選択肢生成エラー: {e}")
+        return None
